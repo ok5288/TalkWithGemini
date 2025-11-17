@@ -3,6 +3,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useSettingStore, useEnvStore } from '@/store/setting'
 import { useModelStore } from '@/store/model'
 import { fetchModels } from '@/utils/models'
+import { getRandomKey } from '@/utils/common'
 import { Model } from '@/constant/model'
 import { values, keys, find } from 'lodash-es'
 
@@ -79,7 +80,8 @@ function ModelSelect({ className, defaultModel }: Props) {
     const { update: updateModelList } = useModelStore.getState()
     const { apiKey, apiProxy, password } = useSettingStore.getState()
     if (apiKey || password || !isProtected) {
-      fetchModels({ apiKey, apiProxy, password }).then((result) => {
+      const key = getRandomKey(apiKey)
+      fetchModels({ apiKey: key, apiProxy, password }).then((result) => {
         const models = filterModel(result.models)
         if (models.length > 0) {
           updateModelList(models)

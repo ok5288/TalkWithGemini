@@ -65,6 +65,7 @@ export function getSafetySettings(level: string) {
 }
 
 function canUseSearchAsTool(model: string) {
+  if (model.startsWith('gemini-2.5-pro') || model.startsWith('gemini-2.5-flash')) return true
   return (
     model.startsWith('gemini-2.0') && !model.includes('lite') && !model.includes('thinking') && !model.includes('image')
   )

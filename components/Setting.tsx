@@ -20,6 +20,7 @@ import Button from '@/components/Button'
 import ResponsiveDialog from '@/components/ResponsiveDialog'
 import i18n from '@/utils/i18n'
 import { fetchModels } from '@/utils/models'
+import { getRandomKey } from '@/utils/common'
 import locales from '@/constant/locales'
 import { Model, DefaultModel } from '@/constant/model'
 import { GEMINI_API_BASE_URL, ASSISTANT_INDEX_URL } from '@/constant/urls'
@@ -64,6 +65,7 @@ function Setting({ open, hiddenTalkPanel, onClose }: SettingProps) {
   const { toast } = useToast()
   const pwaInstall = usePWAInstall()
   const modelStore = useModelStore()
+  const settingStore = useSettingStore()
   const { isProtected, buildMode, modelList: MODEL_LIST } = useEnvStore()
   const [ttsLang, setTtsLang] = useState<string>('')
   const [hiddenPasswordInput, setHiddenPasswordInput] = useState<boolean>(false)
@@ -119,16 +121,7 @@ function Setting({ open, hiddenTalkPanel, onClose }: SettingProps) {
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    defaultValues: async () => {
-      return new Promise((resolve) => {
-        const state = useSettingStore.getState()
-        const store = omitBy(state, (item) => isFunction(item)) as z.infer<typeof formSchema>
-        setTtsLang(state.ttsLang)
-        setTimeout(() => {
-          resolve(store)
-        }, 500)
-      })
-    },
+    defaultValues: omitBy(settingStore, (item) => isFunction(item)),
   })
 
   const handleTTSChange = (value: string) => {
@@ -197,7 +190,8 @@ function Setting({ open, hiddenTalkPanel, onClose }: SettingProps) {
     const { update: updateModelList } = useModelStore.getState()
     const { apiKey, apiProxy, password } = useSettingStore.getState()
     if (apiKey || password || !isProtected) {
-      fetchModels({ apiKey, apiProxy, password }).then((result) => {
+      const key = getRandomKey(apiKey)
+      fetchModels({ apiKey: key, apiProxy, password }).then((result) => {
         if (result.error) {
           return toast({
             description: result.error.message,

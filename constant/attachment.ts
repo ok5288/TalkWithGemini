@@ -27,6 +27,15 @@ export const textMimeType = [
   'application/vnd.oasis.opendocument.text', // .odt
   'application/vnd.oasis.opendocument.presentation', // .odp
   'application/vnd.oasis.opendocument.spreadsheet', // .ods
+  'text/plain',
+  'text/html',
+  'text/css',
+  'text/md',
+  'text/csv',
+  'text/xml',
+  'text/rtf',
+  'text/javascript',
+  'text/x-python',
   'text/*',
 ]
 
