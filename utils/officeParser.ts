@@ -110,7 +110,7 @@ function extractFiles(zipInput: File, filterFn: (filename: string) => boolean): 
   return new Promise(async (resolve, reject) => {
     const extractedFiles: ExtractedFiles[] = []
     const processZipfile = async (entry: Entry) => {
-      if (filterFn(entry.filename)) {
+      if (filterFn(entry.filename) && 'getData' in entry) {
         if (entry.getData) {
           const data = await entry.getData(new BlobWriter())
           extractedFiles.push({
