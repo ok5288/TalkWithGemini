@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { persist, type StorageValue } from 'zustand/middleware'
 import { DefaultModel } from '@/constant/model'
 
 type DefaultSetting = Omit<Setting, 'isProtected' | 'talkMode' | 'sidebarState'>
@@ -49,7 +49,27 @@ export const useSettingStore = create(
         return defaultSetting
       },
     }),
-    { name: 'twg-settings' },
+    {
+      name: 'twg-settings',
+      version: 1,
+      storage: {
+        getItem: (key: string) => {
+          const value = localStorage.getItem(key)
+          return value ? JSON.parse(value) : null
+        },
+        setItem: (key: string, value: StorageValue<SettingStore>) => {
+          const { update, reset, ...stateToSave } = value.state
+          localStorage.setItem(
+            key,
+            JSON.stringify({
+              state: stateToSave,
+              version: value.version,
+            }),
+          )
+        },
+        removeItem: (key: string) => localStorage.removeItem(key),
+      },
+    },
   ),
 )
 
