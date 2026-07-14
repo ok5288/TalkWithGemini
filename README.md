@@ -125,6 +125,10 @@ Import the repository as a Next.js project. Vercel can use the framework preset
 and package manager detection from `pnpm-lock.yaml` and the `packageManager`
 field, so the project does not need a custom output directory.
 
+One-click deployment of the project, you can choose to deploy to Vercel
+
+   [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fok5288%2FTalkWithGemini&project-name=TalkWithGemini&repository-name=TalkWithGemini)
+
 Recommended project settings:
 
 ```text
