@@ -1,0 +1,440 @@
+import type { EncryptedSecretEnvelope } from "../byok/shared";
+import type { ServerDefaultProviderSource } from "../defaultConfig/shared";
+import type { ProviderType } from "@/types";
+import { HostedProxyBlockedError } from "../errors";
+import {
+  getOutboundPolicyProfile,
+  type OutboundPolicyProfile,
+} from "./deployment";
+import {
+  ANTHROPIC_PROVIDER_TYPE,
+  GOOGLE_PROVIDER_TYPE,
+  OPENAI_COMPATIBLE_PROVIDER_TYPE,
+  OPENAI_PROVIDER_TYPE,
+  normalizeProviderType,
+} from "../providers/providerTypes";
+
+export type OutboundContext =
+  | "provider"
+  | "search"
+  | "rag"
+  | "plugin"
+  | "pluginManifest"
+  | "mcp"
+  | "docs"
+  | "voice"
+  | "agent"
+  | "metadata"
+  | "image"
+  | "sharedStore";
+
+export interface SafeUrlPolicy {
+  context: OutboundContext;
+  allowedProtocols?: Array<"https:" | "http:">;
+  allowLocalhost?: boolean;
+  allowPrivateNetwork?: boolean;
+  allowHttp?: boolean;
+  allowLocalHttp?: boolean;
+  allowedHosts?: string[];
+  maxRedirects?: number;
+  requireDnsResolution?: boolean;
+  profile?: OutboundPolicyProfile;
+  hostedProxyBlocked?: boolean;
+}
+
+export interface ValidatedOutboundRequest {
+  url: URL;
+  policy: SafeUrlPolicy;
+  hostname: string;
+  protocol: string;
+}
+
+export interface ProviderRuntimeConfig {
+  type: ProviderType;
+  source?: ServerDefaultProviderSource;
+  apiKey?: string;
+  apiKeySecret?: EncryptedSecretEnvelope;
+  baseUrl?: string;
+  name?: string;
+}
+
+export const ANTHROPIC_API_VERSION_HEADER = "2023-06-01";
+
+const API_VERSION_SEGMENT_PATTERN = /^v\d+[a-z]*$/i;
+const DEFAULT_PROVIDER_API = {
+  [OPENAI_COMPATIBLE_PROVIDER_TYPE]: {
+    baseUrl: "https://api.openai.com",
+    version: "v1",
+    chatPath: "chat/completions",
+  },
+  [OPENAI_PROVIDER_TYPE]: {
+    baseUrl: "https://api.openai.com",
+    version: "v1",
+    chatPath: "responses",
+  },
+  [ANTHROPIC_PROVIDER_TYPE]: {
+    baseUrl: "https://api.anthropic.com",
+    version: "v1",
+    chatPath: "messages",
+  },
+  [GOOGLE_PROVIDER_TYPE]: {
+    baseUrl: "https://generativelanguage.googleapis.com",
+    version: "v1beta",
+    chatPath: "models",
+  },
+} as const satisfies Record<
+  ProviderType,
+  {
+    baseUrl: string;
+    version: string;
+    chatPath: string;
+  }
+>;
+
+function trimBaseUrl(baseUrl: string): string {
+  let normalized = baseUrl.trim();
+  if (normalized.endsWith("#")) normalized = normalized.slice(0, -1);
+  return normalized.replace(/\/+$/, "");
+}
+
+function getVersionedProviderBase(
+  baseUrl: string | undefined,
+  providerType: ProviderRuntimeConfig["type"] | string,
+) {
+  const type = normalizeProviderType(providerType);
+  const defaults = DEFAULT_PROVIDER_API[type];
+  const rawBaseUrl =
+    !baseUrl || baseUrl === "default" ? defaults.baseUrl : trimBaseUrl(baseUrl);
+  const parsed = new URL(rawBaseUrl);
+  const pathSegments = parsed.pathname.split("/").filter(Boolean);
+  const versionIndex = pathSegments.findIndex((segment) =>
+    API_VERSION_SEGMENT_PATTERN.test(segment),
+  );
+
+  if (versionIndex !== -1) {
+    const apiVersion = pathSegments[versionIndex];
+    const rootSegments = pathSegments.slice(0, versionIndex);
+    const root = new URL(parsed.toString());
+    root.pathname = rootSegments.length ? `/${rootSegments.join("/")}` : "";
+    root.search = "";
+    root.hash = "";
+
+    return {
+      type,
+      apiVersion,
+      baseUrl: trimBaseUrl(root.toString()),
+      versionedBaseUrl: trimBaseUrl(parsed.toString()),
+    };
+  }
+
+  const root = trimBaseUrl(parsed.toString());
+  return {
+    type,
+    apiVersion: defaults.version,
+    baseUrl: root,
+    versionedBaseUrl: `${root}/${defaults.version}`,
+  };
+}
+
+export function normalizeProviderBaseUrl(
+  baseUrl: string | undefined,
+  providerType: ProviderRuntimeConfig["type"] | string,
+): string {
+  return getVersionedProviderBase(baseUrl, providerType).versionedBaseUrl;
+}
+
+export function getProviderGoogleSdkOptions(baseUrl: string | undefined): {
+  baseUrl: string;
+  apiVersion: string;
+} {
+  const resolved = getVersionedProviderBase(baseUrl, GOOGLE_PROVIDER_TYPE);
+  return {
+    baseUrl: resolved.baseUrl,
+    apiVersion: resolved.apiVersion,
+  };
+}
+
+export function getProviderAnthropicSdkBaseUrl(
+  baseUrl: string | undefined,
+): string {
+  return getVersionedProviderBase(baseUrl, ANTHROPIC_PROVIDER_TYPE).baseUrl;
+}
+
+export function getProviderChatUrl(
+  baseUrl: string | undefined,
+  providerType: ProviderRuntimeConfig["type"],
+): string {
+  const type = normalizeProviderType(providerType);
+  const normalized = normalizeProviderBaseUrl(baseUrl, type);
+  return `${normalized}/${DEFAULT_PROVIDER_API[type].chatPath}`;
+}
+
+export function getProviderModelsUrl(
+  baseUrl: string | undefined,
+  providerType: ProviderRuntimeConfig["type"],
+): string {
+  const type = normalizeProviderType(providerType);
+  const normalized = normalizeProviderBaseUrl(baseUrl, type);
+  return `${normalized}/models`;
+}
+
+export function getProviderApiKey(provider: ProviderRuntimeConfig): string {
+  return provider.apiKey?.trim() || "";
+}
+
+export function redactUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    parsed.username = "";
+    parsed.password = "";
+    for (const key of parsed.searchParams.keys()) {
+      if (/key|token|secret|auth|password/i.test(key)) {
+        parsed.searchParams.set(key, "[redacted]");
+      }
+    }
+    return parsed.toString();
+  } catch {
+    return "[invalid-url]";
+  }
+}
+
+export function isLocalhostName(hostname: string): boolean {
+  const host = hostname.toLowerCase().replace(/\.$/, "");
+  return host === "localhost" || host.endsWith(".localhost");
+}
+
+export function isPrivateIpAddress(address: string): boolean {
+  const value = address.toLowerCase();
+
+  const parseIpv4Parts = (input: string): number[] | null => {
+    const parts = input.split(".").map((part) => Number(part));
+    if (
+      parts.length !== 4 ||
+      parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)
+    ) {
+      return null;
+    }
+    return parts;
+  };
+
+  const ipv4ToNumber = (parts: number[]) =>
+    parts.reduce((acc, part) => (acc << 8) + part, 0) >>> 0;
+
+  const isIpv4InCidr = (parts: number[], base: number, prefix: number) => {
+    const mask = prefix === 0 ? 0 : (0xffffffff << (32 - prefix)) >>> 0;
+    return (ipv4ToNumber(parts) & mask) === (base & mask);
+  };
+
+  const isNonPublicIpv4 = (input: string) => {
+    const parts = parseIpv4Parts(input);
+    if (!parts) return false;
+
+    const cidrs: Array<[number, number]> = [
+      [0x00000000, 8],
+      [0x0a000000, 8],
+      [0x64400000, 10],
+      [0x7f000000, 8],
+      [0xa9fe0000, 16],
+      [0xac100000, 12],
+      [0xc0000000, 24],
+      [0xc0000200, 24],
+      [0xc0586300, 24],
+      [0xc0a80000, 16],
+      [0xc6120000, 15],
+      [0xc6336400, 24],
+      [0xcb007100, 24],
+      [0xe0000000, 4],
+      [0xf0000000, 4],
+    ];
+
+    return cidrs.some(([base, prefix]) => isIpv4InCidr(parts, base, prefix));
+  };
+
+  if (value === "::1" || value === "0:0:0:0:0:0:0:1" || value === "0.0.0.0") {
+    return true;
+  }
+
+  if (value.includes(":")) {
+    const ipv4MappedMatch = value.match(/::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/);
+    if (ipv4MappedMatch) {
+      return isPrivateIpAddress(ipv4MappedMatch[1]);
+    }
+
+    return (
+      value === "::" ||
+      value.startsWith("0:") ||
+      value.startsWith("fc") ||
+      value.startsWith("fd") ||
+      value.startsWith("fe8") ||
+      value.startsWith("fe9") ||
+      value.startsWith("fea") ||
+      value.startsWith("feb") ||
+      value.startsWith("fe80:") ||
+      value.startsWith("ff") ||
+      value.startsWith("2001:db8") ||
+      value.startsWith("2001:0:") ||
+      value.startsWith("2002:")
+    );
+  }
+
+  return isNonPublicIpv4(value);
+}
+
+export function getSafeUrlPolicy(context: OutboundContext): SafeUrlPolicy {
+  const profile = getOutboundPolicyProfile();
+  const localNetworkProxyAllowed = profile.allowLocalNetworkProxy;
+
+  switch (context) {
+    case "provider":
+    case "rag":
+    case "search":
+    case "image":
+      return {
+        context,
+        allowedProtocols: localNetworkProxyAllowed
+          ? ["https:", "http:"]
+          : ["https:"],
+        allowLocalhost: localNetworkProxyAllowed,
+        allowPrivateNetwork: localNetworkProxyAllowed,
+        allowLocalHttp: localNetworkProxyAllowed,
+        requireDnsResolution:
+          profile.mode === "hosted" && !localNetworkProxyAllowed,
+        hostedProxyBlocked:
+          profile.mode === "hosted" && !localNetworkProxyAllowed,
+        profile,
+      };
+    case "mcp":
+      return {
+        context,
+        allowedProtocols: ["https:"],
+        allowLocalhost: localNetworkProxyAllowed,
+        allowPrivateNetwork: localNetworkProxyAllowed,
+        hostedProxyBlocked:
+          profile.mode === "hosted" && !localNetworkProxyAllowed,
+        profile,
+      };
+    case "docs":
+      return {
+        context,
+        allowedProtocols: ["https:"],
+        allowedHosts: [
+          "api.cloud.llamaindex.ai",
+          "mineru.net",
+          "oss-mineru.openxlab.org.cn",
+          "mineru.oss-cn-shanghai.aliyuncs.com",
+          "cdn-mineru.openxlab.org.cn",
+        ],
+        profile,
+      };
+    case "voice":
+      return {
+        context,
+        allowedProtocols: ["https:"],
+        allowedHosts: ["api.elevenlabs.io", "api.xiaomimimo.com"],
+        profile,
+      };
+    case "agent":
+      return {
+        context,
+        allowedProtocols: ["https:"],
+        allowedHosts: ["registry.npmmirror.com"],
+        profile,
+      };
+    case "metadata":
+      return {
+        context,
+        allowedProtocols: ["https:"],
+        allowedHosts: ["basellm.github.io"],
+        profile,
+      };
+    case "pluginManifest":
+    case "plugin":
+    case "sharedStore":
+    default:
+      return {
+        context,
+        allowedProtocols: ["https:"],
+        allowLocalhost: false,
+        allowPrivateNetwork: false,
+        profile,
+      };
+  }
+}
+
+function createOutboundPolicyError(
+  policy: SafeUrlPolicy,
+  message: string,
+): Error {
+  return policy.hostedProxyBlocked
+    ? new HostedProxyBlockedError(message)
+    : new Error(message);
+}
+
+export function validateOutboundUrl(
+  value: string | URL,
+  policy: SafeUrlPolicy,
+): ValidatedOutboundRequest {
+  let url: URL;
+  try {
+    url = value instanceof URL ? value : new URL(value);
+  } catch {
+    throw new Error(`Invalid outbound URL for ${policy.context}`);
+  }
+
+  if (url.username || url.password) {
+    throw new Error("Outbound URLs must not include embedded credentials");
+  }
+
+  const allowedProtocols = policy.allowedProtocols || ["https:"];
+  if (!allowedProtocols.includes(url.protocol as "https:" | "http:")) {
+    throw createOutboundPolicyError(
+      policy,
+      `Protocol ${url.protocol} is not allowed`,
+    );
+  }
+
+  const hostname = url.hostname.toLowerCase();
+  if (policy.allowedHosts?.length) {
+    const isAllowedHost = policy.allowedHosts.some((host) => {
+      const expected = host.toLowerCase();
+      return hostname === expected || hostname.endsWith(`.${expected}`);
+    });
+    if (!isAllowedHost) {
+      throw new Error(`Host ${hostname} is not trusted for ${policy.context}`);
+    }
+  }
+
+  const isLocalhost = isLocalhostName(hostname);
+  const isPrivateLiteral = isPrivateIpAddress(hostname);
+
+  if (isLocalhost && !policy.allowLocalhost) {
+    throw createOutboundPolicyError(
+      policy,
+      "Localhost outbound requests are blocked",
+    );
+  }
+
+  if (isPrivateLiteral && !policy.allowPrivateNetwork) {
+    throw createOutboundPolicyError(
+      policy,
+      "Private network outbound requests are blocked",
+    );
+  }
+
+  if (url.protocol === "http:") {
+    const isLocalHttp = isLocalhost || isPrivateLiteral;
+    if (!policy.allowHttp && !(policy.allowLocalHttp && isLocalHttp)) {
+      throw createOutboundPolicyError(
+        policy,
+        "Plain HTTP outbound requests are blocked",
+      );
+    }
+  }
+
+  return {
+    url,
+    policy,
+    hostname,
+    protocol: url.protocol,
+  };
+}
