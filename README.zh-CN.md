@@ -124,6 +124,14 @@ ghcr.io/u14app/neo-chat:latest
 `packageManager` 字段识别 pnpm，并使用 Next.js framework preset，因此
 不需要自定义输出目录。
 
+One-click deployment of the project to Vercel, with pre-filled environment variables:
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fu14app%2Fneo-chat&project-name=neo-chat&repository-name=neo-chat&env=DEPLOYMENT_MODE=hosted&env=RATE_LIMIT_STORE=upstash&env=DOCUMENT_PARSE_JOB_STORE=upstash&env=PLUGIN_REGISTRY_STORE=upstash&env=BYOK_ALLOW_EPHEMERAL_KEY=false&env=NEXT_PUBLIC_SITE_URL&env-description=NEXT_PUBLIC_SITE_URL=The%20public%20URL%20for%20your%20deployed%20application%20(e.g.,%20https%3A%2F%2Fyour-domain.com).&env=ACCESS_PASSWORD&env-description=ACCESS_PASSWORD=Optional%3A%20A%20password%20to%20protect%20your%20deployment.&env=OPENAI_API_KEY&env-description=OPENAI_API_KEY=Your%20OpenAI%20API%20key%20(if%20using%20OpenAI%20models).&env=ANTHROPIC_API_KEY&env-description=ANTHROPIC_API_KEY=Your%20Anthropic%20API%20key%20(if%20using%20Anthropic%20models).&env=GOOGLE_API_KEY&env-description=GOOGLE_API_KEY=Your%20Google%20API%20key%20(if%20using%20Google%20Gemini%20models).&env=UPSTASH_REDIS_URL&env-description=UPSTASH_REDIS_URL=The%20URL%20for%20your%20Upstash%20Redis%20database%20(required%20for%20shared%20stores).&env=UPSTASH_REDIS_TOKEN&env-description=UPSTASH_REDIS_TOKEN=The%20API%20token%20for%20your%20Upstash%20Redis%20database%20(required%20for%20shared%20stores).)
+
+Recommended project settings (Vercel usually auto-detects these for Next.js with pnpm):
+
+
+
 推荐项目设置：
 
 ```text
