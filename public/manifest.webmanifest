@@ -1,0 +1,41 @@
+{
+  "id": "/",                                                                   
+  "name": "Ed iChat",
+  "short_name": "Ed iChat",
+  "description": "Ed iChat is a local-first AI chat workspace for multi-model conversations, assistant presets, plugin tools, web search, knowledge-base RAG, voice, and artifacts.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#09090b",
+  "theme_color": "#09090b",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable" 
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/desktop.png",
+      "sizes": "2880x1568",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Ed iChat desktop workspace screenshot"
+    },
+    {
+      "src": "/mobile.png",
+      "sizes": "1490x1332",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Ed iChat mobile workspace screenshot"
+    }
+  ]
+}
