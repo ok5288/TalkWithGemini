@@ -151,7 +151,7 @@ field, so the project does not need a custom output directory.
 
 One-click deployment of the project to Vercel, with pre-filled environment variables:
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fu14app%2Fneo-chat&project-name=neo-chat&repository-name=neo-chat&env=DEPLOYMENT_MODE=hosted&env=RATE_LIMIT_STORE=upstash&env=DOCUMENT_PARSE_JOB_STORE=upstash&env=PLUGIN_REGISTRY_STORE=upstash&env=BYOK_ALLOW_EPHEMERAL_KEY=false&env=NEXT_PUBLIC_SITE_URL&env-description=NEXT_PUBLIC_SITE_URL=The%20public%20URL%20for%20your%20deployed%20application%20(e.g.,%20https%3A%2F%2Fyour-domain.com).)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fok5288%2FTalkWithGemini.git&project-name=TalkWithGemini&repository-name=TalkWithGemini&env=DEPLOYMENT_MODE,RATE_LIMIT_STORE,DOCUMENT_PARSE_JOB_STORE,PLUGIN_REGISTRY_STORE,BYOK_ALLOW_EPHEMERAL_KEY,TRUST_PROXY_HEADERS,NEXT_PUBLIC_SITE_URL,ACCESS_PASSWORD,UPSTASH_REDIS_REST_URL,UPSTASH_REDIS_REST_TOKEN,DEFAULT_PROVIDER_TYPE,DEFAULT_PROVIDER_BASE_URL,DEFAULT_PROVIDER_API_KEY,DEFAULT_PROVIDER_MODELS&envDescription=DEPLOYMENT_MODE%3Dhosted%20%7C%20RATE_LIMIT_STORE%3Dupstash%20%7C%20BYOK_ALLOW_EPHEMERAL_KEY%3Dtrue%20%7C%20TRUST_PROXY_HEADERS%3Dtrue)
 
 Recommended project settings (Vercel usually auto-detects these for Next.js with pnpm):
 
