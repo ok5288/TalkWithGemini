@@ -10,9 +10,7 @@ export interface SecurityHeader {
 
 function buildCsp(mode: DeploymentMode): string {
   const isHosted = mode === "hosted";
-  const themeScriptHash = createHash("sha256")
-    .update(THEME_INIT_SCRIPT)
-    .digest("base64");
+  // 注意：我们不再把 themeScriptHash 放入 script-src 中
 
   return [
     "default-src 'self'",
@@ -20,9 +18,8 @@ function buildCsp(mode: DeploymentMode): string {
     "object-src 'none'",
     "frame-ancestors 'none'",
     "form-action 'self'",
-    isHosted
-      ? `script-src 'self' 'sha256-${themeScriptHash}'`
-      : "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+    // 核心修改：只保留 self, unsafe-inline 和 unsafe-eval，彻底去掉 sha256 限制！
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
     "style-src 'self' 'unsafe-inline'",
     `img-src 'self' data: blob: https:${isHosted ? "" : " http:"}`,
     "media-src 'self' data: blob:",
