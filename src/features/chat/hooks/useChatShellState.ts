@@ -62,6 +62,8 @@ export function useChatShellState() {
       installedSkills: state.installedSkills,
       customSkills: state.customSkills,
       activeSkillIds: state.activeSkillIds,
+      skillBundles: state.skillBundles,
+      activeSkillBundleIds: state.activeSkillBundleIds,
       skillAutoSelect: state.skillAutoSelect,
       setActivePlugins: state.setActivePlugins,
       togglePluginActive: state.togglePluginActive,

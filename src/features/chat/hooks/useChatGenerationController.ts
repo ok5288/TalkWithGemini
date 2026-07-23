@@ -60,7 +60,20 @@ export function useChatGenerationController({
   );
 
   const stopActiveGeneration = useCallback(async () => {
-    const state = useChatStore.getState();
+    let state = useChatStore.getState();
+    const streamingMessage = [...state.activeMessages]
+      .reverse()
+      .find((message) => message.generation?.status === "streaming");
+    if (state.currentSessionId && streamingMessage?.generation) {
+      state.updateMessage(state.currentSessionId, streamingMessage.id, {
+        generation: {
+          ...streamingMessage.generation,
+          status: "interrupted",
+          checkpointAt: Date.now(),
+        },
+      });
+      state = useChatStore.getState();
+    }
     const syncSnapshot = createActiveGenerationSyncSnapshot({
       currentSessionId: state.currentSessionId,
       activeMessages: state.activeMessages,

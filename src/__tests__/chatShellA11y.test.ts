@@ -185,13 +185,16 @@ describe("chat shell accessibility", () => {
   });
 
   it("finds the last user message once before rendering the list", () => {
-    const chatShell = readFileSync(
-      resolve(process.cwd(), "src/components/app/ChatAppShell.tsx"),
+    const timeline = readFileSync(
+      resolve(
+        process.cwd(),
+        "src/components/chat/VirtualizedMessageTimeline.tsx",
+      ),
       "utf8",
     );
 
-    expect(chatShell).toContain("let lastUserMessageIndex = -1");
-    expect(chatShell).toContain("idx === lastUserMessageIndex");
-    expect(chatShell).not.toContain("messages.slice(idx + 1)");
+    expect(timeline).toContain("const lastUserMessageIndex = React.useMemo");
+    expect(timeline).toContain("row.messageIndex !== lastUserMessageIndex");
+    expect(timeline).not.toContain("messages.slice(row.messageIndex + 1)");
   });
 });

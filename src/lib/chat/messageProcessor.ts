@@ -1,4 +1,5 @@
 import { v7 as uuidv7 } from "uuid";
+import { createCitationSources } from "@/lib/utils/citations";
 import type { Attachment, Message, Source } from "@/types";
 import type { ModelInfo } from "@/services/api/chatService";
 import {
@@ -19,7 +20,6 @@ import {
 import { parseModelString } from "../utils/model";
 import { resolveOPFSUrl } from "@/utils/opfs";
 import { appendContextToChatInput } from "../utils/chatInput";
-import { hasRagVectorStore } from "../security/localSecretResolvers";
 
 export interface ProcessMessageOptions {
   text: string;
@@ -104,8 +104,7 @@ export async function processMessageForSending(
     ...ragConfig,
     enabled: ragConfig.enabled && ragEnabled,
   };
-  const isRagServiceEnabled =
-    effectiveRagConfig.enabled && hasRagVectorStore(effectiveRagConfig);
+  const isRagServiceEnabled = effectiveRagConfig.enabled;
 
   if (hasKB && isRagServiceEnabled) {
     const fileAttachments = allKBAttachments.filter(isKnowledgeFileAttachment);
@@ -195,6 +194,10 @@ export function createBotMessagePlaceholder(
     timestamp: startTime,
     model: modelDisplayName,
     ragSources: ragSources.length > 0 ? ragSources : undefined,
+    citations:
+      ragSources.length > 0
+        ? createCitationSources({ knowledge: ragSources })
+        : undefined,
     ragError,
     isSearching: false,
   };

@@ -61,9 +61,10 @@ update cannot reuse a stale execution contract. Plugin execution still goes
 through the server route, request validation, BYOK secret handling, outbound URL
 policy, response limits, and the tool-call round ceiling.
 
-MCP-backed functions add a remote side-effect boundary: the MCP server owns the
-tool implementation and may perform external actions. The supported MCP
-transport is remote `streamable-http` over HTTP or HTTPS. User-configured MCP,
+MCP-backed functions add a side-effect boundary: the MCP server owns the tool
+implementation and may perform external actions. The application transport is
+`streamable-http` over HTTP or HTTPS; local Docker deployments can translate an
+explicit stdio allowlist through the separate bridge. User-configured MCP,
 provider, search, RAG, and plugin targets may resolve to localhost or private
 networks in either deployment mode; fixed registries and built-in services
 remain HTTPS-only. HTTP may expose credentials or permit response tampering,

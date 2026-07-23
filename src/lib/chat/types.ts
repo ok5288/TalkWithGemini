@@ -1,5 +1,5 @@
 import type { PluginFunctionRisk } from "../plugin/types";
-import type { ImageSource, Source } from "../search/types";
+import type { CitationSource, ImageSource, Source } from "../search/types";
 import type { AppliedSkillInvocation } from "../skills/types";
 
 export interface Attachment {
@@ -29,6 +29,24 @@ export interface MessageVersion {
     endTime: number;
     duration: number;
   };
+}
+
+export interface MessageReplyReference {
+  messageId: string;
+  role: "user" | "model";
+  excerpt: string;
+}
+
+export type MessageGenerationStatus = "streaming" | "interrupted" | "completed";
+
+export interface MessageGenerationState {
+  status: MessageGenerationStatus;
+  requestId: string;
+  ownerDeviceId: string;
+  model: string;
+  attempt: number;
+  checkpointAt: number;
+  continuedFrom?: string;
 }
 
 export interface ToolCall {
@@ -143,6 +161,8 @@ export interface Message {
   reasoning?: string;
   timestamp: number;
   attachments?: Attachment[];
+  replyTo?: MessageReplyReference;
+  generation?: MessageGenerationState;
   toolCalls?: ToolCall[];
   skillInvocations?: AppliedSkillInvocation[];
   memoryContext?: {
@@ -157,6 +177,7 @@ export interface Message {
     code?: string;
   };
   searchSources?: Source[];
+  citations?: CitationSource[];
   searchImages?: ImageSource[];
   isSearching?: boolean;
   outputBlocks?: MessageOutputBlock[];

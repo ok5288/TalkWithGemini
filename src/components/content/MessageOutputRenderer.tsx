@@ -30,6 +30,7 @@ interface MessageOutputRendererProps {
   isThinking?: boolean;
   isErrorMessage?: boolean;
   searchSources: Source[];
+  ragSources?: Source[];
   onFileClick?: (file: MarkdownGeneratedFile) => void;
   forcedTheme?: MarkdownRendererProps["forcedTheme"];
   forceExpandCodeBlocks?: boolean;
@@ -161,6 +162,7 @@ const MessageOutputRenderer: React.FC<MessageOutputRendererProps> = ({
   isThinking = false,
   isErrorMessage = false,
   searchSources,
+  ragSources,
   onFileClick,
   forcedTheme,
   forceExpandCodeBlocks,
@@ -193,6 +195,7 @@ const MessageOutputRenderer: React.FC<MessageOutputRendererProps> = ({
                 content={block.content}
                 className={isErrorMessage ? "text-red-500" : undefined}
                 searchSources={searchSources}
+                ragSources={ragSources}
                 onFileClick={onFileClick}
                 isStreaming={isTyping}
                 forcedTheme={forcedTheme}

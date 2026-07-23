@@ -353,6 +353,7 @@ const PluginSchema = z
     mcp: z
       .object({
         transport: z.literal("streamable-http"),
+        source: z.enum(["registry", "custom", "bridge"]).optional(),
         serverUrl: z.string().min(1).max(2_048),
         serverName: z.string().min(1).max(300),
         serverVersion: z.string().max(120).optional(),
@@ -440,6 +441,13 @@ export const PluginInstallSchema = z
     plugin: PluginSchema.partial().optional(),
     customInput: z.string().max(2_000_000).optional(),
     authConfig: PluginAuthConfigSchema,
+  })
+  .strict();
+
+export const McpBridgeDiscoveryRequestSchema = z
+  .object({
+    manifestUrl: z.string().min(1).max(2_048),
+    tokenSecret: EncryptedSecretEnvelopeSchema,
   })
   .strict();
 

@@ -183,13 +183,16 @@ describe("skills domain", () => {
     expect(
       createSkillInvocations([{ skill: baseSkill, mode: "auto" }]),
     ).toEqual([
-      {
+      expect.objectContaining({
         id: "translation-localization",
         title: "Translation & Localization",
         description: "Translate and localize text between Chinese and English.",
         category: "writing",
         mode: "auto",
-      },
+        schemaVersion: 2,
+        definitionHash: expect.stringMatching(/^fnv1a-[0-9a-f]{8}$/),
+        order: 0,
+      }),
     ]);
   });
 

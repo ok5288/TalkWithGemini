@@ -378,7 +378,10 @@ describe("message preprocessing", () => {
             title: collectionId,
             url: "#",
             content: `Result from ${collectionId}`,
-            metadata: { collectionId },
+            metadata: {
+              collectionId,
+              fileId: `rag_${collectionId}`,
+            },
           },
         ];
       },
@@ -400,7 +403,19 @@ describe("message preprocessing", () => {
         useDefaultVectorStore: true,
         serverVectorStoreAvailable: true,
       },
-      knowledgeCollections: collectionIds.map((id) => ({ id, files: [] })),
+      knowledgeCollections: collectionIds.map((id) => ({
+        id,
+        files: [
+          {
+            id: `file_${id}`,
+            ragId: `rag_${id}`,
+            name: `${id}.md`,
+            type: "text/markdown",
+            status: "indexed",
+            uploadedAt: 1,
+          },
+        ],
+      })),
     });
 
     expect(maxActiveQueries).toBeLessThanOrEqual(4);

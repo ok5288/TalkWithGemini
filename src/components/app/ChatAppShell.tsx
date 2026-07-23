@@ -6,11 +6,12 @@ import { useTranslations } from "next-intl";
 import { MessageSquarePlus, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 
 import Sidebar from "@/components/layout/Sidebar";
-import MessageItem from "@/components/chat/MessageItem";
 import MessageInput, { MessageInputRef } from "@/components/chat/MessageInput";
-import AssistantHeader from "@/components/assistant/AssistantHeader";
+import type { ComposerSkillParameterValues } from "@/components/skill/SkillParameterDialog";
+import VirtualizedMessageTimeline, {
+  type VirtualizedMessageTimelineRef,
+} from "@/components/chat/VirtualizedMessageTimeline";
 import Tooltip from "@/components/ui/Tooltip";
-import FollowUpQuestions from "@/components/chat/FollowUpQuestions";
 import { Logo } from "@/components/ui/Icons";
 import type { ModelInfo } from "@/services/api/chatService";
 import type { ChatPanel, SettingsTabId } from "@/lib/chat/panelUrlState";
@@ -18,16 +19,22 @@ import type {
   Attachment,
   LobeAgent,
   Message,
+  MessageReplyReference,
   Session,
   SessionMessageTree,
   ToolCall,
   ToolConfirmationDecision,
   ToolConfirmationRequest,
 } from "@/types";
-import { getMessageBranchInfo } from "@/lib/chat/messageTree";
 import { getActiveMessagePath } from "@/lib/chat/messageTree";
+import { getReplyExcerpt } from "@/lib/chat/streamResilience";
 import type { GlobalSearchNavigationTarget } from "@/lib/global-search";
 import { useChatStore } from "@/store/core/chatStore";
+import { getSyncDeviceId } from "@/lib/sync/deviceIdentity";
+import {
+  KNOWLEDGE_SOURCE_NAVIGATE_EVENT,
+  type KnowledgeSourceNavigationDetail,
+} from "@/lib/knowledge/navigation";
 
 const ImagePreview = dynamic(() => import("@/components/media/ImagePreview"), {
   ssr: false,
@@ -86,7 +93,6 @@ interface ChatAppShellProps {
   welcomeState: WelcomeState;
   messageInputVariant: MessageInputVariant;
   messagesScrollRef: React.RefObject<HTMLDivElement | null>;
-  messagesEndRef: React.RefObject<HTMLDivElement | null>;
   messageInputRef: React.RefObject<MessageInputRef | null>;
   setIsSidebarOpen: React.Dispatch<React.SetStateAction<boolean>>;
   navigateToPanel: (
@@ -95,7 +101,6 @@ interface ChatAppShellProps {
     historyMode?: "push" | "replace",
   ) => void;
   handleSettingsTabChange: (tab: SettingsTabId) => void;
-  updateIsNearMessageBottom: () => void;
   stopActiveGenerationWithFeedback: () => Promise<void>;
   selectSession: (id: string) => Promise<void>;
   handleNewChat: () => void;
@@ -113,9 +118,16 @@ interface ChatAppShellProps {
     newContent: string,
   ) => Promise<void>;
   handleRetractMessage: (msg: Message) => Promise<void>;
-  handleRegenerate: (messageId: string) => Promise<void>;
+  handleRegenerate: (messageId: string, model?: string) => Promise<void>;
+  handleContinueGeneration: (messageId: string) => Promise<void>;
   handleVersionChange: (msgId: string, direction: "prev" | "next") => void;
-  handleSendMessage: (text: string, attachments: Attachment[]) => Promise<void>;
+  handleSendMessage: (
+    text: string,
+    attachments: Attachment[],
+    replyTo?: MessageReplyReference,
+    skillParameters?: ComposerSkillParameterValues,
+  ) => Promise<void>;
+  prepareComposerSkillParameters: () => Promise<ComposerSkillParameterValues | null>;
   handleSuggestionClick: (question: string) => void;
   handleStopGeneration: () => void;
   setModel: (model: string) => void;
@@ -150,12 +162,10 @@ const ChatAppShell = ({
   welcomeState,
   messageInputVariant,
   messagesScrollRef,
-  messagesEndRef,
   messageInputRef,
   setIsSidebarOpen,
   navigateToPanel,
   handleSettingsTabChange,
-  updateIsNearMessageBottom,
   stopActiveGenerationWithFeedback,
   selectSession,
   handleNewChat,
@@ -171,8 +181,10 @@ const ChatAppShell = ({
   handleSubmitUserMessageEdit,
   handleRetractMessage,
   handleRegenerate,
+  handleContinueGeneration,
   handleVersionChange,
   handleSendMessage,
+  prepareComposerSkillParameters,
   handleSuggestionClick,
   handleStopGeneration,
   setModel,
@@ -183,18 +195,60 @@ const ChatAppShell = ({
 }: ChatAppShellProps) => {
   const t = useTranslations("ChatApp");
   const [focusedMessageId, setFocusedMessageId] = React.useState<string>();
+  const [replyTarget, setReplyTarget] = React.useState<MessageReplyReference>();
+  const timelineRef = React.useRef<VirtualizedMessageTimelineRef>(null);
   const [focusedWorkspaceId, setFocusedWorkspaceId] = React.useState<string>();
   const [focusedKnowledgeTarget, setFocusedKnowledgeTarget] = React.useState<{
     collectionId: string;
     fileId?: string;
+    chunkIndex?: number;
+    excerpt?: string;
   }>();
   const [focusedMemoryId, setFocusedMemoryId] = React.useState<string>();
+  const [isOnline, setIsOnline] = React.useState(true);
+  const [streamClock, setStreamClock] = React.useState(() => Date.now());
+  const localDeviceId = React.useMemo(() => getSyncDeviceId(), []);
+  const hasForeignActiveGeneration = React.useMemo(
+    () =>
+      messages.some(
+        (message) =>
+          message.generation?.status === "streaming" &&
+          message.generation.ownerDeviceId !== localDeviceId &&
+          streamClock - message.generation.checkpointAt <= 2 * 60 * 1000,
+      ),
+    [localDeviceId, messages, streamClock],
+  );
   const pendingToolConfirmation = pendingToolConfirmations[0];
+  const pendingToolMessageId = React.useMemo(
+    () =>
+      pendingToolConfirmation
+        ? messages.find((message) =>
+            message.toolCalls?.some(
+              (toolCall) => toolCall.id === pendingToolConfirmation.toolCallId,
+            ),
+          )?.id
+        : undefined,
+    [messages, pendingToolConfirmation],
+  );
+  const [pendingToolVisibility, setPendingToolVisibility] = React.useState<{
+    messageId: string;
+    visible: boolean;
+  }>();
+  const handlePendingToolVisibilityChange = React.useCallback(
+    (visible: boolean) => {
+      if (!pendingToolMessageId) return;
+      setPendingToolVisibility({ messageId: pendingToolMessageId, visible });
+    },
+    [pendingToolMessageId],
+  );
   const shouldShowPendingToolBanner = Boolean(
     pendingToolConfirmation &&
     (viewMode !== "chat" ||
       (pendingToolConfirmation.sessionId &&
-        pendingToolConfirmation.sessionId !== currentSessionId)),
+        pendingToolConfirmation.sessionId !== currentSessionId) ||
+      !pendingToolMessageId ||
+      (pendingToolVisibility?.messageId === pendingToolMessageId &&
+        !pendingToolVisibility.visible)),
   );
 
   const returnToPendingToolSession = React.useCallback(async () => {
@@ -205,6 +259,16 @@ const ChatAppShell = ({
       await selectSession(pendingToolConfirmation.sessionId);
     }
     navigateToPanel("chat");
+    const activePendingMessage = useChatStore
+      .getState()
+      .activeMessages.find((message) =>
+        message.toolCalls?.some(
+          (toolCall) => toolCall.id === pendingToolConfirmation?.toolCallId,
+        ),
+      );
+    if (activePendingMessage) {
+      setFocusedMessageId(activePendingMessage.id);
+    }
   }, [
     currentSessionId,
     navigateToPanel,
@@ -212,18 +276,58 @@ const ChatAppShell = ({
     selectSession,
   ]);
 
-  const denyPendingTool = React.useCallback(async () => {
-    if (!pendingToolConfirmation) return;
-    await returnToPendingToolSession();
-    onToolConfirmationDecision(pendingToolConfirmation.toolCallId, "deny");
-  }, [
-    onToolConfirmationDecision,
-    pendingToolConfirmation,
-    returnToPendingToolSession,
-  ]);
-
   const openGlobalSearch = React.useCallback(() => {
     navigateToPanel("search");
+  }, [navigateToPanel]);
+
+  React.useEffect(() => {
+    const updateOnlineStatus = () => setIsOnline(navigator.onLine);
+    updateOnlineStatus();
+    window.addEventListener("online", updateOnlineStatus);
+    window.addEventListener("offline", updateOnlineStatus);
+    return () => {
+      window.removeEventListener("online", updateOnlineStatus);
+      window.removeEventListener("offline", updateOnlineStatus);
+    };
+  }, []);
+
+  React.useEffect(() => {
+    const deadlines = messages
+      .filter(
+        (message) =>
+          message.generation?.status === "streaming" &&
+          message.generation.ownerDeviceId !== localDeviceId,
+      )
+      .map(
+        (message) =>
+          message.generation!.checkpointAt + 2 * 60 * 1000 - Date.now(),
+      )
+      .filter((delay) => delay > 0);
+    if (deadlines.length === 0) return;
+    const timer = window.setTimeout(
+      () => setStreamClock(Date.now()),
+      Math.max(50, Math.min(...deadlines)),
+    );
+    return () => window.clearTimeout(timer);
+  }, [localDeviceId, messages, streamClock]);
+
+  React.useEffect(() => {
+    const handleKnowledgeSourceNavigate = (event: Event) => {
+      const detail = (event as CustomEvent<KnowledgeSourceNavigationDetail>)
+        .detail;
+      if (!detail?.collectionId) return;
+      setFocusedKnowledgeTarget(detail);
+      navigateToPanel("knowledge");
+    };
+    window.addEventListener(
+      KNOWLEDGE_SOURCE_NAVIGATE_EVENT,
+      handleKnowledgeSourceNavigate,
+    );
+    return () =>
+      window.removeEventListener(
+        KNOWLEDGE_SOURCE_NAVIGATE_EVENT,
+        handleKnowledgeSourceNavigate,
+      );
   }, [navigateToPanel]);
 
   React.useEffect(() => {
@@ -244,22 +348,54 @@ const ChatAppShell = ({
 
   React.useEffect(() => {
     if (viewMode !== "chat" || !focusedMessageId) return;
-    const frameId = requestAnimationFrame(() => {
-      const target = Array.from(
-        document.querySelectorAll<HTMLElement>("[data-message-id]"),
-      ).find((element) => element.dataset.messageId === focusedMessageId);
-      target?.scrollIntoView({ block: "center", behavior: "smooth" });
-      target?.focus({ preventScroll: true });
-    });
+    timelineRef.current?.scrollToMessage(focusedMessageId);
+    const focusTimerId = window.setTimeout(() => {
+      document.getElementById(`message-${focusedMessageId}`)?.focus({
+        preventScroll: true,
+      });
+    }, 180);
     const timerId = window.setTimeout(
       () => setFocusedMessageId(undefined),
       2400,
     );
     return () => {
-      cancelAnimationFrame(frameId);
+      window.clearTimeout(focusTimerId);
       window.clearTimeout(timerId);
     };
-  }, [focusedMessageId, messages, viewMode]);
+  }, [focusedMessageId, messages.length, viewMode]);
+
+  React.useEffect(() => setReplyTarget(undefined), [currentSessionId]);
+
+  const focusMessage = React.useCallback((messageId: string) => {
+    setFocusedMessageId(messageId);
+  }, []);
+
+  const selectReplyTarget = React.useCallback(
+    (message: Message) => {
+      setReplyTarget({
+        messageId: message.id,
+        role: message.role,
+        excerpt: getReplyExcerpt(message),
+      });
+      requestAnimationFrame(() => messageInputRef.current?.focus());
+    },
+    [messageInputRef],
+  );
+
+  const handleTimelineVersionChange = React.useCallback(
+    (messageId: string, direction: "prev" | "next") => {
+      const messageIndex = messages.findIndex(
+        (message) => message.id === messageId,
+      );
+      handleVersionChange(messageId, direction);
+      requestAnimationFrame(() => {
+        const nextMessage =
+          useChatStore.getState().activeMessages[messageIndex];
+        if (nextMessage) setFocusedMessageId(nextMessage.id);
+      });
+    },
+    [handleVersionChange, messages],
+  );
 
   const handleGlobalSearchNavigate = React.useCallback(
     async (target: GlobalSearchNavigationTarget) => {
@@ -305,14 +441,6 @@ const ChatAppShell = ({
       stopActiveGenerationWithFeedback,
     ],
   );
-  let lastUserMessageIndex = -1;
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    if (messages[index].role === "user") {
-      lastUserMessageIndex = index;
-      break;
-    }
-  }
-
   return (
     <div className="relative flex h-dvh w-full overflow-hidden bg-background font-sans text-foreground transition-colors duration-300">
       <ImagePreview />
@@ -393,13 +521,6 @@ const ChatAppShell = ({
             >
               {t("reviewToolAction")}
             </button>
-            <button
-              type="button"
-              onClick={() => void denyPendingTool()}
-              className="rounded-md border border-amber-400 px-2.5 py-1 text-xs font-medium hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 dark:hover:bg-amber-900"
-            >
-              {t("denyToolAction")}
-            </button>
           </div>
         ) : null}
         {viewMode === "search" ? (
@@ -421,6 +542,8 @@ const ChatAppShell = ({
             onClose={() => navigateToPanel("chat")}
             initialCollectionId={focusedKnowledgeTarget?.collectionId}
             initialFileId={focusedKnowledgeTarget?.fileId}
+            initialChunkIndex={focusedKnowledgeTarget?.chunkIndex}
+            initialExcerpt={focusedKnowledgeTarget?.excerpt}
           />
         ) : viewMode === "settings" ? (
           <SettingsPage
@@ -458,7 +581,10 @@ const ChatAppShell = ({
               </div>
 
               {shouldShowChatTitleBar && (
-                <div className="absolute left-1/2 top-1/2 max-w-[50%] -translate-x-1/2 -translate-y-1/2 truncate text-center font-bold text-foreground">
+                <div
+                  suppressHydrationWarning
+                  className="absolute left-1/2 top-1/2 max-w-[50%] -translate-x-1/2 -translate-y-1/2 truncate text-center font-bold text-foreground"
+                >
                   {currentSession?.title || t("newChat")}
                 </div>
               )}
@@ -481,27 +607,10 @@ const ChatAppShell = ({
 
             <div
               ref={messagesScrollRef}
-              onScroll={updateIsNearMessageBottom}
-              className="relative flex-1 overflow-y-auto px-3 pb-[calc(8rem+env(safe-area-inset-bottom))] pt-4 motion-safe:scroll-smooth md:px-6 md:pt-6"
+              data-chat-scroll-container
+              className="relative flex-1 overflow-y-auto px-3 md:px-6"
             >
-              <div className="w-full max-w-3xl mx-auto min-h-full flex flex-col">
-                {currentSession &&
-                  (messages.length > 0 ||
-                    !!currentSession.systemInstruction) && (
-                    <AssistantHeader
-                      instruction={currentSession.systemInstruction || ""}
-                      onUpdate={(newInst) =>
-                        updateSessionInstruction(currentSession.id, newInst)
-                      }
-                      onDelete={
-                        currentSession.systemInstruction
-                          ? () =>
-                              updateSessionInstruction(currentSession.id, "")
-                          : undefined
-                      }
-                    />
-                  )}
-
+              <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col">
                 {(welcomeState === "visible" || welcomeState === "exiting") && (
                   <div
                     className={`emptyChatSurface flex-1 motion-safe:transition-[opacity,transform] motion-safe:duration-300 motion-safe:transform origin-center ${
@@ -513,70 +622,51 @@ const ChatAppShell = ({
                 )}
 
                 {welcomeState === "hidden" && (
-                  <div className="space-y-1 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-500 fill-mode-forwards">
-                    {messages.map((msg, idx) => {
-                      const isLastUserMessage =
-                        msg.role === "user" && idx === lastUserMessageIndex;
-                      const isLastMessage = idx === messages.length - 1;
-
-                      return (
-                        <React.Fragment key={msg.id}>
-                          <div
-                            id={`message-${msg.id}`}
-                            data-message-id={msg.id}
-                            tabIndex={-1}
-                            className={`[content-visibility:auto] [contain-intrinsic-size:0_240px] rounded-xl outline-none transition-shadow ${
-                              focusedMessageId === msg.id
-                                ? "ring-2 ring-blue-500/60 ring-offset-2 ring-offset-background"
-                                : ""
-                            }`}
-                          >
-                            <MessageItem
-                              message={msg}
-                              actionsDisabled={isActiveSessionLoading}
-                              branchInfo={getMessageBranchInfo(
-                                activeMessageTree,
-                                msg.id,
-                              )}
-                              onEdit={handleEditMessage}
-                              onDelete={handleDeleteMessage}
-                              canEditUserMessage={
-                                msg.role === "user" && !isLastUserMessage
-                              }
-                              onSubmitUserEdit={handleSubmitUserMessageEdit}
-                              onRetract={
-                                isLastUserMessage
-                                  ? () => handleRetractMessage(msg)
-                                  : undefined
-                              }
-                              isLast={isLastMessage}
-                              isTyping={isGenerating && isLastMessage}
-                              onRegenerate={() => handleRegenerate(msg.id)}
-                              onVersionChange={handleVersionChange}
-                              onToolConfirmationDecision={
-                                onToolConfirmationDecision
-                              }
-                              onRevokeToolSessionApproval={
-                                onRevokeToolSessionApproval
-                              }
-                            />
-                          </div>
-                          {msg.role === "model" &&
-                            isLastMessage &&
-                            !isGenerating &&
-                            msg.suggestedQuestions &&
-                            msg.suggestedQuestions.length > 0 && (
-                              <FollowUpQuestions
-                                questions={msg.suggestedQuestions}
-                                onClick={handleSuggestionClick}
-                              />
-                            )}
-                        </React.Fragment>
-                      );
-                    })}
-
-                    <div ref={messagesEndRef} />
-                  </div>
+                  <VirtualizedMessageTimeline
+                    key={currentSession?.id}
+                    ref={timelineRef}
+                    scrollRef={messagesScrollRef}
+                    currentSession={currentSession}
+                    messages={messages}
+                    activeMessageTree={activeMessageTree}
+                    focusedMessageId={focusedMessageId}
+                    isGenerating={isGenerating}
+                    actionsDisabled={isActiveSessionLoading}
+                    mutationsDisabled={
+                      isActiveSessionLoading ||
+                      !isOnline ||
+                      hasForeignActiveGeneration
+                    }
+                    availableModels={availableModels}
+                    onUpdateInstruction={(instruction) => {
+                      if (currentSession) {
+                        updateSessionInstruction(
+                          currentSession.id,
+                          instruction,
+                        );
+                      }
+                    }}
+                    onEdit={handleEditMessage}
+                    onDelete={handleDeleteMessage}
+                    onSubmitUserEdit={handleSubmitUserMessageEdit}
+                    onRetract={(message) => void handleRetractMessage(message)}
+                    onRegenerate={(messageId, model) =>
+                      void handleRegenerate(messageId, model)
+                    }
+                    onContinue={(messageId) =>
+                      void handleContinueGeneration(messageId)
+                    }
+                    onReply={selectReplyTarget}
+                    onNavigateToMessage={focusMessage}
+                    onVersionChange={handleTimelineVersionChange}
+                    onSuggestionClick={handleSuggestionClick}
+                    onToolConfirmationDecision={onToolConfirmationDecision}
+                    onRevokeToolSessionApproval={onRevokeToolSessionApproval}
+                    pendingToolMessageId={pendingToolMessageId}
+                    onPendingToolVisibilityChange={
+                      handlePendingToolVisibilityChange
+                    }
+                  />
                 )}
               </div>
             </div>
@@ -595,6 +685,16 @@ const ChatAppShell = ({
                   welcomeState === "visible" ? "max-w-2xl" : "max-w-3xl"
                 }`}
               >
+                {hasForeignActiveGeneration || !isOnline ? (
+                  <div
+                    role="status"
+                    className="mb-2 w-full rounded-lg border border-blue-200 bg-blue-50/95 px-3 py-2 text-xs text-blue-800 shadow-sm backdrop-blur dark:border-blue-900/60 dark:bg-blue-950/90 dark:text-blue-100"
+                  >
+                    {hasForeignActiveGeneration
+                      ? t("foreignGenerationActive")
+                      : t("offlineReadOnly")}
+                  </div>
+                ) : null}
                 {(welcomeState === "visible" || welcomeState === "exiting") && (
                   <div
                     className={`mb-3 md:mb-5 flex items-center gap-3 text-center motion-safe:transition-[opacity,transform] motion-safe:duration-300 ${
@@ -614,11 +714,22 @@ const ChatAppShell = ({
                 <MessageInput
                   ref={messageInputRef}
                   variant={messageInputVariant}
-                  onSend={handleSendMessage}
+                  onSend={(text, attachments, replyTo, skillParameters) => {
+                    void handleSendMessage(
+                      text,
+                      attachments,
+                      replyTo,
+                      skillParameters,
+                    );
+                    setReplyTarget(undefined);
+                  }}
+                  onPrepareSend={prepareComposerSkillParameters}
                   onStop={isGenerating ? handleStopGeneration : undefined}
                   disabled={
                     isGenerating ||
                     isActiveSessionLoading ||
+                    !isOnline ||
+                    hasForeignActiveGeneration ||
                     availableModels.length === 0
                   }
                   availableModels={availableModels}
@@ -626,6 +737,9 @@ const ChatAppShell = ({
                   onSelectModel={setModel}
                   isSearchEnabled={isSearchEnabled}
                   onToggleSearch={onToggleSearch}
+                  replyTo={replyTarget}
+                  onCancelReply={() => setReplyTarget(undefined)}
+                  onNavigateReply={focusMessage}
                 />
               </div>
             </div>

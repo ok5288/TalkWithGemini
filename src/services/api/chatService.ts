@@ -563,6 +563,7 @@ export const streamChatResponse = async (
   skillsContext?: string,
   onOutputBlocks?: (outputBlocks: MessageOutputBlock[]) => void,
   toolConfirmationController?: ToolConfirmationController,
+  options?: { disableTools?: boolean },
 ): Promise<string> => {
   const enableDestructiveToolConfirmation =
     useSettingsStore.getState().system?.enableDestructiveToolConfirmation ===
@@ -623,9 +624,11 @@ export const streamChatResponse = async (
   const tools: ChatToolDefinition[] = [];
   const toolNames = new Set<string>();
 
-  addInternalMemoryTools(tools, toolNames, newMessage);
+  if (!options?.disableTools) {
+    addInternalMemoryTools(tools, toolNames, newMessage);
+  }
 
-  if (activePlugins && activePlugins.length > 0) {
+  if (!options?.disableTools && activePlugins && activePlugins.length > 0) {
     activePlugins.forEach((pluginId) => {
       const plugin = installedPlugins.find((p) => p.id === pluginId);
       const pluginConfig = pluginConfigs[pluginId];

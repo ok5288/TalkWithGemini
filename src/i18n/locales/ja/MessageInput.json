@@ -89,5 +89,8 @@
   "activeSkillsCount": "有効なスキル {count} 件",
   "activeSkillsAria": "有効なスキル {count} 件",
   "installedSkills": "インストール済みスキル",
-  "noSkillsAvailable": "利用できるスキルはありません。"
+  "noSkillsAvailable": "利用できるスキルはありません。",
+  "openReplySource": "返信元のメッセージを開く",
+  "replySourceUnavailable": "元のメッセージを利用できません",
+  "cancelReply": "返信をキャンセル"
 }

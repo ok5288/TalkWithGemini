@@ -1,4 +1,5 @@
 import type { ImageSource, Message, Source } from "@/types";
+import { createCitationSources } from "@/lib/utils/citations";
 
 export function mergeSources(
   existing: Source[] = [],
@@ -41,10 +42,12 @@ export function buildSearchUpdate(
 ): Partial<Message> {
   const updates: Partial<Message> = { isSearching };
   if (results) {
-    updates.searchSources = mergeSources(
-      message?.searchSources,
-      results.sources,
-    );
+    const searchSources = mergeSources(message?.searchSources, results.sources);
+    updates.searchSources = searchSources;
+    updates.citations = createCitationSources({
+      web: searchSources,
+      knowledge: message?.ragSources,
+    });
     updates.searchImages = mergeImages(message?.searchImages, results.images);
   }
   return updates;

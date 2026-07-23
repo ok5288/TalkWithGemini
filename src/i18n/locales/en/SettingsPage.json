@@ -8,6 +8,7 @@
   "tabRag": "RAG Service",
   "tabVoice": "Voice & Speech",
   "tabMemory": "Memory",
+  "tabSync": "Encrypted Sync",
   "tabHealth": "Deployment Health",
   "tabSystem": "System Settings",
   "tabAbout": "About"

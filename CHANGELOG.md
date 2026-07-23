@@ -7,6 +7,45 @@ group changes under a level-2 heading that matches the release tag, such as
 `## v2.0.0`; the release workflow uses that section as the GitHub release notes
 when the matching tag is pushed.
 
+## v2.4.0
+
+- **Private cross-device vault:** Added opt-in WebDAV and S3/MinIO sync with
+  per-domain Automerge documents, client-side HKDF/AES-GCM encryption,
+  opaque remote object names, encrypted OPFS chunks, device state, recovery
+  codes, deterministic conflict handling, transactional local application, and
+  no server-side credential or plaintext persistence. ZIP export remains
+  version 3 and deliberately excludes sync keys, credentials, baselines, and
+  device identity.
+- **Local MCP bridge:** Added an optional hardened Docker profile that exposes
+  deployment-admin allowlisted stdio MCP servers through authenticated
+  Streamable HTTP. Commands and environment variables come only from a
+  read-only configuration file; the bridge runs unprivileged with bounded
+  output, timeouts, restart backoff, and redacted logs.
+- **Long-chat reliability:** Virtualized message timelines with dynamic row
+  measurement, stable end anchoring, screen-proximity rendering for expensive
+  diagrams, durable streaming checkpoints, bounded pre-output retries, partial
+  output preservation, and guarded continuation after interruptions.
+- **Message workflows:** Added reply snapshots and jump navigation, explicit
+  interrupted-generation ownership, and model-selectable sibling-branch
+  regeneration while preserving the existing context-compression pipeline.
+- **Parameterized Skills:** Upgraded custom Skills to a compatible schema with
+  validated text, textarea, and select parameters; reproducible invocation
+  metadata; and ordered bundles of up to four non-nested Skills with fixed or
+  mapped inputs.
+- **Hybrid knowledge retrieval:** Added collection-level Markdown-aware or
+  recursive chunking, preview and explicit reindex controls, chunk-level lexical
+  search, vector-plus-keyword reciprocal-rank fusion, lexical fallback, and
+  stable source previews with retrieval-method labels.
+- **Local offline PWA:** Added a local-deployment-only application shell for
+  offline history, branch navigation, local search, knowledge reading, and
+  backup export. API routes, streams, model traffic, sync, MCP, user files, and
+  external requests are never cached; hosted deployments unregister workers and
+  remove application caches.
+- **Compatibility and engineering:** Advanced local storage schema to version
+  6 while retaining ZIP export version 3, added English, Chinese, and Japanese
+  copy for new surfaces, and expanded security, migration, convergence,
+  performance, offline, and container regression coverage.
+
 ## v2.3.0
 
 - **Local search and navigation:** Added a local global search center, available

@@ -60,12 +60,17 @@ MCP servers live in `installedPlugins`, enabled MCP servers live in
 local-secret path as OpenAPI plugins. There is no separate `activeMcpServers`
 store.
 
-Version 1 supports remote `streamable-http` MCP servers discovered from the
-official MCP Registry or configured by the user. It does not launch local stdio
-processes, npm packages, Docker containers, or OAuth login flows. User-
-configured MCP server URLs may use HTTP or HTTPS and may target localhost or a
-private network in local or hosted deployments. The official Registry fetch
-remains HTTPS-only.
+The application supports `streamable-http` MCP servers discovered from the
+official MCP Registry or configured by the user. Local deployments may run the
+separate authenticated [stdio bridge](mcp-stdio-bridge.md), which translates a
+startup allowlist of stdio processes to the same Streamable HTTP interface. The
+local-only custom MCP dialog can discover its authenticated `/servers` list
+through a request-proof-protected BYOK proxy and imports each descriptor with
+`plugin.mcp.source = "bridge"`. The web application never receives or launches
+commands, arguments, or environment configuration. User-configured MCP
+server URLs may use HTTP or HTTPS and may target localhost or a private network
+in local or hosted deployments. The official Registry fetch remains
+HTTPS-only.
 
 During installation, the server route opens a short-lived MCP SDK client,
 calls `listTools`, converts the tools into `PluginFunction` entries, registers

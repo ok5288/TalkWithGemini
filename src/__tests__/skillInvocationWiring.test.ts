@@ -17,10 +17,11 @@ describe("skill invocation wiring", () => {
 
     expect(streamCallCount).toBeGreaterThan(0);
     expect(countOccurrences(chatApp, "resolveSkillsForMessage({")).toBe(
-      streamCallCount,
+      streamCallCount - 1,
     );
+    expect(chatApp).toContain("continuationSkillContext");
     expect(countOccurrences(chatApp, "skillResolution.context")).toBe(
-      streamCallCount,
+      streamCallCount - 1,
     );
   });
 });

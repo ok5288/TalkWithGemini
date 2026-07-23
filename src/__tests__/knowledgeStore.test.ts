@@ -129,6 +129,8 @@ const makeCollection = (files: Collection["files"] = []): Collection => ({
   description: "",
   icon: "Folder",
   color: "blue",
+  chunking: { strategy: "recursive", chunkSize: 512, overlapPercent: 10 },
+  chunkingRevision: "recursive:512:10",
   files,
   updatedAt: 1,
 });

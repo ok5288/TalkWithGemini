@@ -1,4 +1,5 @@
 "use client";
+import dynamic from "next/dynamic";
 import React, { useState } from "react";
 import {
   X,
@@ -10,6 +11,7 @@ import {
   FolderSearch,
   ShieldCheck,
   Brain,
+  Cloud,
   Info,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -25,6 +27,10 @@ import MemorySettings from "./MemorySettings";
 import AboutSettings from "./AboutSettings";
 import type { SettingsTabId } from "@/lib/chat/panelUrlState";
 
+const SyncSettings = dynamic(() => import("./SyncSettings"), {
+  ssr: false,
+});
+
 const SETTINGS_TABS: Array<{
   id: SettingsTabId;
   labelKey: string;
@@ -36,6 +42,7 @@ const SETTINGS_TABS: Array<{
   { id: "rag", labelKey: "tabRag", Icon: FolderSearch },
   { id: "voice", labelKey: "tabVoice", Icon: Mic },
   { id: "memory", labelKey: "tabMemory", Icon: Brain },
+  { id: "sync", labelKey: "tabSync", Icon: Cloud },
   { id: "health", labelKey: "tabHealth", Icon: ShieldCheck },
   { id: "system", labelKey: "tabSystem", Icon: Settings },
   { id: "about", labelKey: "tabAbout", Icon: Info },
@@ -55,6 +62,8 @@ const renderTabContent = (activeTab: SettingsTabId, focusMemoryId?: string) => {
       return <VoiceSettings />;
     case "memory":
       return <MemorySettings focusMemoryId={focusMemoryId} />;
+    case "sync":
+      return <SyncSettings />;
     case "health":
       return <DeploymentHealth />;
     case "system":

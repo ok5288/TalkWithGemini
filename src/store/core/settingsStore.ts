@@ -14,6 +14,7 @@ import {
   TextSkill,
   SkillCatalog,
   SkillDataLocale,
+  SkillBundle,
 } from "@/types";
 import { BUILT_IN_PLUGINS, UNSPLASH_PLUGIN } from "@/config/plugins";
 import { DEFAULT_SYSTEM_SETTINGS } from "@/config/defaults";
@@ -58,6 +59,7 @@ import {
 import {
   normalizeCustomSkills,
   normalizeSkillCatalog,
+  normalizeSkillBundles,
   normalizeTextSkill,
 } from "@/lib/skills";
 import { normalizeSystemSettings } from "@/lib/settings/appConfig";
@@ -167,6 +169,8 @@ interface SettingsState {
   customSkills: TextSkill[];
   activeSkillIds: string[];
   skillAutoSelect: boolean;
+  skillBundles: SkillBundle[];
+  activeSkillBundleIds: string[];
   installSkill: (skill: TextSkill) => void;
   uninstallSkill: (skillId: string) => void;
   updateInstalledSkill: (skillId: string, skill: Partial<TextSkill>) => void;
@@ -176,6 +180,11 @@ interface SettingsState {
   setActiveSkillIds: (skillIds: string[]) => void;
   toggleSkillActive: (skillId: string) => void;
   setSkillAutoSelect: (enabled: boolean) => void;
+  addSkillBundle: (bundle: SkillBundle) => void;
+  updateSkillBundle: (bundleId: string, bundle: Partial<SkillBundle>) => void;
+  removeSkillBundle: (bundleId: string) => void;
+  setActiveSkillBundleIds: (bundleIds: string[]) => void;
+  toggleSkillBundleActive: (bundleId: string) => void;
 
   // Agent Management
   customAgents: LobeAgent[];
@@ -888,6 +897,8 @@ export const useSettingsStore = create<SettingsState>()(
       customSkills: [],
       activeSkillIds: [],
       skillAutoSelect: true,
+      skillBundles: [],
+      activeSkillBundleIds: [],
 
       installSkill: (skill) =>
         set((state) => {
@@ -1084,6 +1095,73 @@ export const useSettingsStore = create<SettingsState>()(
         }),
 
       setSkillAutoSelect: (enabled) => set({ skillAutoSelect: enabled }),
+
+      addSkillBundle: (bundle) =>
+        set((state) => ({
+          skillBundles: normalizeSkillBundles(
+            [
+              {
+                ...bundle,
+                createdAt: bundle.createdAt || new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+              },
+              ...state.skillBundles.filter((item) => item.id !== bundle.id),
+            ],
+            MARKET_LIMITS.maxCustomSkills,
+          ),
+        })),
+
+      updateSkillBundle: (bundleId, bundle) =>
+        set((state) => ({
+          skillBundles: normalizeSkillBundles(
+            state.skillBundles.map((current) =>
+              current.id === bundleId
+                ? {
+                    ...current,
+                    ...bundle,
+                    id: current.id,
+                    updatedAt: new Date().toISOString(),
+                  }
+                : current,
+            ),
+            MARKET_LIMITS.maxCustomSkills,
+          ),
+        })),
+
+      removeSkillBundle: (bundleId) =>
+        set((state) => ({
+          skillBundles: state.skillBundles.filter(
+            (bundle) => bundle.id !== bundleId,
+          ),
+          activeSkillBundleIds: state.activeSkillBundleIds.filter(
+            (id) => id !== bundleId,
+          ),
+        })),
+
+      setActiveSkillBundleIds: (bundleIds) =>
+        set((state) => {
+          const validIds = new Set(
+            state.skillBundles.map((bundle) => bundle.id),
+          );
+          return {
+            activeSkillBundleIds: normalizeSkillIdRefsForStorage(
+              bundleIds,
+              20,
+            ).filter((id) => validIds.has(id)),
+          };
+        }),
+
+      toggleSkillBundleActive: (bundleId) =>
+        set((state) => {
+          if (!state.skillBundles.some((bundle) => bundle.id === bundleId)) {
+            return state;
+          }
+          return {
+            activeSkillBundleIds: state.activeSkillBundleIds.includes(bundleId)
+              ? state.activeSkillBundleIds.filter((id) => id !== bundleId)
+              : [...state.activeSkillBundleIds, bundleId],
+          };
+        }),
 
       // Agent Management
       customAgents: [],
@@ -1299,6 +1377,14 @@ export const useSettingsStore = create<SettingsState>()(
             typeof state.skillAutoSelect === "boolean"
               ? state.skillAutoSelect
               : true,
+          skillBundles: normalizeSkillBundles(
+            state.skillBundles,
+            MARKET_LIMITS.maxCustomSkills,
+          ),
+          activeSkillBundleIds: normalizeSkillIdRefsForStorage(
+            state.activeSkillBundleIds,
+            20,
+          ),
           customAgents: normalizeLocalAgents(
             state.customAgents,
             MARKET_LIMITS.maxCustomAgents,
@@ -1336,6 +1422,8 @@ export const useSettingsStore = create<SettingsState>()(
         customSkills: state.customSkills,
         activeSkillIds: state.activeSkillIds,
         skillAutoSelect: state.skillAutoSelect,
+        skillBundles: state.skillBundles,
+        activeSkillBundleIds: state.activeSkillBundleIds,
         customAgents: state.customAgents,
         usedAgents: state.usedAgents,
         agentOverrides: state.agentOverrides,

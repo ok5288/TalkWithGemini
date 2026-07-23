@@ -1,5 +1,12 @@
 "use client";
-import React, { useEffect, useState, useRef, useMemo, useId } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useState,
+  useRef,
+  useMemo,
+  useId,
+} from "react";
 import { createPortal } from "react-dom";
 import { useLocale, useTranslations } from "next-intl";
 import {
@@ -40,7 +47,12 @@ import {
 } from "lucide-react";
 import { useKnowledgeStore } from "@/store/core/knowledgeStore";
 import { useSettingsStore } from "@/store/core/settingsStore";
-import { Collection, KnowledgeFile, KnowledgeFileStatus } from "@/types";
+import {
+  Collection,
+  KnowledgeChunkingConfig,
+  KnowledgeFile,
+  KnowledgeFileStatus,
+} from "@/types";
 import Tooltip from "../ui/Tooltip";
 import { resolveOPFSUrl, isOPFSUrl } from "@/utils/opfs";
 import {
@@ -58,6 +70,8 @@ import {
 } from "@/lib/utils/timedStatus";
 import { withResolvedObjectUrl } from "@/lib/utils/objectUrlLifecycle";
 import { logDevError } from "@/lib/utils/devLogger";
+import { buildKnowledgeVectorItems } from "@/lib/utils/knowledgeVectors";
+import { createKnowledgeChunkingRevision } from "@/lib/knowledge/entities";
 
 const formatBytes = (bytes: number, decimals = 2) => {
   if (!+bytes) return "0 Bytes";
@@ -102,7 +116,10 @@ type CollectionModalData = {
   description: string;
   icon: string;
   color: string;
+  chunking: KnowledgeChunkingConfig;
 };
+
+type ChunkPreview = { total: number; chunks: string[] };
 
 // --- Modal Content Component (Reused for New/Edit) ---
 const CollectionModalContent = ({
@@ -110,12 +127,14 @@ const CollectionModalContent = ({
   initialData,
   onSubmit,
   onDelete,
+  onPreview,
   onClose,
 }: {
   title: string;
   initialData?: Partial<Collection>;
   onSubmit: (data: CollectionModalData) => void;
   onDelete?: () => void | Promise<void>;
+  onPreview?: (chunking: KnowledgeChunkingConfig) => Promise<ChunkPreview>;
   onClose: () => void;
 }) => {
   const t = useTranslations("Knowledge");
@@ -127,6 +146,17 @@ const CollectionModalContent = ({
   const [selectedColor, setSelectedColor] = useState(
     initialData?.color || "blue",
   );
+  const defaultChunkSize = useSettingsStore((state) => state.rag.chunkSize);
+  const [chunking, setChunking] = useState<KnowledgeChunkingConfig>(
+    initialData?.chunking || {
+      strategy: "auto",
+      chunkSize: defaultChunkSize || 512,
+      overlapPercent: 10,
+    },
+  );
+  const [chunkPreview, setChunkPreview] = useState<ChunkPreview | null>(null);
+  const [isPreviewing, setIsPreviewing] = useState(false);
+  const [previewError, setPreviewError] = useState("");
   const [isDeleteConfirming, setIsDeleteConfirming] = useState(false);
   const [deleteError, setDeleteError] = useState("");
   const deleteConfirmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
@@ -224,7 +254,22 @@ const CollectionModalContent = ({
       description: desc.trim(),
       icon: selectedIcon,
       color: selectedColor,
+      chunking,
     });
+  };
+
+  const handlePreview = async () => {
+    if (!onPreview || isPreviewing) return;
+    setIsPreviewing(true);
+    setPreviewError("");
+    try {
+      setChunkPreview(await onPreview(chunking));
+    } catch (error) {
+      logDevError("Failed to preview knowledge chunks", error);
+      setPreviewError(t("chunking.previewError"));
+    } finally {
+      setIsPreviewing(false);
+    }
   };
 
   const handleDeleteClick = () => {
@@ -327,6 +372,117 @@ const CollectionModalContent = ({
               />
             </div>
           </div>
+
+          <section className="space-y-3 rounded-xl border border-gray-200 bg-gray-50/70 p-4 dark:border-border dark:bg-muted/40">
+            <div>
+              <h3 className="text-xs font-semibold text-gray-700 dark:text-foreground">
+                {t("chunking.title")}
+              </h3>
+              <p className="mt-1 text-[11px] leading-relaxed text-gray-500 dark:text-muted-foreground">
+                {t("chunking.description")}
+              </p>
+            </div>
+            <label className="block space-y-1.5 text-xs font-semibold text-gray-500 dark:text-muted-foreground">
+              <span>{t("chunking.strategy")}</span>
+              <select
+                value={chunking.strategy}
+                onChange={(event) =>
+                  setChunking((current) => ({
+                    ...current,
+                    strategy: event.target
+                      .value as KnowledgeChunkingConfig["strategy"],
+                  }))
+                }
+                className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-800 outline-none transition-[border-color,box-shadow] focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-border dark:bg-card dark:text-foreground"
+              >
+                <option value="auto">{t("chunking.auto")}</option>
+                <option value="recursive">{t("chunking.recursive")}</option>
+                <option value="markdown">{t("chunking.markdown")}</option>
+              </select>
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="space-y-1.5 text-xs font-semibold text-gray-500 dark:text-muted-foreground">
+                <span>{t("chunking.chunkSize")}</span>
+                <input
+                  type="number"
+                  min={128}
+                  max={4096}
+                  step={64}
+                  value={chunking.chunkSize}
+                  onChange={(event) =>
+                    setChunking((current) => ({
+                      ...current,
+                      chunkSize: Number(event.target.value),
+                    }))
+                  }
+                  className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm tabular-nums text-gray-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-border dark:bg-card dark:text-foreground"
+                />
+              </label>
+              <label className="space-y-1.5 text-xs font-semibold text-gray-500 dark:text-muted-foreground">
+                <span>{t("chunking.overlap")}</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={30}
+                  value={chunking.overlapPercent}
+                  onChange={(event) =>
+                    setChunking((current) => ({
+                      ...current,
+                      overlapPercent: Number(event.target.value),
+                    }))
+                  }
+                  className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm tabular-nums text-gray-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-border dark:bg-card dark:text-foreground"
+                />
+              </label>
+            </div>
+            {initialData?.files?.length ? (
+              <button
+                type="button"
+                onClick={() => void handlePreview()}
+                disabled={isPreviewing}
+                className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:opacity-50 dark:border-blue-900/60 dark:bg-card dark:text-blue-300 dark:hover:bg-blue-950/30"
+              >
+                <RefreshCw
+                  size={13}
+                  aria-hidden="true"
+                  className={isPreviewing ? "animate-spin" : ""}
+                />
+                {t("chunking.preview")}
+              </button>
+            ) : (
+              <p className="text-[11px] text-gray-500 dark:text-muted-foreground">
+                {t("chunking.previewEmpty")}
+              </p>
+            )}
+            {previewError ? (
+              <p
+                role="alert"
+                className="text-[11px] text-red-600 dark:text-red-300"
+              >
+                {previewError}
+              </p>
+            ) : null}
+            {chunkPreview ? (
+              <div className="space-y-2 rounded-lg border border-blue-100 bg-white p-3 dark:border-blue-900/40 dark:bg-card">
+                <div className="text-[11px] font-semibold text-blue-700 dark:text-blue-300">
+                  {t("chunking.previewCount", { count: chunkPreview.total })}
+                </div>
+                {chunkPreview.chunks.map((chunk, index) => (
+                  <p
+                    key={index}
+                    className="line-clamp-3 rounded-md bg-gray-50 px-2 py-1.5 font-mono text-[10px] leading-relaxed text-gray-600 dark:bg-muted dark:text-foreground/75"
+                  >
+                    {chunk}
+                  </p>
+                ))}
+              </div>
+            ) : null}
+            {initialData?.files?.length ? (
+              <p className="text-[11px] text-amber-700 dark:text-amber-300">
+                {t("chunking.reindexNotice")}
+              </p>
+            ) : null}
+          </section>
 
           {/* Visuals */}
           <div className="space-y-4">
@@ -471,7 +627,13 @@ const NewCollectionModal = ({ onClose }: { onClose: () => void }) => {
   const { createCollection } = useKnowledgeStore();
 
   const handleSubmit = (data: CollectionModalData) => {
-    createCollection(data.name, data.description, data.icon, data.color);
+    createCollection(
+      data.name,
+      data.description,
+      data.icon,
+      data.color,
+      data.chunking,
+    );
     onClose();
   };
 
@@ -494,11 +656,39 @@ const EditCollectionModal = ({
   onClose: () => void;
 }) => {
   const t = useTranslations("Knowledge");
-  const { deleteCollection, updateCollection } = useKnowledgeStore();
+  const { deleteCollection, updateCollection, updateCollectionChunking } =
+    useKnowledgeStore();
 
   const handleSubmit = (data: CollectionModalData) => {
-    updateCollection(collection.id, data);
+    const { chunking, ...metadata } = data;
+    updateCollection(collection.id, metadata);
+    updateCollectionChunking(collection.id, chunking);
     onClose();
+  };
+
+  const handlePreview = async (
+    chunking: KnowledgeChunkingConfig,
+  ): Promise<ChunkPreview> => {
+    const file = collection.files.find((item) => item.contentPath || item.path);
+    const contentPath = file?.contentPath || file?.path;
+    if (!file || !contentPath) return { total: 0, chunks: [] };
+    const content = await withResolvedObjectUrl({
+      source: contentPath,
+      resolveObjectUrl: resolveOPFSUrl,
+      read: async (objectUrl) => (await fetch(objectUrl)).text(),
+    });
+    const items = buildKnowledgeVectorItems({
+      collectionId: collection.id,
+      fileName: file.name,
+      ragFileId: file.ragId || file.id,
+      textContent: content || "",
+      chunking,
+      chunkingRevision: createKnowledgeChunkingRevision(chunking),
+    });
+    return {
+      total: items.length,
+      chunks: items.slice(0, 3).map((item) => item.data),
+    };
   };
 
   const handleDelete = async () => {
@@ -513,6 +703,7 @@ const EditCollectionModal = ({
       initialData={collection}
       onSubmit={handleSubmit}
       onDelete={handleDelete}
+      onPreview={handlePreview}
       onClose={onClose}
     />,
     document.body,
@@ -520,13 +711,20 @@ const EditCollectionModal = ({
 };
 
 // --- Create Collection Card (Dashed) ---
-const CreateCollectionCard = ({ onClick }: { onClick: () => void }) => {
+const CreateCollectionCard = ({
+  onClick,
+  disabled = false,
+}: {
+  onClick: () => void;
+  disabled?: boolean;
+}) => {
   const t = useTranslations("Knowledge");
   return (
     <button
       type="button"
       aria-label={t("createNewCollectionAria")}
       onClick={onClick}
+      disabled={disabled}
       className="group flex flex-col items-center justify-center p-6 h-full min-h-45 rounded-3xl border-2 border-dashed border-gray-300 dark:border-border hover:border-blue-500 dark:hover:border-blue-400 hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-[border-color,background-color,box-shadow] duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-background"
     >
       <div className="w-14 h-14 rounded-full bg-gray-100 dark:bg-muted group-hover:bg-blue-500 group-hover:text-white dark:group-hover:bg-blue-500 text-gray-400 dark:text-muted-foreground/70 flex items-center justify-center mb-4 transition-[background-color,color,transform,box-shadow] duration-300 shadow-sm group-hover:shadow-blue-500/30">
@@ -547,7 +745,8 @@ const CollectionCard: React.FC<{
   collection: Collection;
   onClick: () => void;
   onEdit: (e: React.MouseEvent) => void;
-}> = ({ collection, onClick, onEdit }) => {
+  readOnly?: boolean;
+}> = ({ collection, onClick, onEdit, readOnly = false }) => {
   const t = useTranslations("Knowledge");
   const IconObj =
     COLLECTION_ICONS.find((i) => i.name === collection.icon) ||
@@ -606,6 +805,7 @@ const CollectionCard: React.FC<{
         type="button"
         aria-label={t("editCollectionAria", { name: collection.name })}
         onClick={onEdit}
+        disabled={readOnly}
         className="absolute right-5 top-5 z-10 p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-foreground hover:bg-gray-100 dark:hover:bg-accent rounded-lg transition-colors opacity-0 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
       >
         <Settings size={16} aria-hidden="true" />
@@ -715,6 +915,7 @@ const FileRow: React.FC<{
   onDownloadOriginal?: () => void | Promise<void>;
   isReindexing?: boolean;
   isBusy?: boolean;
+  readOnly?: boolean;
 }> = ({
   file,
   rowRef,
@@ -729,6 +930,7 @@ const FileRow: React.FC<{
   onDownloadOriginal,
   isReindexing = false,
   isBusy = false,
+  readOnly = false,
 }) => {
   const t = useTranslations("Knowledge");
   const locale = useLocale();
@@ -767,6 +969,7 @@ const FileRow: React.FC<{
   }, []);
 
   const handleDeleteClick = () => {
+    if (readOnly) return;
     if (!isDeleteConfirming) {
       setIsDeleteConfirming(true);
       if (deleteConfirmTimerRef.current) {
@@ -909,7 +1112,7 @@ const FileRow: React.FC<{
             <button
               type="button"
               aria-label={t("reparseFileAria", { name: file.name })}
-              disabled={isBusy}
+              disabled={isBusy || readOnly}
               onClick={(event) => {
                 event.stopPropagation();
                 void onReparse();
@@ -930,6 +1133,7 @@ const FileRow: React.FC<{
             <input
               ref={replacementInputRef}
               type="file"
+              disabled={readOnly}
               className="sr-only"
               tabIndex={-1}
               aria-label={t("selectOriginalAria", { name: file.name })}
@@ -943,7 +1147,7 @@ const FileRow: React.FC<{
               <button
                 type="button"
                 aria-label={t("selectOriginalAria", { name: file.name })}
-                disabled={isBusy}
+                disabled={isBusy || readOnly}
                 onClick={(event) => {
                   event.stopPropagation();
                   replacementInputRef.current?.click();
@@ -961,7 +1165,7 @@ const FileRow: React.FC<{
             <button
               type="button"
               aria-label={t("retryFileAria", { name: file.name })}
-              disabled={isBusy}
+              disabled={isBusy || readOnly}
               onClick={(event) => {
                 event.stopPropagation();
                 void onRetry();
@@ -982,6 +1186,7 @@ const FileRow: React.FC<{
             <button
               type="button"
               aria-label={t("cancelProcessingAria", { name: file.name })}
+              disabled={readOnly}
               onClick={(event) => {
                 event.stopPropagation();
                 void onCancel();
@@ -1002,7 +1207,7 @@ const FileRow: React.FC<{
               type="button"
               aria-label={t("reindexFileAria", { name: file.name })}
               aria-busy={isReindexing || undefined}
-              disabled={isReindexing}
+              disabled={isReindexing || readOnly}
               onClick={(e) => {
                 e.stopPropagation();
                 void onReindex();
@@ -1029,6 +1234,7 @@ const FileRow: React.FC<{
             e.stopPropagation();
             handleDeleteClick();
           }}
+          disabled={readOnly}
           className={`shrink-0 rounded-lg p-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60 ${
             isDeleteConfirming
               ? "bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-200"
@@ -1050,6 +1256,8 @@ interface KnowledgeBaseProps {
   onClose?: () => void;
   initialCollectionId?: string;
   initialFileId?: string;
+  initialChunkIndex?: number;
+  initialExcerpt?: string;
 }
 
 // --- Main Component ---
@@ -1057,6 +1265,8 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
   onClose,
   initialCollectionId,
   initialFileId,
+  initialChunkIndex,
+  initialExcerpt,
 }) => {
   const t = useTranslations("Knowledge");
   const {
@@ -1066,6 +1276,7 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
     deleteFile,
     updateFileContent,
     reindexFile,
+    reindexCollection,
     cancelUpload,
     retryFile,
     reparseFile,
@@ -1083,6 +1294,7 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [uploadNotice, setUploadNotice] = useState("");
   const [reindexingFileId, setReindexingFileId] = useState<string | null>(null);
+  const [isReindexingCollection, setIsReindexingCollection] = useState(false);
   const [busyFileId, setBusyFileId] = useState<string | null>(null);
   const [highlightedFileId, setHighlightedFileId] = useState<string | null>(
     null,
@@ -1102,10 +1314,13 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
   const [copyStatus, setCopyStatus] = useState<CopyStatus>("idle");
   const isCopied = copyStatus === "copied";
   const [saveError, setSaveError] = useState("");
+  const [isOnline, setIsOnline] = useState(true);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileContentInputRef = useRef<HTMLTextAreaElement>(null);
   const highlightedFileRef = useRef<HTMLDivElement | null>(null);
   const locatedTargetRef = useRef("");
+  const openedTargetRef = useRef("");
   const fileViewerDialogRef = useRef<HTMLDivElement | null>(null);
   const fileViewerCloseButtonRef = useRef<HTMLButtonElement | null>(null);
   const fileViewerPreviousFocusRef = useRef<HTMLElement | null>(null);
@@ -1123,6 +1338,24 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
 
   const activeCollection = collections.find((c) => c.id === activeCollectionId);
   const viewingFileId = viewingFile?.id;
+
+  useEffect(() => {
+    const updateOnlineStatus = () => setIsOnline(navigator.onLine);
+    updateOnlineStatus();
+    window.addEventListener("online", updateOnlineStatus);
+    window.addEventListener("offline", updateOnlineStatus);
+    return () => {
+      window.removeEventListener("online", updateOnlineStatus);
+      window.removeEventListener("offline", updateOnlineStatus);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isOnline) return;
+    setShowNewModal(false);
+    setEditingCollection(null);
+    setIsDragging(false);
+  }, [isOnline]);
 
   useEffect(() => {
     if (!initialCollectionId && !initialFileId) {
@@ -1146,12 +1379,19 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
     const targetFile = initialFileId
       ? targetCollection.files.find((file) => file.id === initialFileId)
       : undefined;
-    const targetKey = `${targetCollection.id}:${targetFile?.id || ""}`;
+    const targetKey = `${targetCollection.id}:${targetFile?.id || ""}:${initialChunkIndex ?? ""}:${initialExcerpt || ""}`;
     if (locatedTargetRef.current === targetKey) return;
     locatedTargetRef.current = targetKey;
     setActiveCollectionId(targetCollection.id);
     setHighlightedFileId(targetFile?.id || null);
-  }, [_hasHydrated, collections, initialCollectionId, initialFileId]);
+  }, [
+    _hasHydrated,
+    collections,
+    initialChunkIndex,
+    initialCollectionId,
+    initialExcerpt,
+    initialFileId,
+  ]);
 
   useEffect(() => {
     if (!highlightedFileId || activeCollectionId === null) return;
@@ -1245,7 +1485,7 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
   );
 
   const handleFileUpload = async (files: FileList | null) => {
-    if (!files || !activeCollectionId) return;
+    if (!isOnline || !files || !activeCollectionId) return;
     const fileArray = Array.from(files);
     const selection = selectKnowledgeFilesForUpload(
       activeCollection?.files.length || 0,
@@ -1265,72 +1505,112 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
+    if (!isOnline) return;
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       void handleFileUpload(e.dataTransfer.files);
     }
   };
 
-  const handleFileClick = async (file: KnowledgeFile) => {
-    try {
-      let content = t("previewNotAvailable");
-      const contentPath = file.contentPath || file.path;
+  const handleFileClick = useCallback(
+    async (file: KnowledgeFile) => {
+      try {
+        let content = t("previewNotAvailable");
+        const contentPath = file.contentPath || file.path;
 
-      if (contentPath && isOPFSUrl(contentPath)) {
-        const result = await withResolvedObjectUrl({
-          source: contentPath,
-          resolveObjectUrl: resolveOPFSUrl,
-          read: async (blobUrl) => {
-            const response = await fetch(blobUrl);
-            if (response.ok) {
-              return {
-                status: "loaded" as const,
-                content: await response.text(),
-              };
-            }
-            return { status: "failed" as const };
-          },
-        });
+        if (contentPath && isOPFSUrl(contentPath)) {
+          const result = await withResolvedObjectUrl({
+            source: contentPath,
+            resolveObjectUrl: resolveOPFSUrl,
+            read: async (blobUrl) => {
+              const response = await fetch(blobUrl);
+              if (response.ok) {
+                return {
+                  status: "loaded" as const,
+                  content: await response.text(),
+                };
+              }
+              return { status: "failed" as const };
+            },
+          });
 
-        if (result?.status === "loaded") {
-          content = result.content;
-        } else if (result?.status === "failed") {
-          content = t("loadFailed");
-        } else {
-          content = t("fileNotFound");
+          if (result?.status === "loaded") {
+            content = result.content;
+          } else if (result?.status === "failed") {
+            content = t("loadFailed");
+          } else {
+            content = t("fileNotFound");
+          }
+        } else if (
+          file.type.startsWith("text/") ||
+          file.name.endsWith(".md") ||
+          file.name.endsWith(".txt") ||
+          file.name.endsWith(".json")
+        ) {
+          // Fallback message if path is missing but it's a text type (e.g. legacy or pure RAG upload without local save)
+          content = t("previewNotAvailableLocal");
         }
-      } else if (
-        file.type.startsWith("text/") ||
-        file.name.endsWith(".md") ||
-        file.name.endsWith(".txt") ||
-        file.name.endsWith(".json")
-      ) {
-        // Fallback message if path is missing but it's a text type (e.g. legacy or pure RAG upload without local save)
-        content = t("previewNotAvailableLocal");
-      }
 
-      setViewingFile({
-        id: file.id,
-        collectionId: activeCollectionId!,
-        name: file.name,
-        originalContent: content,
-      });
-      setEditContent(content);
-      setSaveError("");
-    } catch (e) {
-      logDevError("Failed to read file", e);
-      const errText = t("errorReadingFile");
-      setViewingFile({
-        id: file.id,
-        collectionId: activeCollectionId!,
-        name: file.name,
-        originalContent: errText,
-      });
-      setEditContent(errText);
-      setSaveError("");
-    }
-  };
+        setViewingFile({
+          id: file.id,
+          collectionId: activeCollectionId!,
+          name: file.name,
+          originalContent: content,
+        });
+        setEditContent(content);
+        setSaveError("");
+      } catch (e) {
+        logDevError("Failed to read file", e);
+        const errText = t("errorReadingFile");
+        setViewingFile({
+          id: file.id,
+          collectionId: activeCollectionId!,
+          name: file.name,
+          originalContent: errText,
+        });
+        setEditContent(errText);
+        setSaveError("");
+      }
+    },
+    [activeCollectionId, t],
+  );
+
+  useEffect(() => {
+    if (!initialFileId || !activeCollection) return;
+    const targetFile = activeCollection.files.find(
+      (file) => file.id === initialFileId,
+    );
+    if (!targetFile) return;
+    const targetKey = `${activeCollection.id}:${targetFile.id}:${initialChunkIndex ?? ""}:${initialExcerpt || ""}`;
+    if (openedTargetRef.current === targetKey) return;
+    openedTargetRef.current = targetKey;
+    void handleFileClick(targetFile);
+  }, [
+    activeCollection,
+    handleFileClick,
+    initialChunkIndex,
+    initialExcerpt,
+    initialFileId,
+  ]);
+
+  useEffect(() => {
+    const input = fileContentInputRef.current;
+    if (!input || !viewingFile || !initialExcerpt) return;
+    const normalizedExcerpt = initialExcerpt.trim().slice(0, 240);
+    if (!normalizedExcerpt) return;
+    const start = editContent.indexOf(normalizedExcerpt);
+    if (start < 0) return;
+    const end = start + normalizedExcerpt.length;
+    const line = editContent.slice(0, start).split("\n").length - 1;
+    requestAnimationFrame(() => {
+      input.focus({ preventScroll: true });
+      input.setSelectionRange(start, end);
+      const lineHeight = Number.parseFloat(getComputedStyle(input).lineHeight);
+      input.scrollTop = Math.max(0, line * (lineHeight || 20) - 80);
+    });
+  }, [editContent, initialExcerpt, viewingFile]);
 
   const handleDeleteFile = async (collectionId: string, fileId: string) => {
+    if (!isOnline) return;
     try {
       await deleteFile(collectionId, fileId);
       setUploadNotice("");
@@ -1341,7 +1621,7 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
   };
 
   const handleSaveFile = async () => {
-    if (!viewingFile) return;
+    if (!isOnline || !viewingFile) return;
     try {
       setSaveError("");
       await updateFileContent(
@@ -1363,7 +1643,7 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
     collectionId: string,
     file: KnowledgeFile,
   ) => {
-    if (reindexingFileId) return;
+    if (!isOnline || reindexingFileId) return;
 
     setReindexingFileId(file.id);
     setUploadNotice("");
@@ -1385,7 +1665,7 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
     action: () => Promise<void>,
     successMessage?: string,
   ) => {
-    if (busyFileId) return;
+    if (!isOnline || busyFileId) return;
     setBusyFileId(file.id);
     setUploadNotice("");
     try {
@@ -1406,6 +1686,7 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
     file: KnowledgeFile,
     replacementSource?: File,
   ) => {
+    if (!isOnline) return;
     if (
       file.contentEditedAt &&
       !window.confirm(t("confirmReparseEdited", { name: file.name }))
@@ -1441,6 +1722,21 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
     } catch (error) {
       logDevError("Failed to download original knowledge file", error);
       setUploadNotice(t("downloadOriginalFailed"));
+    }
+  };
+
+  const handleReindexCollection = async () => {
+    if (!isOnline || !activeCollection || isReindexingCollection) return;
+    setIsReindexingCollection(true);
+    setUploadNotice("");
+    try {
+      await reindexCollection(activeCollection.id);
+      setUploadNotice(t("chunking.reindexComplete"));
+    } catch (error) {
+      logDevError("Failed to re-index knowledge collection", error);
+      setUploadNotice(t("chunking.reindexFailed"));
+    } finally {
+      setIsReindexingCollection(false);
     }
   };
 
@@ -1505,7 +1801,7 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
                     aria-hidden="true"
                   />
                   <span className="truncate">{viewingFile.name}</span>
-                  {isDirty && (
+                  {isDirty && isOnline && (
                     <span className="text-xs text-gray-400 font-normal ml-1 shrink-0">
                       ({t("edited")})
                     </span>
@@ -1578,10 +1874,12 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
                   {t("fileContentLabel")}
                 </label>
                 <textarea
+                  ref={fileContentInputRef}
                   id={fileContentInputId}
                   name="knowledge-file-content"
                   className="h-full w-full resize-none rounded-lg border-none bg-transparent p-4 font-mono text-sm leading-relaxed text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:text-foreground custom-scrollbar"
                   value={editContent}
+                  readOnly={!isOnline}
                   onChange={(e) => setEditContent(e.target.value)}
                   spellCheck={false}
                 />
@@ -1657,6 +1955,15 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
         )}
       </div>
 
+      {!isOnline ? (
+        <div
+          role="status"
+          className="mx-4 mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100"
+        >
+          {t("offlineReadOnly")}
+        </div>
+      ) : null}
+
       {/* Search Bar & Filter - Only on Index View */}
       {!activeCollection && (
         <div className="mx-auto flex w-full max-w-7xl shrink-0 gap-3 px-6 pb-6 pt-6">
@@ -1697,7 +2004,10 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
               {/* Grid View */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500 content-start">
                 {/* Special "Create New" Card */}
-                <CreateCollectionCard onClick={() => setShowNewModal(true)} />
+                <CreateCollectionCard
+                  onClick={() => setShowNewModal(true)}
+                  disabled={!isOnline}
+                />
 
                 {/* Collection Cards */}
                 {filteredCollections.map((c) => (
@@ -1705,6 +2015,7 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
                     key={c.id}
                     collection={c}
                     onClick={() => setActiveCollectionId(c.id)}
+                    readOnly={!isOnline}
                     onEdit={(e) => {
                       e.stopPropagation();
                       setEditingCollection(c);
@@ -1723,6 +2034,37 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
             <div className="animate-in fade-in slide-in-from-right-8 duration-300">
               {/* Collection Detail View */}
               <div className="flex flex-col gap-6">
+                {activeCollection.files.some(
+                  (file) =>
+                    (file.contentPath || file.path) &&
+                    (file.indexStatus || file.status) !== "indexed",
+                ) ? (
+                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-blue-200 bg-blue-50/70 px-4 py-3 dark:border-blue-900/60 dark:bg-blue-950/20">
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-blue-800 dark:text-blue-200">
+                        {t("chunking.pendingTitle")}
+                      </div>
+                      <p className="mt-0.5 text-xs text-blue-700/80 dark:text-blue-300/80">
+                        {t("chunking.pendingDescription")}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void handleReindexCollection()}
+                      disabled={
+                        !isOnline || !rag.enabled || isReindexingCollection
+                      }
+                      className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <RefreshCw
+                        size={14}
+                        aria-hidden="true"
+                        className={isReindexingCollection ? "animate-spin" : ""}
+                      />
+                      {t("chunking.reindexAll")}
+                    </button>
+                  </div>
+                ) : null}
                 {/* Upload Zone */}
                 <div
                   role="region"
@@ -1749,6 +2091,7 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
                     name="knowledge-files"
                     multiple
                     ref={fileInputRef}
+                    disabled={!isOnline}
                     className="sr-only"
                     tabIndex={-1}
                     aria-label={t("knowledgeFilesAria")}
@@ -1757,6 +2100,7 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
                   />
                   <button
                     type="button"
+                    disabled={!isOnline}
                     onClick={() => fileInputRef.current?.click()}
                     aria-describedby={`${uploadDescriptionId} ${uploadLimitsId}`}
                     className="group/upload flex max-w-full flex-col items-center rounded-xl px-4 py-3 text-center transition-[background-color,box-shadow] hover:bg-white/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:hover:bg-muted/50 dark:focus-visible:ring-offset-background"
@@ -1896,6 +2240,7 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
                             }
                             isReindexing={reindexingFileId === file.id}
                             isBusy={busyFileId === file.id}
+                            readOnly={!isOnline}
                           />
                         ))}
                       </div>

@@ -1,4 +1,5 @@
 {
+  "offlineReadOnly": "当前为离线只读模式：可打开本地文件，但上传、编辑、删除、解析和索引均已禁用。",
   "sourcesHeading": "知识库（{count} 个来源）",
   "selectKnowledgeBase": "选择知识库",
   "closeSelection": "关闭知识库选择",
@@ -107,5 +108,30 @@
   "fileNotFound": "本地存储中未找到该文件。",
   "previewNotAvailableLocal": "此文件无法在本地预览内容。",
   "errorReadingFile": "读取文件内容出错。",
-  "deleteFileFailed": "删除文件失败，请重试。"
+  "deleteFileFailed": "删除文件失败，请重试。",
+  "retrieval": {
+    "vector": "向量",
+    "keyword": "关键词",
+    "both": "混合"
+  },
+  "chunking": {
+    "title": "分块策略",
+    "description": "选择此合集的检索分块方式。修改后，已有向量会等待你明确重建。",
+    "strategy": "策略",
+    "auto": "自动",
+    "recursive": "递归文本",
+    "markdown": "Markdown 标题",
+    "chunkSize": "分块大小",
+    "overlap": "重叠比例（%）",
+    "preview": "预览分块",
+    "previewEmpty": "添加文档后即可预览分块边界。",
+    "previewCount": "示例文档共 {count} 个分块",
+    "previewError": "无法预览文档分块。",
+    "reindexNotice": "保存新策略不会自动创建向量。",
+    "pendingTitle": "有文档等待索引",
+    "pendingDescription": "确认分块策略后，再统一重建向量。",
+    "reindexAll": "全部重新索引",
+    "reindexComplete": "合集索引已重建。",
+    "reindexFailed": "部分文档未能重新索引。"
+  }
 }

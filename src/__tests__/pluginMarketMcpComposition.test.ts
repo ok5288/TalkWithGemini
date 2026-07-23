@@ -19,6 +19,17 @@ describe("PluginMarket MCP composition", () => {
     expect(pluginMarket).toContain("showCustomMcpServerModal");
     expect(pluginMarket).toContain("CustomMcpServerModal");
     expect(pluginMarket).toContain("installCustomMcpServer");
+    expect(pluginMarket).toContain("discoverMcpBridgeServers");
+    expect(pluginMarket).toContain(
+      'serverConfig?.deployment?.mode === "local"',
+    );
+    expect(pluginMarket).toContain('source: "bridge"');
+    expect(pluginMarket).toContain('window.addEventListener("offline"');
+    expect(pluginMarket).toContain('t("mcpOfflineUnavailable")');
+    expect(pluginMarket).toContain("!isOnline || isLoading");
+    expect(pluginMarket).not.toContain("bridgeCommand");
+    expect(pluginMarket).not.toContain("bridgeArgs");
+    expect(pluginMarket).not.toContain("bridgeEnvironment");
     expect(pluginMarket).toContain('activeSource === "mcp"');
     expect(pluginMarket).toContain('plugin.source === "mcp"');
     expect(pluginMarket).toContain('plugin.source !== "mcp"');

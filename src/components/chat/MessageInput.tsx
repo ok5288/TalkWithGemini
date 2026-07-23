@@ -29,9 +29,10 @@ import {
   Library,
   PencilSparkles,
   Sparkles,
+  Quote,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
-import type { Attachment, ReasoningMode } from "@/types";
+import type { Attachment, MessageReplyReference, ReasoningMode } from "@/types";
 import { localizePluginMeta } from "@/lib/plugin/localizedMeta";
 import type { ModelInfo } from "@/services/api/chatService";
 import Tooltip from "../ui/Tooltip";
@@ -99,11 +100,18 @@ import {
   useComposerCapabilityState,
   useComposerMenuState,
 } from "@/features/chat";
+import type { ComposerSkillParameterValues } from "@/components/skill/SkillParameterDialog";
 
 type MessageInputVariant = "default" | "hero";
 
 interface MessageInputProps {
-  onSend: (text: string, attachments: Attachment[]) => void;
+  onSend: (
+    text: string,
+    attachments: Attachment[],
+    replyTo?: MessageReplyReference,
+    skillParameters?: ComposerSkillParameterValues,
+  ) => void;
+  onPrepareSend?: () => Promise<ComposerSkillParameterValues | null>;
   onStop?: () => void;
   disabled: boolean;
   availableModels?: ModelInfo[];
@@ -112,6 +120,9 @@ interface MessageInputProps {
   isSearchEnabled?: boolean;
   onToggleSearch?: () => void;
   variant?: MessageInputVariant;
+  replyTo?: MessageReplyReference;
+  onCancelReply?: () => void;
+  onNavigateReply?: (messageId: string) => void;
 }
 
 export interface MessageInputRef {
@@ -134,6 +145,7 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
   (
     {
       onSend,
+      onPrepareSend,
       onStop,
       disabled,
       availableModels = [],
@@ -142,6 +154,9 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
       isSearchEnabled = false,
       onToggleSearch,
       variant = "default",
+      replyTo,
+      onCancelReply,
+      onNavigateReply,
     },
     ref,
   ) => {
@@ -168,6 +183,7 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
     const [isDragUploadActive, setIsDragUploadActive] = useState(false);
     const [isPolishingInput, setIsPolishingInput] = useState(false);
     const [isParsingAttachments, setIsParsingAttachments] = useState(false);
+    const [isPreparingSend, setIsPreparingSend] = useState(false);
 
     const t = useTranslations("MessageInput");
     const tConfig = useTranslations("Config");
@@ -563,25 +579,39 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
         })
       ) {
         e.preventDefault();
-        handleSend();
+        void handleSend();
       }
     };
 
-    const handleSend = () => {
+    const handleSend = async () => {
       if (
         (!input.trim() && attachments.length === 0) ||
         disabled ||
         isParsingAttachments ||
+        isPreparingSend ||
         !selectedModel
       ) {
         return;
       }
 
-      onSend(input, attachments);
-      setInput("");
-      setAttachments([]);
-      if (textareaRef.current) {
-        textareaRef.current.style.height = "auto";
+      setIsPreparingSend(true);
+      setErrorMsg(null);
+      try {
+        const skillParameters = onPrepareSend
+          ? await onPrepareSend()
+          : undefined;
+        if (onPrepareSend && !skillParameters) return;
+        onSend(input, attachments, replyTo, skillParameters || undefined);
+        setInput("");
+        setAttachments([]);
+        if (textareaRef.current) {
+          textareaRef.current.style.height = "auto";
+        }
+      } catch (error) {
+        logInputError("Failed to prepare message send:", error);
+        setErrorMsg(error instanceof Error ? error.message : String(error));
+      } finally {
+        if (isMountedRef.current) setIsPreparingSend(false);
       }
     };
 
@@ -1097,7 +1127,8 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
       selectedModel ||
       t("noModelSelected");
     const hasKnowledgeAttachments = attachments.some(isKnowledgeAttachment);
-    const isInputBusy = disabled || isTranscribing || isParsingAttachments;
+    const isInputBusy =
+      disabled || isTranscribing || isParsingAttachments || isPreparingSend;
     const textareaMinHeightClass = isHeroVariant
       ? "min-h-[5em]"
       : "min-h-[2em]";
@@ -1229,6 +1260,30 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
         )}
 
         {/* Attachments Preview Area */}
+        {replyTo ? (
+          <div className="mx-3 mt-3 flex items-start gap-2 rounded-lg border border-border/70 bg-muted/35 px-3 py-2 text-xs text-muted-foreground">
+            <button
+              type="button"
+              onClick={() => onNavigateReply?.(replyTo.messageId)}
+              className={`flex min-w-0 flex-1 items-start gap-2 rounded text-left transition-colors hover:text-foreground ${iconButtonFocusClass}`}
+              aria-label={t("openReplySource")}
+            >
+              <Quote size={13} className="mt-0.5 shrink-0" aria-hidden="true" />
+              <span className="line-clamp-2 wrap-break-word">
+                {replyTo.excerpt || t("replySourceUnavailable")}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={onCancelReply}
+              className={`shrink-0 rounded p-0.5 transition-colors hover:bg-accent hover:text-foreground ${iconButtonFocusClass}`}
+              aria-label={t("cancelReply")}
+            >
+              <X size={13} aria-hidden="true" />
+            </button>
+          </div>
+        ) : null}
+
         <MessageInputAttachmentTray
           attachments={attachments}
           onRemove={removeAttachment}
@@ -1930,7 +1985,7 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
                     aria-label={t("sendMessageAria")}
                     disabled={!selectedModel || isParsingAttachments}
                     className={`${iconButtonBaseClass} bg-gray-100 text-gray-500 shadow-sm transition-colors hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-accent dark:text-muted-foreground dark:hover:bg-accent/80 ${iconButtonFocusClass}`}
-                    onClick={handleSend}
+                    onClick={() => void handleSend()}
                   >
                     <SendHorizontal size={16} aria-hidden="true" />
                   </button>

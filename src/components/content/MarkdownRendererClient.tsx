@@ -59,6 +59,7 @@ import {
 } from "@/lib/utils/markdownImages";
 import { copyTextToClipboard } from "@/lib/utils/clipboard";
 import { linkifyCitationReferences } from "@/lib/utils/citations";
+import { requestKnowledgeSourceNavigation } from "@/lib/knowledge/navigation";
 import { resolveObjectUrlWithLifecycle } from "@/lib/utils/objectUrlLifecycle";
 import { parseModelString } from "@/lib/utils/model";
 import type { PreviewImageInput } from "@/lib/utils/imagePreview";
@@ -71,6 +72,7 @@ export interface MarkdownRendererProps {
   content: string;
   className?: string;
   searchSources?: Source[];
+  ragSources?: Source[];
   onFileClick?: (file: MarkdownGeneratedFile) => void;
   isStreaming?: boolean;
   forcedTheme?: DiagramTheme;
@@ -200,6 +202,12 @@ const markdownRehypePlugins = [
   rehypeSanitizeInlineStyles,
   rehypeKatex,
   rehypeHighlight,
+] as any;
+
+const streamingMarkdownRehypePlugins = [
+  rehypeRaw,
+  [rehypeSanitize, htmlSanitizeSchema],
+  rehypeSanitizeInlineStyles,
 ] as any;
 
 const mergeClassName = (...classNames: Array<string | undefined>) =>
@@ -397,6 +405,21 @@ const CitationLink = ({
   const hidePreview = () => setHoverPos(null);
 
   const safeSourceUrl = getSafeWebHref(source.url);
+  const collectionId =
+    typeof source.metadata?.collectionId === "string"
+      ? source.metadata.collectionId
+      : "";
+  const fileId =
+    typeof source.metadata?.localFileId === "string"
+      ? source.metadata.localFileId
+      : typeof source.metadata?.fileId === "string"
+        ? source.metadata.fileId
+        : undefined;
+  const chunkIndex =
+    typeof source.metadata?.chunkIndex === "number"
+      ? source.metadata.chunkIndex
+      : undefined;
+  const canNavigateKnowledge = Boolean(collectionId);
 
   return (
     <span
@@ -407,10 +430,10 @@ const CitationLink = ({
       onTouchStart={showPreview}
     >
       <a
-        href={safeSourceUrl || undefined}
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-disabled={!safeSourceUrl}
+        href={safeSourceUrl || (canNavigateKnowledge ? "#" : undefined)}
+        target={canNavigateKnowledge ? undefined : "_blank"}
+        rel={canNavigateKnowledge ? undefined : "noopener noreferrer"}
+        aria-disabled={!safeSourceUrl && !canNavigateKnowledge}
         onFocus={showPreview}
         onBlur={hidePreview}
         onKeyDown={(event) => {
@@ -419,10 +442,22 @@ const CitationLink = ({
           }
         }}
         onClick={(event) => {
-          if (!safeSourceUrl) event.preventDefault();
+          if (canNavigateKnowledge) {
+            event.preventDefault();
+            requestKnowledgeSourceNavigation({
+              collectionId,
+              fileId,
+              chunkIndex,
+              excerpt: source.content,
+            });
+          } else if (!safeSourceUrl) {
+            event.preventDefault();
+          }
         }}
         className={`markdown-citation-badge ${
-          safeSourceUrl ? "cursor-pointer" : "markdown-citation-badge-disabled"
+          safeSourceUrl || canNavigateKnowledge
+            ? "cursor-pointer"
+            : "markdown-citation-badge-disabled"
         }`}
       >
         {children}
@@ -1249,6 +1284,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
   content,
   className,
   searchSources,
+  ragSources,
   onFileClick,
   isStreaming,
   forcedTheme,
@@ -1258,10 +1294,42 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
   const defaultTextColors = "markdown-body-default";
   const finalClass = className ? className : defaultTextColors;
   const t = useTranslations("Content");
+  const rendererRef = useRef<HTMLDivElement>(null);
+  const [isNearViewport, setIsNearViewport] = useState(false);
   const imageGallery = useMemo(
     () => collectMarkdownImageGallery(content),
     [content],
   );
+  const citationSources = useMemo(
+    () => [...(searchSources || []), ...(ragSources || [])],
+    [ragSources, searchSources],
+  );
+  const shouldUseHeavyMarkdown =
+    !isStreaming && (forceExpandCodeBlocks || isNearViewport);
+
+  useEffect(() => {
+    const element = rendererRef.current;
+    if (!element || isNearViewport || forceExpandCodeBlocks) return;
+    if (typeof IntersectionObserver === "undefined") {
+      setIsNearViewport(true);
+      return;
+    }
+
+    const scrollRoot = element.closest<HTMLElement>(
+      "[data-chat-scroll-container]",
+    );
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setIsNearViewport(true);
+          observer.disconnect();
+        }
+      },
+      { root: scrollRoot, rootMargin: "600px 0px" },
+    );
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [forceExpandCodeBlocks, isNearViewport]);
 
   // Define components for ReactMarkdown
   const markdownComponents: any = useMemo(
@@ -1325,7 +1393,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
       },
       a: ({ href, children }: any) => {
         return (
-          <CitationLink href={href} sources={searchSources || []}>
+          <CitationLink href={href} sources={citationSources}>
             {children}
           </CitationLink>
         );
@@ -1416,7 +1484,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
         );
       },
     }),
-    [imageGallery, searchSources, isStreaming, forceExpandCodeBlocks, t],
+    [citationSources, imageGallery, isStreaming, forceExpandCodeBlocks, t],
   );
 
   // Process content line by line for <file> tags
@@ -1426,6 +1494,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
     const textWithCitations = linkifyCitationReferences(
       normalizedContent,
       searchSources,
+      ragSources,
     );
 
     // 2. Split bounded model-generated file blocks from normal Markdown.
@@ -1447,7 +1516,11 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
               <ReactMarkdown
                 key={`md-chunk-${index}-${segmentIndex}`}
                 remarkPlugins={[remarkGfm, remarkMath]}
-                rehypePlugins={markdownRehypePlugins}
+                rehypePlugins={
+                  shouldUseHeavyMarkdown
+                    ? markdownRehypePlugins
+                    : streamingMarkdownRehypePlugins
+                }
                 components={markdownComponents}
               >
                 {diagramSegment.content}
@@ -1463,10 +1536,19 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
         </div>
       );
     });
-  }, [content, searchSources, onFileClick, markdownComponents, forcedTheme]);
+  }, [
+    content,
+    searchSources,
+    ragSources,
+    onFileClick,
+    markdownComponents,
+    forcedTheme,
+    shouldUseHeavyMarkdown,
+  ]);
 
   return (
     <div
+      ref={rendererRef}
       className={`markdown-body text-(length:--neo-font-size-base) leading-relaxed wrap-break-word w-full overflow-hidden ${finalClass}`}
     >
       {renderContent}

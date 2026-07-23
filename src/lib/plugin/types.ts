@@ -16,6 +16,7 @@ export interface PluginFunction {
 
 export interface PluginMcpMetadata {
   transport: McpTransport;
+  source?: "registry" | "custom" | "bridge";
   serverUrl: string;
   serverName: string;
   serverVersion?: string;

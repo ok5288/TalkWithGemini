@@ -30,7 +30,7 @@ export const appDb = localforage.createInstance({
   description: "Unified application storage",
 });
 
-export const STORAGE_VERSION = 5;
+export const STORAGE_VERSION = 6;
 export type StorageVersion = typeof STORAGE_VERSION;
 
 export const noopStorage: StateStorage = {
@@ -182,11 +182,33 @@ function prepareBrowserAppRestoreHydration(): Promise<void> | undefined {
   });
 }
 
+let browserSyncRecoveryImport: Promise<void> | undefined;
+
+/**
+ * A sync materialization may have been interrupted after only some persisted
+ * stores were replaced. Every application store waits on this shared recovery
+ * barrier before its first hydration read or write, so a reloaded page cannot
+ * observe or persist the mixed state.
+ */
+function prepareBrowserSyncApplyRecovery(): Promise<void> | undefined {
+  if (typeof window === "undefined") return undefined;
+  browserSyncRecoveryImport ||= import("@/lib/sync/applyJournal").then(
+    ({ prepareBrowserSyncApplyRecovery: prepare }) => prepare(),
+  );
+  return browserSyncRecoveryImport;
+}
+
+function prepareBrowserAppDataHydration(): Promise<void> | undefined {
+  const syncRecovery = prepareBrowserSyncApplyRecovery();
+  if (!syncRecovery) return prepareBrowserAppRestoreHydration();
+  return syncRecovery.then(() => prepareBrowserAppRestoreHydration());
+}
+
 export const getAppDbStorage = (): StateStorage => {
   if (typeof window === "undefined") return noopStorage;
   return {
     getItem: async (name) => {
-      await prepareBrowserAppRestoreHydration();
+      await prepareBrowserAppDataHydration();
       if (!isAppRestoreHydrationInProgress()) {
         try {
           await ensureLegacyGeminiNextChatMigration({
@@ -200,10 +222,16 @@ export const getAppDbStorage = (): StateStorage => {
       }
       return appDb.getItem<string>(name);
     },
-    setItem: (name, value) =>
-      runWithAppRestoreHydrationWriteLock(() => appDb.setItem(name, value)),
-    removeItem: (name) =>
-      runWithAppRestoreHydrationWriteLock(() => appDb.removeItem(name)),
+    setItem: async (name, value) => {
+      await prepareBrowserAppDataHydration();
+      return runWithAppRestoreHydrationWriteLock(() =>
+        appDb.setItem(name, value),
+      );
+    },
+    removeItem: async (name) => {
+      await prepareBrowserAppDataHydration();
+      return runWithAppRestoreHydrationWriteLock(() => appDb.removeItem(name));
+    },
   };
 };
 
@@ -225,19 +253,23 @@ export const getBrowserLocalStorage = (): StateStorage => {
 
   return {
     getItem: (name) => {
-      const preparation = prepareBrowserAppRestoreHydration();
+      const preparation = prepareBrowserAppDataHydration();
       return preparation
         ? preparation.then(() => readItem(name))
         : readItem(name);
     },
-    setItem: (name, value) =>
-      runWithAppRestoreHydrationWriteLock(async () => {
+    setItem: async (name, value) => {
+      await prepareBrowserAppDataHydration();
+      return runWithAppRestoreHydrationWriteLock(async () => {
         window.localStorage.setItem(name, value);
-      }),
-    removeItem: (name) =>
-      runWithAppRestoreHydrationWriteLock(async () => {
+      });
+    },
+    removeItem: async (name) => {
+      await prepareBrowserAppDataHydration();
+      return runWithAppRestoreHydrationWriteLock(async () => {
         window.localStorage.removeItem(name);
-      }),
+      });
+    },
   };
 };
 

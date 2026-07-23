@@ -7,6 +7,17 @@ export interface Source {
   metadata?: Record<string, unknown>;
 }
 
+export type CitationSourceKind = "web" | "knowledge";
+
+export interface CitationSource extends Source {
+  id: string;
+  kind: CitationSourceKind;
+  collectionId?: string;
+  fileId?: string;
+  chunkIndex?: number;
+  retrieval?: "vector" | "keyword" | "both";
+}
+
 export interface ImageSource {
   url: string;
   description?: string;

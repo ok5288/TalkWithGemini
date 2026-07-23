@@ -114,7 +114,7 @@ async function clearBrowserAppData(page: Page) {
 }
 
 function persistedState(state: Record<string, unknown>) {
-  return JSON.stringify({ state, version: 5 });
+  return JSON.stringify({ state, version: 6 });
 }
 
 function sseBody(events: unknown[]) {
@@ -165,6 +165,419 @@ test("loads the local chat shell", async ({ page }) => {
   await page.goto("/");
 
   await expect(page.locator('textarea[name="message"]')).toBeVisible();
+});
+
+test("keeps a 500-message chat timeline DOM bounded while scrolling", async ({
+  page,
+}) => {
+  await page.goto("/manifest.webmanifest");
+  const sessionId = "virtualized-500-message-fixture";
+  const now = Date.now();
+  const nodesById = Object.fromEntries(
+    Array.from({ length: 500 }, (_, index) => {
+      const id = `message-${index}`;
+      const nextId = index < 499 ? `message-${index + 1}` : undefined;
+      return [
+        id,
+        {
+          id,
+          message: {
+            id,
+            role: index % 2 === 0 ? "user" : "model",
+            content: `Virtualized fixture message ${index}`,
+            timestamp: now + index,
+          },
+          parentMessageId: index > 0 ? `message-${index - 1}` : undefined,
+          childMessageIds: nextId ? [nextId] : [],
+          activeChildMessageId: nextId,
+        },
+      ];
+    }),
+  );
+
+  await setIndexedDbValue(
+    page,
+    "neo-chat-storage",
+    persistedState({
+      sessions: [
+        {
+          id: sessionId,
+          title: "Virtualized 500 messages",
+          messageCount: 500,
+          updatedAt: now,
+          model: "",
+        },
+      ],
+      workspaces: [],
+      currentSessionId: sessionId,
+      selectedModel: "",
+      chatConfig: {},
+    }),
+  );
+  await setIndexedDbValue(page, `session_messages_${sessionId}`, {
+    nodesById,
+    rootMessageIds: ["message-0"],
+  });
+
+  await page.goto("/");
+  const timeline = page.getByTestId("virtualized-message-timeline");
+  await expect(timeline).toBeVisible();
+  const renderedRows = page.locator("[data-message-id]");
+  await expect(renderedRows.first()).toBeVisible();
+  expect(await renderedRows.count()).toBeLessThanOrEqual(50);
+
+  const scroller = page.locator("[data-chat-scroll-container]");
+  await scroller.evaluate((element) => element.scrollTo({ top: 0 }));
+  await expect(page.locator('[data-message-id="message-0"]')).toBeVisible();
+  expect(await renderedRows.count()).toBeLessThanOrEqual(50);
+});
+
+test("keeps manual scrolling stable while reasoning and content stream", async ({
+  page,
+}) => {
+  test.setTimeout(45_000);
+  await page.goto("/manifest.webmanifest");
+  await page.addInitScript(() => {
+    const originalFetch = window.fetch.bind(window);
+    const releasedGates = new Set<string>();
+    const gateWaiters = new Map<string, () => void>();
+    const fixture = {
+      phase: "idle",
+      release(gate: string) {
+        releasedGates.add(gate);
+        gateWaiters.get(gate)?.();
+        gateWaiters.delete(gate);
+      },
+    };
+    Object.defineProperty(window, "__streamScrollFixture", {
+      configurable: true,
+      value: fixture,
+    });
+
+    const waitForGate = (gate: string) => {
+      if (releasedGates.has(gate)) return Promise.resolve();
+      return new Promise<void>((resolve) => gateWaiters.set(gate, resolve));
+    };
+    const wait = (durationMs: number) =>
+      new Promise<void>((resolve) => window.setTimeout(resolve, durationMs));
+
+    window.fetch = async (input, init) => {
+      const requestUrl =
+        typeof input === "string" || input instanceof URL
+          ? String(input)
+          : input.url;
+      const url = new URL(requestUrl, window.location.href);
+      if (url.pathname !== "/api/chat") {
+        return originalFetch(input, init);
+      }
+
+      const encoder = new TextEncoder();
+      let cancelled = false;
+      fixture.phase = "connected";
+      const stream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          const push = (event: unknown) => {
+            if (cancelled) return;
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify(event)}\n\n`),
+            );
+          };
+
+          void (async () => {
+            try {
+              push({
+                type: "reasoning",
+                content: "Initial reasoning fixture.",
+              });
+              fixture.phase = "reasoning-ready";
+              await waitForGate("grow-reasoning");
+
+              for (let index = 0; index < 10; index += 1) {
+                push({
+                  type: "reasoning",
+                  content:
+                    `\n\n### Reasoning segment ${index}\n` +
+                    "Measured reasoning detail ".repeat(12),
+                });
+                await wait(30);
+              }
+              push({
+                type: "reasoning",
+                content: "\n\nreasoning-tail-marker",
+              });
+              fixture.phase = "reasoning-grown";
+              await waitForGate("grow-content");
+
+              for (let index = 0; index < 10; index += 1) {
+                push({
+                  type: "content",
+                  content:
+                    `\n\nContent segment ${index}. ` +
+                    "Streaming answer detail ".repeat(5),
+                });
+                await wait(30);
+              }
+              push({
+                type: "content",
+                content: "\n\ncontent-tail-marker",
+              });
+              fixture.phase = "content-grown";
+              await waitForGate("finish");
+
+              push({ type: "done" });
+              fixture.phase = "done";
+              controller.close();
+            } catch (error) {
+              if (!cancelled) controller.error(error);
+            }
+          })();
+        },
+        cancel() {
+          cancelled = true;
+        },
+      });
+
+      return new Response(stream, {
+        status: 200,
+        headers: { "Content-Type": "text/event-stream" },
+      });
+    };
+  });
+
+  await page.evaluate(
+    (value) => {
+      localStorage.setItem("neo-chat-core-settings", value);
+    },
+    persistedState({
+      theme: "light",
+      language: "en",
+      providers: [
+        {
+          id: "scroll-provider",
+          name: "Scroll Provider",
+          type: "OpenAI Compatible",
+          baseUrl: "https://model.example.test/v1",
+          apiKey: "",
+          enabled: true,
+          models: ["scroll-model"],
+          modelsList: ["scroll-model"],
+        },
+      ],
+      defaultModels: {},
+    }),
+  );
+  await setIndexedDbValue(
+    page,
+    "neo-chat-settings",
+    persistedState({
+      system: {
+        enableAutoTitle: false,
+        enableRelatedQuestions: false,
+        enableAutoCompression: false,
+      },
+      customModelMetadata: {
+        "scroll-model": {
+          id: "scroll-model",
+          name: "Scroll Model",
+          reasoning: true,
+        },
+      },
+    }),
+  );
+
+  const sessionId = "stream-scroll-session";
+  const now = Date.now();
+  const historyLength = 32;
+  const nodesById = Object.fromEntries(
+    Array.from({ length: historyLength }, (_, index) => {
+      const id = `scroll-history-${index}`;
+      const nextId =
+        index < historyLength - 1 ? `scroll-history-${index + 1}` : undefined;
+      return [
+        id,
+        {
+          id,
+          message: {
+            id,
+            role: index % 2 === 0 ? "user" : "model",
+            content:
+              `Scroll history fixture ${index}. ` +
+              "A long archived message keeps the timeline overflow real. ".repeat(
+                4,
+              ),
+            timestamp: now - historyLength + index,
+          },
+          parentMessageId:
+            index > 0 ? `scroll-history-${index - 1}` : undefined,
+          childMessageIds: nextId ? [nextId] : [],
+          activeChildMessageId: nextId,
+        },
+      ];
+    }),
+  );
+  await setIndexedDbValue(
+    page,
+    "neo-chat-storage",
+    persistedState({
+      sessions: [
+        {
+          id: sessionId,
+          title: "Streaming scroll fixture",
+          messageCount: historyLength,
+          updatedAt: now,
+          model: "scroll-provider:scroll-model",
+        },
+      ],
+      workspaces: [],
+      currentSessionId: sessionId,
+      selectedModel: "scroll-provider:scroll-model",
+      chatConfig: {
+        useSearch: false,
+        useReasoning: true,
+        reasoningMode: "auto",
+        useRAG: false,
+        temperature: 1,
+      },
+    }),
+  );
+  await setIndexedDbValue(page, `session_messages_${sessionId}`, {
+    nodesById,
+    rootMessageIds: ["scroll-history-0"],
+    activeRootMessageId: "scroll-history-0",
+  });
+  await setIndexedDbValue(
+    page,
+    "neo-chat-memory",
+    persistedState({
+      settings: {
+        enabled: false,
+        searchEnabled: false,
+        autoRecordEnabled: false,
+        dreamEnabled: false,
+      },
+      memories: [],
+      dreamStatus: { isRunning: false },
+    }),
+  );
+
+  const streamPhase = () =>
+    page.evaluate(
+      () =>
+        (
+          window as unknown as {
+            __streamScrollFixture: { phase: string };
+          }
+        ).__streamScrollFixture.phase,
+    );
+  const releaseStream = (gate: string) =>
+    page.evaluate(
+      (gateName) =>
+        (
+          window as unknown as {
+            __streamScrollFixture: { release: (name: string) => void };
+          }
+        ).__streamScrollFixture.release(gateName),
+      gate,
+    );
+
+  await page.goto("/");
+  const scroller = page.locator("[data-chat-scroll-container]");
+  await expect(scroller).toBeVisible();
+  expect(
+    await scroller.evaluate(
+      (element) => getComputedStyle(element).scrollBehavior,
+    ),
+  ).toBe("auto");
+
+  await sendChatMessage(page, "Exercise streamed scrolling");
+  await expect.poll(streamPhase).toBe("reasoning-ready");
+  const activeReasoningToggle = scroller.locator('button[aria-busy="true"]');
+  await expect(activeReasoningToggle).toBeVisible();
+  await expect(activeReasoningToggle).toHaveAttribute("aria-expanded", "true");
+  await expect
+    .poll(() =>
+      scroller.evaluate(
+        (element) =>
+          element.scrollHeight - element.scrollTop - element.clientHeight,
+      ),
+    )
+    .toBeLessThanOrEqual(8);
+
+  await scroller.hover();
+  await page.mouse.wheel(0, -80);
+  await expect
+    .poll(() =>
+      scroller.evaluate(
+        (element) =>
+          element.scrollHeight - element.scrollTop - element.clientHeight,
+      ),
+    )
+    .toBeGreaterThan(40);
+  const pausedScroll = await scroller.evaluate((element) => ({
+    distanceFromEnd:
+      element.scrollHeight - element.scrollTop - element.clientHeight,
+    scrollHeight: element.scrollHeight,
+    scrollTop: element.scrollTop,
+  }));
+  expect(pausedScroll.distanceFromEnd).toBeLessThan(160);
+
+  await releaseStream("grow-reasoning");
+  await expect.poll(streamPhase).toBe("reasoning-grown");
+  await expect
+    .poll(() =>
+      scroller.evaluate((element) =>
+        element.textContent?.includes("reasoning-tail-marker"),
+      ),
+    )
+    .toBe(true);
+  await expect
+    .poll(() => scroller.evaluate((element) => element.scrollHeight))
+    .toBeGreaterThan(pausedScroll.scrollHeight);
+  const afterReasoning = await scroller.evaluate((element) => ({
+    scrollHeight: element.scrollHeight,
+    scrollTop: element.scrollTop,
+  }));
+  expect(afterReasoning.scrollHeight).toBeGreaterThan(
+    pausedScroll.scrollHeight,
+  );
+  expect(
+    Math.abs(afterReasoning.scrollTop - pausedScroll.scrollTop),
+  ).toBeLessThanOrEqual(2);
+
+  await scroller.evaluate((element) =>
+    element.scrollTo({ top: element.scrollHeight, behavior: "auto" }),
+  );
+  await expect
+    .poll(() =>
+      scroller.evaluate(
+        (element) =>
+          element.scrollHeight - element.scrollTop - element.clientHeight,
+      ),
+    )
+    .toBeLessThanOrEqual(8);
+
+  await releaseStream("grow-content");
+  await expect.poll(streamPhase).toBe("content-grown");
+  await expect
+    .poll(
+      () =>
+        scroller.evaluate((element) =>
+          element.textContent?.includes("content-tail-marker"),
+        ),
+      { timeout: 15_000 },
+    )
+    .toBe(true);
+  await expect
+    .poll(() =>
+      scroller.evaluate(
+        (element) =>
+          element.scrollHeight - element.scrollTop - element.clientHeight,
+      ),
+    )
+    .toBeLessThanOrEqual(8);
+
+  await releaseStream("finish");
+  await expect.poll(streamPhase).toBe("done");
 });
 
 test("applies stable gutters to the primary app scroll regions", async ({
@@ -296,11 +709,10 @@ test("avoids page-level horizontal overflow on mobile panels", async ({
     await expectNoPageHorizontalOverflow(page);
   }
 
-  await page.goto("/?panel=settings&settingsTab=system");
   const mobileSettingsNavigation = page.locator(
     '[class~="md:overflow-y-auto"]',
   );
-  await expect(mobileSettingsNavigation).toBeVisible();
+  await expect(mobileSettingsNavigation).toBeVisible({ timeout: 15_000 });
   expect(
     await mobileSettingsNavigation.evaluate(
       (element) => getComputedStyle(element).scrollbarGutter,
@@ -1094,7 +1506,7 @@ test("exports and restores a ZIP v3 backup without local credentials", async ({
   expect(manifest).toMatchObject({
     format: "neo-chat-backup",
     exportVersion: 3,
-    storageVersion: 5,
+    storageVersion: 6,
   });
   expect(manifest.files).toHaveLength(2);
   expect(exportedDataText).toContain("non-active branch retained in backup");

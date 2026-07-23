@@ -19,17 +19,25 @@ import {
   parseKnowledgeFileAttachmentData,
 } from "./knowledgeAttachments";
 import { mapSettledWithConcurrency } from "./concurrency";
+import { readPersistedKnowledgeContent } from "@/lib/global-search/browserAdapter";
+import { GLOBAL_SEARCH_LIMITS } from "@/config/limits";
+import {
+  buildKnowledgeLexicalIndex,
+  reciprocalRankFuseKnowledgeSources,
+  searchKnowledgeLexicalIndex,
+} from "@/lib/knowledge/hybridSearch";
 
 const RAG_QUERY_CONCURRENCY = 4;
 
 type IndexedKnowledgeFileSelector = {
   collectionId: string;
   fileId: string;
+  localFileId: string;
 };
 
 export interface RagQueryError {
   message: string;
-  code: "RAG_QUERY_FAILED";
+  code: "RAG_QUERY_FAILED" | "RAG_VECTOR_FALLBACK";
 }
 
 /**
@@ -80,10 +88,16 @@ export function isIndexedKnowledgeFileAttachment(
   attachment: Attachment,
   knowledgeCollections: any[],
 ): boolean {
+  const fileData = parseKnowledgeFileAttachmentData(attachment);
+  const collection = knowledgeCollections.find(
+    (item) => item.id === fileData?.collectionId,
+  );
   const file = getKnowledgeFile(attachment, knowledgeCollections);
   return (
     (file?.indexStatus === "indexed" || file?.status === "indexed") &&
-    typeof file.ragId === "string"
+    typeof file.ragId === "string" &&
+    (!file.indexedChunkingRevision ||
+      file.indexedChunkingRevision === collection?.chunkingRevision)
   );
 }
 
@@ -109,6 +123,7 @@ function getIndexedKnowledgeFileSelectors(
     selectors.push({
       collectionId: fileData.collectionId,
       fileId: file.ragId,
+      localFileId: fileData.fileId,
     });
   }
 
@@ -130,6 +145,29 @@ function sourceMatchesSelectedRagScope(
   return selectedFileIds.has(fileId);
 }
 
+function sourceMatchesCurrentKnowledgeIndex(
+  source: Source,
+  knowledgeCollections: any[],
+): boolean {
+  if (source.metadata?.retrieval === "keyword") return true;
+  const collectionId = getSourceMetadataString(source, "collectionId");
+  const collection = knowledgeCollections.find(
+    (item) => item.id === collectionId,
+  );
+  if (!collection) return false;
+  const fileId = getSourceMetadataString(source, "fileId");
+  const file = collection.files?.find(
+    (item: any) => item.id === fileId || item.ragId === fileId,
+  );
+  if (!file || (file.indexStatus || file.status) !== "indexed") return false;
+  const sourceRevision = getSourceMetadataString(source, "chunkingRevision");
+  return (
+    (!file.indexedChunkingRevision && !sourceRevision) ||
+    (file.indexedChunkingRevision === collection.chunkingRevision &&
+      (!sourceRevision || sourceRevision === collection.chunkingRevision))
+  );
+}
+
 /**
  * Process RAG (Retrieval-Augmented Generation) attachments
  */
@@ -143,6 +181,7 @@ export const processRAGAttachments = async (
     tokenSecret?: unknown;
     useDefaultVectorStore?: boolean;
     serverVectorStoreAvailable?: boolean;
+    topK?: number;
   },
   supportAttachment: boolean,
   knowledgeCollections: any[] = [],
@@ -163,7 +202,7 @@ export const processRAGAttachments = async (
     return { convertedContent, finalAttachments, ragSources };
   }
 
-  const isRagServiceEnabled = ragConfig.enabled && hasRagVectorStore(ragConfig);
+  const isRagServiceEnabled = ragConfig.enabled;
 
   if (isRagServiceEnabled) {
     try {
@@ -178,6 +217,7 @@ export const processRAGAttachments = async (
         knowledgeCollections,
       );
       const indexedFileIdsByCollectionId = new Map<string, Set<string>>();
+      const lexicalFileIdsByCollectionId = new Map<string, Set<string>>();
       for (const selector of indexedFileSelectors) {
         if (!indexedFileIdsByCollectionId.has(selector.collectionId)) {
           indexedFileIdsByCollectionId.set(selector.collectionId, new Set());
@@ -185,6 +225,12 @@ export const processRAGAttachments = async (
         indexedFileIdsByCollectionId
           .get(selector.collectionId)
           ?.add(selector.fileId);
+        if (!lexicalFileIdsByCollectionId.has(selector.collectionId)) {
+          lexicalFileIdsByCollectionId.set(selector.collectionId, new Set());
+        }
+        lexicalFileIdsByCollectionId
+          .get(selector.collectionId)
+          ?.add(selector.localFileId);
       }
       const queryCollectionIds = new Set([
         ...selectedCollectionIds,
@@ -199,6 +245,35 @@ export const processRAGAttachments = async (
       const queries = await generateRAGSearchQueries(text, signal);
 
       if (queries && queries.length > 0) {
+        const topK = Math.max(1, Math.min(50, ragConfig.topK || 10));
+        let lexicalIndex;
+        try {
+          lexicalIndex = await buildKnowledgeLexicalIndex({
+            collections: knowledgeCollections,
+            collectionIds: selectedCollectionIds,
+            fileIdsByCollectionId: lexicalFileIdsByCollectionId,
+            signal,
+            readContent: async (collection, file, readSignal) => {
+              const result = await readPersistedKnowledgeContent(
+                collection,
+                file,
+                readSignal,
+                GLOBAL_SEARCH_LIMITS.maxSingleContentChars,
+              );
+              return result?.content || null;
+            },
+          });
+        } catch (error) {
+          if (
+            signal?.aborted ||
+            (error instanceof Error && error.name === "AbortError")
+          ) {
+            throw error;
+          }
+          logDevError("Local knowledge index failed", error);
+          lexicalIndex = null;
+        }
+
         // 2. Perform the search across all selected collections
         const collectionIds = Array.from(queryCollectionIds);
 
@@ -210,26 +285,34 @@ export const processRAGAttachments = async (
           }
         }
 
-        const settledResults = await mapSettledWithConcurrency<
-          { query: string; collectionId: string },
-          Source[]
-        >(searchRequests, RAG_QUERY_CONCURRENCY, ({ query, collectionId }) => {
-          signal?.throwIfAborted();
-          const request = signal
-            ? queryRAG(query, collectionId, signal)
-            : queryRAG(query, collectionId);
-          return request.then((sources) =>
-            sources.map((source): Source => ({
-              ...source,
-              metadata: {
-                ...(source.metadata || {}),
-                collectionId:
-                  getSourceMetadataString(source, "collectionId") ||
-                  collectionId,
+        const vectorEnabled = hasRagVectorStore(ragConfig);
+        const settledResults = vectorEnabled
+          ? await mapSettledWithConcurrency<
+              { query: string; collectionId: string },
+              Source[]
+            >(
+              searchRequests,
+              RAG_QUERY_CONCURRENCY,
+              ({ query, collectionId }) => {
+                signal?.throwIfAborted();
+                const request = signal
+                  ? queryRAG(query, collectionId, signal)
+                  : queryRAG(query, collectionId);
+                return request.then((sources) =>
+                  sources.map((source): Source => ({
+                    ...source,
+                    metadata: {
+                      ...(source.metadata || {}),
+                      collectionId:
+                        getSourceMetadataString(source, "collectionId") ||
+                        collectionId,
+                      retrieval: "vector",
+                    },
+                  })),
+                );
               },
-            })),
-          );
-        });
+            )
+          : [];
         signal?.throwIfAborted();
         const successfulResults = settledResults.filter(
           (result): result is PromiseFulfilledResult<Source[]> =>
@@ -239,7 +322,16 @@ export const processRAGAttachments = async (
           (result): result is PromiseRejectedResult =>
             result.status === "rejected",
         );
-        if (successfulResults.length === 0 && failedResults.length > 0) {
+        const keywordResults = lexicalIndex
+          ? queries.flatMap((query) =>
+              searchKnowledgeLexicalIndex(lexicalIndex, query, topK),
+            )
+          : [];
+        if (
+          successfulResults.length === 0 &&
+          failedResults.length > 0 &&
+          keywordResults.length === 0
+        ) {
           throw failedResults[0].reason;
         }
         failedResults.forEach((result) => {
@@ -249,7 +341,7 @@ export const processRAGAttachments = async (
           );
         });
 
-        const allResults = successfulResults
+        const vectorResults = successfulResults
           .map((result) => result.value)
           .flat()
           .filter((source) =>
@@ -258,19 +350,35 @@ export const processRAGAttachments = async (
               selectedCollectionIds,
               indexedFileIdsByCollectionId,
             ),
+          )
+          .filter((source) =>
+            sourceMatchesCurrentKnowledgeIndex(source, knowledgeCollections),
           );
+        const scopedKeywordResults = keywordResults.filter((source) =>
+          sourceMatchesSelectedRagScope(
+            source,
+            selectedCollectionIds,
+            indexedFileIdsByCollectionId,
+          ),
+        );
 
-        // Deduplicate results based on content
-        const uniqueResults = new Map<string, Source>();
-        allResults.forEach((res) => {
-          const key = res.content.slice(0, 100);
-          if (!uniqueResults.has(key)) {
-            uniqueResults.set(key, res);
-          }
+        const finalResults = reciprocalRankFuseKnowledgeSources({
+          vector: vectorResults,
+          keyword: scopedKeywordResults,
+          limit: topK,
         });
-
-        const finalResults = Array.from(uniqueResults.values());
         ragSources = finalResults;
+        if (
+          failedResults.length > 0 &&
+          vectorResults.length === 0 &&
+          scopedKeywordResults.length > 0
+        ) {
+          ragError = {
+            code: "RAG_VECTOR_FALLBACK",
+            message:
+              "Vector retrieval was unavailable; local keyword results were used.",
+          };
+        }
 
         if (finalResults.length > 0) {
           const ragContextParts: string[] = [];
