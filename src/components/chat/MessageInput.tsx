@@ -85,6 +85,10 @@ import { isPluginAuthRequired } from "@/lib/plugin/config";
 import { isKnowledgeAttachment } from "@/lib/utils/knowledgeAttachments";
 import { createChatDocumentAttachment } from "@/lib/utils/documentAttachments";
 import { ensureImageDisplayCache } from "@/lib/utils/imageDisplayCache";
+import {
+  compressImageFile,
+  getImageCompressionConfig,
+} from "@/lib/utils/imageCompression";
 import { polishTextContent } from "@/services/artifactService";
 import { normalizeSkillIdRefs } from "@/lib/skills";
 import {
@@ -206,6 +210,7 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
       voice,
       search,
       rag,
+      system,
       serverConfig,
     } = useSettingsStore();
 
@@ -1045,7 +1050,13 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
                 continue;
               }
 
-              const base64 = await fileToBase64(file);
+              const preparedFile = file.type.startsWith("image/")
+                ? await compressImageFile(
+                    file,
+                    getImageCompressionConfig(system),
+                  )
+                : file;
+              const base64 = await fileToBase64(preparedFile);
               if (
                 !isMountedRef.current ||
                 fileSelectionRunRef.current !== runId
@@ -1056,9 +1067,9 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
 
               const attachment: Attachment = {
                 id: uuidv7(),
-                mimeType: file.type || "application/octet-stream",
+                mimeType: preparedFile.type || "application/octet-stream",
                 data: base64Data,
-                fileName: file.name,
+                fileName: preparedFile.name,
               };
 
               newAttachments.push(

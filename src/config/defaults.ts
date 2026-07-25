@@ -69,6 +69,9 @@ export const DEFAULT_SYSTEM_SETTINGS = {
   enableAutoCompression: true,
   compressionThreshold: 12, // 12 轮对话
   historyKeepCount: 4, // 保留最近 4 轮
+  enableAutoImageCompression: true,
+  imageCompressionMaxSizeMB: 1,
+  imageCompressionMaxWidthOrHeight: 1024,
   enableCodeCollapse: false,
   enableHtmlVisualPrompt: true,
   enableDestructiveToolConfirmation: true,

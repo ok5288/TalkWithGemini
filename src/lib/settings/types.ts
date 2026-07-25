@@ -61,6 +61,9 @@ export interface SystemSettings {
   enableAutoCompression: boolean;
   compressionThreshold: number;
   historyKeepCount: number;
+  enableAutoImageCompression: boolean;
+  imageCompressionMaxSizeMB: number;
+  imageCompressionMaxWidthOrHeight: number;
   enableCodeCollapse: boolean;
   enableHtmlVisualPrompt: boolean;
   enableDestructiveToolConfirmation: boolean;

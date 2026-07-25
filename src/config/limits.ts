@@ -195,6 +195,14 @@ export const SYSTEM_SETTINGS_LIMITS = {
   minHistoryKeepCount: 1,
   maxHistoryKeepCount: 10,
   defaultHistoryKeepCount: 4,
+  minImageCompressionMaxSizeMB: 0.5,
+  maxImageCompressionMaxSizeMB: 5,
+  defaultImageCompressionMaxSizeMB: 1,
+  imageCompressionMaxSizeMBStep: 0.5,
+  minImageCompressionMaxWidthOrHeight: 512,
+  maxImageCompressionMaxWidthOrHeight: 4_096,
+  defaultImageCompressionMaxWidthOrHeight: 1_024,
+  imageCompressionMaxWidthOrHeightStep: 256,
 } as const;
 
 export const CHAT_ENTITY_LIMITS = {

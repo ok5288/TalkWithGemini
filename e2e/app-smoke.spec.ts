@@ -161,6 +161,77 @@ async function expectNoPageHorizontalOverflow(page: Page) {
   expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth);
 }
 
+async function attachCanvasImages(
+  page: Page,
+  images: Array<{
+    name: string;
+    width: number;
+    height: number;
+    patterned?: boolean;
+  }>,
+) {
+  return page.evaluate(async (specs) => {
+    const input = document.querySelector<HTMLInputElement>(
+      'input[name="chat-images"]',
+    );
+    if (!input) throw new Error("Chat image input is unavailable.");
+
+    const transfer = new DataTransfer();
+    const sizes: Record<string, number> = {};
+
+    for (const spec of specs) {
+      const canvas = document.createElement("canvas");
+      canvas.width = spec.width;
+      canvas.height = spec.height;
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("Canvas 2D context is unavailable.");
+
+      const gradient = context.createLinearGradient(
+        0,
+        0,
+        spec.width,
+        spec.height,
+      );
+      gradient.addColorStop(0, "#2563eb");
+      gradient.addColorStop(0.5, "#22c55e");
+      gradient.addColorStop(1, "#f59e0b");
+      context.fillStyle = gradient;
+      context.fillRect(0, 0, spec.width, spec.height);
+
+      if (spec.patterned) {
+        const block = 12;
+        for (let y = 0; y < spec.height; y += block) {
+          for (let x = 0; x < spec.width; x += block) {
+            if ((x / block + y / block) % 3 !== 0) continue;
+            context.fillStyle = `rgba(${(x * 13) % 255}, ${
+              (y * 17) % 255
+            }, ${(x + y) % 255}, 0.7)`;
+            context.fillRect(x, y, block, block);
+          }
+        }
+      }
+
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob(
+          (value) =>
+            value ? resolve(value) : reject(new Error("Canvas export failed.")),
+          "image/jpeg",
+          0.92,
+        );
+      });
+      const file = new File([blob], spec.name, {
+        type: "image/jpeg",
+      });
+      sizes[spec.name] = file.size;
+      transfer.items.add(file);
+    }
+
+    input.files = transfer.files;
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    return sizes;
+  }, images);
+}
+
 test("loads the local chat shell", async ({ page }) => {
   await page.goto("/");
 
@@ -1017,6 +1088,18 @@ test("avoids page-level horizontal overflow on mobile panels", async ({
 test("renders the destructive confirmation setting across themes and viewports", async ({
   page,
 }) => {
+  const controlledInputWarnings: string[] = [];
+  page.on("console", (message) => {
+    if (
+      message.type() === "error" &&
+      /changing an (?:un)?controlled input to be (?:un)?controlled/.test(
+        message.text(),
+      )
+    ) {
+      controlledInputWarnings.push(message.text());
+    }
+  });
+
   await page.goto("/manifest.webmanifest");
   await page.evaluate(
     (value) => localStorage.setItem("neo-chat-core-settings", value),
@@ -1039,11 +1122,15 @@ test("renders the destructive confirmation setting across themes and viewports",
   const autoScrollToggle = page.getByLabel(
     "Auto-scroll while messages are being generated",
   );
+  const imageCompressionToggle = page.getByLabel(
+    "Automatically compress conversation images",
+  );
   const themeControl = page.getByRole("group", { name: "Appearance theme" });
   await expect(confirmationToggle).toBeVisible();
   await expect(confirmationToggle).not.toBeChecked();
   await expect(autoScrollToggle).toBeVisible();
   await expect(autoScrollToggle).not.toBeChecked();
+  await expect(imageCompressionToggle).toBeChecked();
   await autoScrollToggle.press("Space");
   await expect(autoScrollToggle).toBeChecked();
   await expect(page.locator("html")).not.toHaveClass(/dark/);
@@ -1062,6 +1149,210 @@ test("renders the destructive confirmation setting across themes and viewports",
   await expect(confirmationToggle).toBeChecked();
   await themeControl.getByRole("button", { name: "Light" }).click();
   await expect(page.locator("html")).not.toHaveClass(/dark/);
+  expect(controlledInputWarnings).toEqual([]);
+});
+
+test("persists auto image compression settings and hides disabled controls", async ({
+  page,
+}) => {
+  await page.goto("/manifest.webmanifest");
+  await page.evaluate(
+    (value) => localStorage.setItem("neo-chat-core-settings", value),
+    persistedState({ theme: "light", language: "en" }),
+  );
+
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto("/?panel=settings&settingsTab=system");
+
+  const toggle = page.getByLabel("Automatically compress conversation images");
+  const sizeSlider = page.getByLabel("Maximum compressed image file size");
+  const dimensionSlider = page.getByLabel(
+    "Maximum compressed image width or height",
+  );
+  const controls = page.getByTestId("image-compression-controls");
+
+  await expect(toggle).toBeChecked();
+  await expect(controls).toBeVisible();
+  await expect(sizeSlider).toHaveValue("1");
+  await expect(sizeSlider).toHaveAttribute("aria-valuetext", "1 MB");
+  await expect(dimensionSlider).toHaveValue("1024");
+  await expect(dimensionSlider).toHaveAttribute("aria-valuetext", "1024 px");
+  await expectNoPageHorizontalOverflow(page);
+
+  await sizeSlider.press("Home");
+  for (let index = 0; index < 4; index += 1) {
+    await sizeSlider.press("ArrowRight");
+  }
+  await dimensionSlider.press("Home");
+  for (let index = 0; index < 6; index += 1) {
+    await dimensionSlider.press("ArrowRight");
+  }
+  await expect(sizeSlider).toHaveValue("2.5");
+  await expect(dimensionSlider).toHaveValue("2048");
+
+  await expect
+    .poll(async () => {
+      const stored = await getIndexedDbValue(page, "neo-chat-settings");
+      const parsed =
+        typeof stored === "string"
+          ? JSON.parse(stored)
+          : (stored as { state?: { system?: Record<string, unknown> } });
+      return [
+        parsed?.state?.system?.imageCompressionMaxSizeMB,
+        parsed?.state?.system?.imageCompressionMaxWidthOrHeight,
+      ];
+    })
+    .toEqual([2.5, 2048]);
+
+  await page.reload();
+  await expect(toggle).toBeChecked();
+  await expect(sizeSlider).toHaveValue("2.5");
+  await expect(dimensionSlider).toHaveValue("2048");
+
+  await toggle.press("Space");
+  await expect(toggle).not.toBeChecked();
+  await expect(controls).toHaveCount(0);
+  await page.reload();
+  await expect(toggle).not.toBeChecked();
+  await expect(controls).toHaveCount(0);
+
+  await toggle.press("Space");
+  await expect(controls).toBeVisible();
+  await expect(sizeSlider).toHaveValue("2.5");
+  await expect(dimensionSlider).toHaveValue("2048");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await controls.scrollIntoViewIfNeeded();
+  await expectNoPageHorizontalOverflow(page);
+});
+
+test("compresses normal oversized images but preserves both long-image directions", async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  const sessionId = "image-compression-fixture";
+  const model = "image-provider:vision-model";
+
+  await page.goto("/manifest.webmanifest");
+  await page.evaluate(
+    (value) => localStorage.setItem("neo-chat-core-settings", value),
+    persistedState({
+      theme: "light",
+      language: "en",
+      providers: [
+        {
+          id: "image-provider",
+          name: "Image Provider",
+          type: "OpenAI Compatible",
+          baseUrl: "https://images.example.test/v1",
+          apiKey: "",
+          enabled: true,
+          models: ["vision-model"],
+          modelsList: ["vision-model"],
+        },
+      ],
+      defaultModels: {},
+    }),
+  );
+  await setIndexedDbValue(
+    page,
+    "neo-chat-settings",
+    persistedState({
+      system: {
+        enableAutoTitle: false,
+        enableRelatedQuestions: false,
+        enableAutoCompression: false,
+        enableAutoImageCompression: true,
+        imageCompressionMaxSizeMB: 1,
+        imageCompressionMaxWidthOrHeight: 1024,
+      },
+      customModelMetadata: {
+        "vision-model": {
+          id: "vision-model",
+          name: "Vision Model",
+          attachment: true,
+          modalities: {
+            input: ["text", "image"],
+            output: ["text"],
+          },
+        },
+      },
+    }),
+  );
+  await setIndexedDbValue(
+    page,
+    "neo-chat-storage",
+    persistedState({
+      sessions: [
+        {
+          id: sessionId,
+          title: "Image compression fixture",
+          messageCount: 0,
+          updatedAt: Date.now(),
+          model,
+        },
+      ],
+      workspaces: [],
+      currentSessionId: sessionId,
+      selectedModel: model,
+      chatConfig: {},
+    }),
+  );
+
+  await page.goto("/");
+  await expect(page.locator('textarea[name="message"]')).toBeVisible();
+
+  const sourceSizes = await attachCanvasImages(page, [
+    {
+      name: "normal-oversized.jpg",
+      width: 1600,
+      height: 900,
+      patterned: true,
+    },
+    {
+      name: "horizontal-long.jpg",
+      width: 3000,
+      height: 500,
+    },
+    {
+      name: "vertical-long.jpg",
+      width: 500,
+      height: 3000,
+    },
+  ]);
+  expect(sourceSizes["horizontal-long.jpg"]).toBeLessThan(1024 * 1024);
+  expect(sourceSizes["vertical-long.jpg"]).toBeLessThan(1024 * 1024);
+
+  const normal = page.getByAltText("normal-oversized.jpg");
+  const horizontal = page.getByAltText("horizontal-long.jpg");
+  const vertical = page.getByAltText("vertical-long.jpg");
+  await expect(normal).toBeVisible({ timeout: 30_000 });
+  await expect(horizontal).toBeVisible({ timeout: 30_000 });
+  await expect(vertical).toBeVisible({ timeout: 30_000 });
+
+  await expect
+    .poll(() =>
+      normal.evaluate((image) => ({
+        width: (image as HTMLImageElement).naturalWidth,
+        height: (image as HTMLImageElement).naturalHeight,
+      })),
+    )
+    .toEqual({ width: 1024, height: 576 });
+  await expect
+    .poll(() =>
+      horizontal.evaluate((image) => ({
+        width: (image as HTMLImageElement).naturalWidth,
+        height: (image as HTMLImageElement).naturalHeight,
+      })),
+    )
+    .toEqual({ width: 3000, height: 500 });
+  await expect
+    .poll(() =>
+      vertical.evaluate((image) => ({
+        width: (image as HTMLImageElement).naturalWidth,
+        height: (image as HTMLImageElement).naturalHeight,
+      })),
+    )
+    .toEqual({ width: 500, height: 3000 });
 });
 
 test("opens and closes the global search center with the keyboard", async ({

@@ -98,6 +98,10 @@ import { buildSearchUpdate, mergeSources } from "@/lib/chat/searchUpdate";
 import { createCitationSources } from "@/lib/utils/citations";
 import { resolveEffectiveSearchCapability } from "@/lib/settings/searchRag";
 import {
+  getImageCompressionConfig,
+  prepareConversationImageAttachments,
+} from "@/lib/utils/imageCompression";
+import {
   buildReplyPromptContext,
   createStreamCheckpointController,
   hasUnsafeContinuationToolState,
@@ -988,9 +992,14 @@ const ChatApp = () => {
       session,
       requestModel,
     );
+    const preparedAttachments = await prepareConversationImageAttachments(
+      attachments,
+      getImageCompressionConfig(system),
+      { signal },
+    );
     const processedData = await processMessageForSending({
       text,
-      attachments,
+      attachments: preparedAttachments,
       selectedModel: requestModel,
       modelMetadata,
       customModelMetadata,

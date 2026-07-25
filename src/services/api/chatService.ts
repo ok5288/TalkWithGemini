@@ -40,7 +40,11 @@ import {
 } from "@/lib/providers/providerTypes";
 import { normalizeSessionTitle } from "@/lib/chat/entities";
 import { appendContextToChatInput } from "@/lib/utils/chatInput";
-import { cacheGeneratedImageAttachments } from "@/lib/utils/generatedImages";
+import {
+  compressImageAttachments,
+  getImageCompressionConfig,
+  prepareGeneratedImageAttachments,
+} from "@/lib/utils/imageCompression";
 import {
   stripAttachmentsDisplayCacheForModel,
   stripMessagesDisplayCacheForModel,
@@ -506,8 +510,18 @@ export const generateImage = async (
   if (!provider) throw new Error("No provider found");
 
   try {
-    const requestAttachments = options.attachments
-      ? await stripAttachmentsDisplayCacheForModel(options.attachments)
+    const imageCompressionConfig = getImageCompressionConfig(
+      useSettingsStore.getState().system,
+    );
+    const preparedAttachments = options.attachments
+      ? await compressImageAttachments(
+          options.attachments,
+          imageCompressionConfig,
+          { signal },
+        )
+      : undefined;
+    const requestAttachments = preparedAttachments
+      ? await stripAttachmentsDisplayCacheForModel(preparedAttachments)
       : undefined;
     const response = await fetchWithByokRetry(async () =>
       signedApiFetch("/api/chat/generate-image", {
@@ -536,9 +550,11 @@ export const generateImage = async (
       images?: Attachment[];
       message?: string;
     }>(response, "Image generation failed");
-    const images = await cacheGeneratedImageAttachments(data.images || [], {
-      signal,
-    });
+    const images = await prepareGeneratedImageAttachments(
+      data.images || [],
+      imageCompressionConfig,
+      { signal },
+    );
     return {
       images,
       message: data.message || "No images generated.",
@@ -593,6 +609,9 @@ export const streamChatResponse = async (
   toolConfirmationController?: ToolConfirmationController,
   options?: StreamChatResponseOptions,
 ): Promise<string> => {
+  const imageCompressionConfig = getImageCompressionConfig(
+    useSettingsStore.getState().system,
+  );
   const enableDestructiveToolConfirmation =
     useSettingsStore.getState().system?.enableDestructiveToolConfirmation ===
     true;
@@ -837,8 +856,14 @@ export const streamChatResponse = async (
       ),
       effectiveSystemInstruction,
     );
-    let requestAttachments =
-      await stripAttachmentsDisplayCacheForModel(attachments);
+    const compressedRequestAttachments = await compressImageAttachments(
+      attachments,
+      imageCompressionConfig,
+      { signal },
+    );
+    let requestAttachments = await stripAttachmentsDisplayCacheForModel(
+      compressedRequestAttachments,
+    );
     let requestConfig: Partial<ChatConfig> = {
       ...config,
       useAgentMode: agentModeEnabled,
@@ -1072,8 +1097,9 @@ export const streamChatResponse = async (
 
           case "image":
             if (parsed.image) {
-              const [image] = await cacheGeneratedImageAttachments(
+              const [image] = await prepareGeneratedImageAttachments(
                 [parsed.image],
+                imageCompressionConfig,
                 { signal },
               );
               outputBlockBuilder.appendImage(image);
@@ -1580,8 +1606,9 @@ export const streamChatResponse = async (
         ]),
       );
       if (roundPluginImages.length > 0) {
-        const displayImages = await cacheGeneratedImageAttachments(
+        const displayImages = await prepareGeneratedImageAttachments(
           roundPluginImages,
+          imageCompressionConfig,
           { signal },
         );
         let displayImageIndex = 0;

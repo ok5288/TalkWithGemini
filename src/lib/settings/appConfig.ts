@@ -135,6 +135,22 @@ export function normalizeSystemSettings(
       SYSTEM_SETTINGS_LIMITS.maxHistoryKeepCount,
       defaults.historyKeepCount,
     ),
+    enableAutoImageCompression:
+      typeof raw.enableAutoImageCompression === "boolean"
+        ? raw.enableAutoImageCompression
+        : defaults.enableAutoImageCompression,
+    imageCompressionMaxSizeMB: clampNumber(
+      raw.imageCompressionMaxSizeMB,
+      SYSTEM_SETTINGS_LIMITS.minImageCompressionMaxSizeMB,
+      SYSTEM_SETTINGS_LIMITS.maxImageCompressionMaxSizeMB,
+      defaults.imageCompressionMaxSizeMB,
+    ),
+    imageCompressionMaxWidthOrHeight: clampInteger(
+      raw.imageCompressionMaxWidthOrHeight,
+      SYSTEM_SETTINGS_LIMITS.minImageCompressionMaxWidthOrHeight,
+      SYSTEM_SETTINGS_LIMITS.maxImageCompressionMaxWidthOrHeight,
+      defaults.imageCompressionMaxWidthOrHeight,
+    ),
     enableCodeCollapse:
       typeof raw.enableCodeCollapse === "boolean"
         ? raw.enableCodeCollapse

@@ -44,6 +44,9 @@ describe("app config normalization", () => {
     );
     expect(DEFAULT_SYSTEM_SETTINGS.enableAutoScroll).toBe(false);
     expect(DEFAULT_SYSTEM_SETTINGS.personality).toBe("default");
+    expect(DEFAULT_SYSTEM_SETTINGS.enableAutoImageCompression).toBe(true);
+    expect(DEFAULT_SYSTEM_SETTINGS.imageCompressionMaxSizeMB).toBe(1);
+    expect(DEFAULT_SYSTEM_SETTINGS.imageCompressionMaxWidthOrHeight).toBe(1024);
   });
 
   it("migrates legacy reasoning booleans to reasoning modes", () => {
@@ -76,6 +79,9 @@ describe("app config normalization", () => {
       enableAutoCompression: false,
       compressionThreshold: 999,
       historyKeepCount: 0,
+      enableAutoImageCompression: false,
+      imageCompressionMaxSizeMB: 99,
+      imageCompressionMaxWidthOrHeight: 0,
       enableCodeCollapse: true,
       enableHtmlVisualPrompt: true,
       enableDestructiveToolConfirmation: true,
@@ -94,6 +100,13 @@ describe("app config normalization", () => {
     expect(system.historyKeepCount).toBe(
       SYSTEM_SETTINGS_LIMITS.minHistoryKeepCount,
     );
+    expect(system.enableAutoImageCompression).toBe(false);
+    expect(system.imageCompressionMaxSizeMB).toBe(
+      SYSTEM_SETTINGS_LIMITS.maxImageCompressionMaxSizeMB,
+    );
+    expect(system.imageCompressionMaxWidthOrHeight).toBe(
+      SYSTEM_SETTINGS_LIMITS.minImageCompressionMaxWidthOrHeight,
+    );
     expect(system.enableCodeCollapse).toBe(true);
     expect(system.enableHtmlVisualPrompt).toBe(true);
     expect(system.enableDestructiveToolConfirmation).toBe(true);
@@ -109,6 +122,19 @@ describe("app config normalization", () => {
     });
     expect(normalizeSystemSettings({ enableAutoScroll: true })).toMatchObject({
       enableAutoScroll: true,
+    });
+    expect(
+      normalizeSystemSettings({
+        enableAutoImageCompression: "yes",
+        imageCompressionMaxSizeMB: Number.NaN,
+        imageCompressionMaxWidthOrHeight: Number.POSITIVE_INFINITY,
+      }),
+    ).toMatchObject({
+      enableAutoImageCompression: true,
+      imageCompressionMaxSizeMB:
+        DEFAULT_SYSTEM_SETTINGS.imageCompressionMaxSizeMB,
+      imageCompressionMaxWidthOrHeight:
+        DEFAULT_SYSTEM_SETTINGS.imageCompressionMaxWidthOrHeight,
     });
   });
 

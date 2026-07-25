@@ -1396,6 +1396,21 @@ export const useSettingsStore = create<SettingsState>()(
           agentOverrides: normalizeAgentOverrides(state.agentOverrides),
         } as SettingsState;
       },
+      merge: (persistedState, currentState) => {
+        const persisted =
+          persistedState && typeof persistedState === "object"
+            ? (persistedState as Partial<SettingsState>)
+            : {};
+
+        return {
+          ...currentState,
+          ...persisted,
+          system: normalizeSystemSettings(
+            persisted.system,
+            DEFAULT_SYSTEM_SETTINGS,
+          ),
+        };
+      },
       partialize: (state) => ({
         marketPlugins: state.marketPlugins,
         marketPluginsTimestamp: state.marketPluginsTimestamp,

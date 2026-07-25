@@ -35,6 +35,7 @@
     "@tanstack/react-virtual": "^3.14.7",
     "@xiangfa/mindmap": "^0.7.1",
     "aws4fetch": "^1.0.20",
+    "browser-image-compression": "^2.0.2",
     "fflate": "^0.8.3",
     "html-to-image": "^1.11.13",
     "katex": "^0.18.1",
