@@ -12,6 +12,8 @@ interface PwaLifecycleProps {
   deploymentMode: DeploymentMode;
 }
 
+const PWA_UPDATE_INTERVAL_MS = 30 * 60 * 1000;
+
 export default function PwaLifecycle({ deploymentMode }: PwaLifecycleProps) {
   const t = useTranslations("Common");
   const pwaEnabled = shouldEnablePwa(deploymentMode);
@@ -21,11 +23,29 @@ export default function PwaLifecycle({ deploymentMode }: PwaLifecycleProps) {
   );
 
   useEffect(() => {
+    let disposed = false;
+    let registration: ServiceWorkerRegistration | null = null;
+
+    const checkForUpdate = () => {
+      if (
+        !registration ||
+        !navigator.onLine ||
+        document.visibilityState !== "visible"
+      ) {
+        return;
+      }
+
+      void registration.update().catch(() => {
+        // Update checks are best-effort and retry on the next lifecycle event.
+      });
+    };
+
     setIsOnline(navigator.onLine);
 
     const handleOnline = () => {
       setIsOnline(true);
       document.documentElement.dataset.networkStatus = "online";
+      checkForUpdate();
     };
     const handleOffline = () => {
       setIsOnline(false);
@@ -58,48 +78,85 @@ export default function PwaLifecycle({ deploymentMode }: PwaLifecycleProps) {
       };
     }
 
-    let disposed = false;
+    const hadControllerAtMount = Boolean(navigator.serviceWorker.controller);
+    let isReloading = false;
+    const handleControllerChange = () => {
+      if (!hadControllerAtMount || isReloading) return;
+      isReloading = true;
+      window.location.reload();
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") checkForUpdate();
+    };
+    const updateIntervalId = window.setInterval(
+      checkForUpdate,
+      PWA_UPDATE_INTERVAL_MS,
+    );
+
+    navigator.serviceWorker.addEventListener(
+      "controllerchange",
+      handleControllerChange,
+    );
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    const watchInstallingWorker = (
+      nextRegistration: ServiceWorkerRegistration,
+    ) => {
+      const installing = nextRegistration.installing;
+      if (!installing) return;
+
+      const handleStateChange = () => {
+        if (
+          installing.state === "installed" &&
+          navigator.serviceWorker.controller &&
+          !disposed
+        ) {
+          setWaitingWorker(nextRegistration.waiting ?? installing);
+        }
+      };
+
+      installing.addEventListener("statechange", handleStateChange);
+      handleStateChange();
+    };
+
     const trackWaitingWorker = (registration: ServiceWorkerRegistration) => {
       if (registration.waiting && !disposed) {
         setWaitingWorker(registration.waiting);
       }
 
-      registration.addEventListener("updatefound", () => {
-        const installing = registration.installing;
-        installing?.addEventListener("statechange", () => {
-          if (
-            installing.state === "installed" &&
-            navigator.serviceWorker.controller &&
-            !disposed
-          ) {
-            setWaitingWorker(registration.waiting ?? installing);
-          }
-        });
-      });
+      watchInstallingWorker(registration);
+      registration.addEventListener("updatefound", () =>
+        watchInstallingWorker(registration),
+      );
     };
 
     void registerNeoChatPwa(navigator.serviceWorker)
-      .then(trackWaitingWorker)
+      .then((nextRegistration) => {
+        if (disposed) return;
+        registration = nextRegistration;
+        trackWaitingWorker(nextRegistration);
+        checkForUpdate();
+      })
       .catch(() => {
         // PWA support is optional; registration failure must not block chat.
       });
 
     return () => {
       disposed = true;
+      window.clearInterval(updateIntervalId);
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      navigator.serviceWorker.removeEventListener(
+        "controllerchange",
+        handleControllerChange,
+      );
     };
   }, [deploymentMode, pwaEnabled]);
 
   const activateUpdate = () => {
     if (!waitingWorker) return;
 
-    const handleControllerChange = () => window.location.reload();
-    navigator.serviceWorker.addEventListener(
-      "controllerchange",
-      handleControllerChange,
-      { once: true },
-    );
     waitingWorker.postMessage({ type: "SKIP_WAITING" });
   };
 

@@ -32,6 +32,8 @@ It is designed for people who want the power of modern AI workspaces without giv
 - Added virtualized long-chat timelines, durable streaming checkpoints, bounded
   retry before visible output, partial-output continuation, reply snapshots, and
   explicit model selection when regenerating a sibling branch.
+- Added per-chat Agent mode for tool-call-capable models, with five localized,
+  read-only built-ins orchestrated by the browser and auto-approved at runtime.
 - Added parameterized Skills and ordered bundles of up to four Skills, with
   validated slot values and reproducible invocation metadata.
 - Added collection-level chunking controls, Markdown heading-aware previews,
@@ -76,6 +78,9 @@ It is designed for people who want the power of modern AI workspaces without giv
   device identity, recovery code, convergent CRDT documents, and encrypted OPFS
   chunks.
 - Assistant presets from the LobeHub agent registry plus local custom assistants.
+- Per-chat Agent mode for tool-call-capable models, with browser-orchestrated
+  web search, knowledge search, text-only skill loading, sandboxed JavaScript,
+  and task-plan updates.
 - Parameterized text Skills with localized public catalogs, install/uninstall
   flows, local edits, custom skills, auto-selection, workspace presets, and
   ordered non-nested bundles of up to four Skills.
@@ -397,9 +402,17 @@ The app keeps durable user data in browser storage whenever possible. API routes
 
 Skills are text-only prompt-context modules. The app loads localized metadata catalogs from `public/data/skills`, fetches full skill definitions only when needed, and stores installed, edited, and custom skills locally. Active skills can be selected manually, inherited from workspace presets, or auto-selected for a message.
 
+Agent mode is an opt-in, per-chat client-side orchestration mode for models that
+support tool calls. Its five built-ins (`web_search`, `search_knowledge`,
+`load_skill`, `run_javascript`, and `update_task_plan`) are read-only and
+auto-approved. JavaScript runs synchronously in a bounded browser sandbox
+without network or DOM access, and loaded Skills remain text-only. Agent web
+search requires an external search provider; native Google Search and OpenAI
+Web Search are not combined with Agent function calling.
+
 Plugins are executable tools installed from OpenAPI manifests, built-in definitions, or remote streamable HTTP MCP servers discovered from the official MCP Registry. Enabled plugin functions are exposed to compatible models as tools, then executed by the server-side plugin route. The app transport remains Streamable HTTP; local Docker users may expose preconfigured stdio servers through the separate authenticated [MCP stdio bridge](docs/mcp-stdio-bridge.md). User-configured MCP server URLs may use HTTP or HTTPS and may target localhost or private networks in either deployment mode; the official Registry remains HTTPS-only. Built-in image processing plugin results stay in the tool details and compact conversation history, so the model can decide whether and how to reference generated or edited images in its follow-up message. OpenAI-compatible Images API and OpenAI Responses image processing are separate plugins so their credentials and activation can be managed independently. Supported built-in media plugins expose plugin-level API Base URL and Model ID fields, optional image count parameters, Agnes image-to-image editing, and Agnes video generation from a public HTTPS image URL while keeping Agnes video as the explicit `create_video` / `get_video_result` two-step flow. Tool-call orchestration uses a high but bounded loop limit to avoid runaway recursive calls while still allowing multi-step tasks.
 
-Search can run through Google native Google Search, OpenAI Web Search, or external providers for other model families including Anthropic. Firecrawl's public service works without an API key; a key only raises its request rate. The separate local global search center indexes active chat branches, attachments, workspaces, knowledge, and memories in browser memory and excludes reasoning, tool payloads, and credentials.
+Search can run through Google native Google Search, OpenAI Web Search, or external providers for other model families including Anthropic. When Agent mode is active, select an external provider to expose `web_search`; the composer keeps the Search control usable and explains why a native-search configuration cannot supply that tool. Firecrawl's public service works without an API key; a key only raises its request rate. The separate local global search center indexes active chat branches, attachments, workspaces, knowledge, and memories in browser memory and excludes reasoning, tool payloads, and credentials.
 
 Knowledge-base RAG preserves uploaded originals separately from editable or indexable extracted text, optionally parses documents with Mineru or LlamaParse, and can index chunks into an external vector service. Failed files can be retried, reparsed, reindexed, cancelled, or reconciled without discarding a usable original.
 

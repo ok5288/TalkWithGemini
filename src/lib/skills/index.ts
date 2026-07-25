@@ -969,12 +969,28 @@ function formatListField(label: string, values: readonly string[]): string {
   return values.length > 0 ? `${label}: ${values.join("; ")}` : "";
 }
 
+function formatSkillParameterMetadata(
+  parameter: SkillParameterDefinition,
+): string {
+  return [
+    `key=${parameter.key}`,
+    `required=${parameter.required === true}`,
+    `default=${JSON.stringify(parameter.defaultValue || "")}`,
+    `options=${JSON.stringify(
+      (parameter.options || []).map((option) => option.value),
+    )}`,
+    `maxLength=${parameter.maxLength}`,
+  ].join("; ");
+}
+
 export function buildSkillMetadataContext({
   skills,
   maxChars = DEFAULT_METADATA_CONTEXT_CHARS,
+  includeParameters = false,
 }: {
   skills: readonly SkillCatalogEntry[];
   maxChars?: number;
+  includeParameters?: boolean;
 }): string {
   if (skills.length === 0 || maxChars <= 0) return "";
 
@@ -1008,6 +1024,12 @@ export function buildSkillMetadataContext({
         formatListField("use_when", skill.activation.useWhen),
         formatListField("avoid_when", skill.activation.avoidWhen),
         formatListField("examples", skill.activation.exampleQueries),
+        ...(includeParameters
+          ? (skill.parameters || []).map(
+              (parameter) =>
+                `parameter: ${formatSkillParameterMetadata(parameter)}`,
+            )
+          : []),
       ]
         .filter(Boolean)
         .join("\n"),
@@ -1016,10 +1038,18 @@ export function buildSkillMetadataContext({
 
   const full = sections.join("\n\n---\n\n");
   if (full.length <= maxChars) return full;
-  return (
-    full.slice(0, Math.max(0, maxChars - 92)).trimEnd() +
-    "\n\n[Additional installed skills metadata omitted because of context limits.]"
-  );
+  const truncationNotice =
+    "\n\n[Additional installed skills metadata omitted because of context limits.]";
+  if (includeParameters) {
+    if (truncationNotice.length >= maxChars) {
+      return truncationNotice.slice(0, maxChars);
+    }
+    return (
+      full.slice(0, Math.max(0, maxChars - truncationNotice.length)).trimEnd() +
+      truncationNotice
+    );
+  }
+  return full.slice(0, Math.max(0, maxChars - 92)).trimEnd() + truncationNotice;
 }
 
 export function createSkillInvocations(

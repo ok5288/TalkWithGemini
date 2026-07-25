@@ -1,8 +1,12 @@
 import { v7 as uuidv7 } from "uuid";
 import type { Attachment, Source } from "@/types";
 import { generateRAGSearchQueries } from "@/services/api/chatService";
-import { queryRAG } from "@/services/api/ragService";
 import { resolveOPFSUrl } from "@/utils/opfs";
+import {
+  isIndexedKnowledgeFileAttachment,
+  retrieveKnowledgeSources,
+  type RagQueryError,
+} from "@/lib/knowledge/retrieveKnowledgeSources";
 import {
   appendPlainPromptContext,
   appendPromptContextFile,
@@ -12,33 +16,16 @@ import {
 import { PROMPT_CONTEXT_LIMITS } from "@/config/limits";
 import { withResolvedObjectUrl } from "./objectUrlLifecycle";
 import { logDevError } from "./devLogger";
-import { hasRagVectorStore } from "../security/localSecretResolvers";
 import {
   isKnowledgeCollectionAttachment,
   isKnowledgeFileAttachment,
   parseKnowledgeFileAttachmentData,
 } from "./knowledgeAttachments";
-import { mapSettledWithConcurrency } from "./concurrency";
-import { readPersistedKnowledgeContent } from "@/lib/global-search/browserAdapter";
-import { GLOBAL_SEARCH_LIMITS } from "@/config/limits";
-import {
-  buildKnowledgeLexicalIndex,
-  reciprocalRankFuseKnowledgeSources,
-  searchKnowledgeLexicalIndex,
-} from "@/lib/knowledge/hybridSearch";
 
-const RAG_QUERY_CONCURRENCY = 4;
-
-type IndexedKnowledgeFileSelector = {
-  collectionId: string;
-  fileId: string;
-  localFileId: string;
-};
-
-export interface RagQueryError {
-  message: string;
-  code: "RAG_QUERY_FAILED" | "RAG_VECTOR_FALLBACK";
-}
+export {
+  isIndexedKnowledgeFileAttachment,
+  type RagQueryError,
+} from "@/lib/knowledge/retrieveKnowledgeSources";
 
 /**
  * Citation instructions for Knowledge Base usage
@@ -61,112 +48,6 @@ If the user asks about a specific topic and the information is found in a source
 
 [^1]: Title of Source
 `;
-
-function getSourceMetadataString(source: Source, key: string): string {
-  const value = source.metadata?.[key];
-  if (typeof value === "string") return value;
-  if (typeof value === "number") return String(value);
-  return "";
-}
-
-function getKnowledgeFile(
-  attachment: Attachment,
-  knowledgeCollections: any[],
-): any | null {
-  const fileData = parseKnowledgeFileAttachmentData(attachment);
-  if (!fileData) return null;
-
-  const collection = knowledgeCollections.find(
-    (item) => item.id === fileData.collectionId,
-  );
-  return (
-    collection?.files?.find((item: any) => item.id === fileData.fileId) || null
-  );
-}
-
-export function isIndexedKnowledgeFileAttachment(
-  attachment: Attachment,
-  knowledgeCollections: any[],
-): boolean {
-  const fileData = parseKnowledgeFileAttachmentData(attachment);
-  const collection = knowledgeCollections.find(
-    (item) => item.id === fileData?.collectionId,
-  );
-  const file = getKnowledgeFile(attachment, knowledgeCollections);
-  return (
-    (file?.indexStatus === "indexed" || file?.status === "indexed") &&
-    typeof file.ragId === "string" &&
-    (!file.indexedChunkingRevision ||
-      file.indexedChunkingRevision === collection?.chunkingRevision)
-  );
-}
-
-function getIndexedKnowledgeFileSelectors(
-  kbAttachments: Attachment[],
-  knowledgeCollections: any[],
-): IndexedKnowledgeFileSelector[] {
-  const selectors: IndexedKnowledgeFileSelector[] = [];
-
-  for (const attachment of kbAttachments) {
-    if (!isKnowledgeFileAttachment(attachment)) continue;
-    const fileData = parseKnowledgeFileAttachmentData(attachment);
-    if (!fileData) continue;
-
-    const file = getKnowledgeFile(attachment, knowledgeCollections);
-    if (
-      (file?.indexStatus || file?.status) !== "indexed" ||
-      typeof file.ragId !== "string"
-    ) {
-      continue;
-    }
-
-    selectors.push({
-      collectionId: fileData.collectionId,
-      fileId: file.ragId,
-      localFileId: fileData.fileId,
-    });
-  }
-
-  return selectors;
-}
-
-function sourceMatchesSelectedRagScope(
-  source: Source,
-  collectionIds: Set<string>,
-  fileIdsByCollectionId: Map<string, Set<string>>,
-): boolean {
-  const collectionId = getSourceMetadataString(source, "collectionId");
-  if (collectionIds.has(collectionId)) return true;
-
-  const selectedFileIds = fileIdsByCollectionId.get(collectionId);
-  if (!selectedFileIds) return false;
-
-  const fileId = getSourceMetadataString(source, "fileId");
-  return selectedFileIds.has(fileId);
-}
-
-function sourceMatchesCurrentKnowledgeIndex(
-  source: Source,
-  knowledgeCollections: any[],
-): boolean {
-  if (source.metadata?.retrieval === "keyword") return true;
-  const collectionId = getSourceMetadataString(source, "collectionId");
-  const collection = knowledgeCollections.find(
-    (item) => item.id === collectionId,
-  );
-  if (!collection) return false;
-  const fileId = getSourceMetadataString(source, "fileId");
-  const file = collection.files?.find(
-    (item: any) => item.id === fileId || item.ragId === fileId,
-  );
-  if (!file || (file.indexStatus || file.status) !== "indexed") return false;
-  const sourceRevision = getSourceMetadataString(source, "chunkingRevision");
-  return (
-    (!file.indexedChunkingRevision && !sourceRevision) ||
-    (file.indexedChunkingRevision === collection.chunkingRevision &&
-      (!sourceRevision || sourceRevision === collection.chunkingRevision))
-  );
-}
 
 /**
  * Process RAG (Retrieval-Augmented Generation) attachments
@@ -206,38 +87,13 @@ export const processRAGAttachments = async (
 
   if (isRagServiceEnabled) {
     try {
-      const selectedCollectionIds = new Set(
-        kbAttachments
-          .filter(isKnowledgeCollectionAttachment)
-          .map((a) => a.data)
-          .filter((id): id is string => Boolean(id)),
+      const retrievalScopeAttachments = kbAttachments.filter(
+        (attachment) =>
+          isKnowledgeCollectionAttachment(attachment) ||
+          (isKnowledgeFileAttachment(attachment) &&
+            isIndexedKnowledgeFileAttachment(attachment, knowledgeCollections)),
       );
-      const indexedFileSelectors = getIndexedKnowledgeFileSelectors(
-        kbAttachments,
-        knowledgeCollections,
-      );
-      const indexedFileIdsByCollectionId = new Map<string, Set<string>>();
-      const lexicalFileIdsByCollectionId = new Map<string, Set<string>>();
-      for (const selector of indexedFileSelectors) {
-        if (!indexedFileIdsByCollectionId.has(selector.collectionId)) {
-          indexedFileIdsByCollectionId.set(selector.collectionId, new Set());
-        }
-        indexedFileIdsByCollectionId
-          .get(selector.collectionId)
-          ?.add(selector.fileId);
-        if (!lexicalFileIdsByCollectionId.has(selector.collectionId)) {
-          lexicalFileIdsByCollectionId.set(selector.collectionId, new Set());
-        }
-        lexicalFileIdsByCollectionId
-          .get(selector.collectionId)
-          ?.add(selector.localFileId);
-      }
-      const queryCollectionIds = new Set([
-        ...selectedCollectionIds,
-        ...indexedFileSelectors.map((selector) => selector.collectionId),
-      ]);
-
-      if (queryCollectionIds.size === 0) {
+      if (retrievalScopeAttachments.length === 0) {
         return { convertedContent, finalAttachments, ragSources };
       }
 
@@ -245,140 +101,16 @@ export const processRAGAttachments = async (
       const queries = await generateRAGSearchQueries(text, signal);
 
       if (queries && queries.length > 0) {
-        const topK = Math.max(1, Math.min(50, ragConfig.topK || 10));
-        let lexicalIndex;
-        try {
-          lexicalIndex = await buildKnowledgeLexicalIndex({
-            collections: knowledgeCollections,
-            collectionIds: selectedCollectionIds,
-            fileIdsByCollectionId: lexicalFileIdsByCollectionId,
-            signal,
-            readContent: async (collection, file, readSignal) => {
-              const result = await readPersistedKnowledgeContent(
-                collection,
-                file,
-                readSignal,
-                GLOBAL_SEARCH_LIMITS.maxSingleContentChars,
-              );
-              return result?.content || null;
-            },
-          });
-        } catch (error) {
-          if (
-            signal?.aborted ||
-            (error instanceof Error && error.name === "AbortError")
-          ) {
-            throw error;
-          }
-          logDevError("Local knowledge index failed", error);
-          lexicalIndex = null;
-        }
-
-        // 2. Perform the search across all selected collections
-        const collectionIds = Array.from(queryCollectionIds);
-
-        const searchRequests: Array<{ query: string; collectionId: string }> =
-          [];
-        for (const query of queries) {
-          for (const id of collectionIds) {
-            searchRequests.push({ query, collectionId: id });
-          }
-        }
-
-        const vectorEnabled = hasRagVectorStore(ragConfig);
-        const settledResults = vectorEnabled
-          ? await mapSettledWithConcurrency<
-              { query: string; collectionId: string },
-              Source[]
-            >(
-              searchRequests,
-              RAG_QUERY_CONCURRENCY,
-              ({ query, collectionId }) => {
-                signal?.throwIfAborted();
-                const request = signal
-                  ? queryRAG(query, collectionId, signal)
-                  : queryRAG(query, collectionId);
-                return request.then((sources) =>
-                  sources.map((source): Source => ({
-                    ...source,
-                    metadata: {
-                      ...(source.metadata || {}),
-                      collectionId:
-                        getSourceMetadataString(source, "collectionId") ||
-                        collectionId,
-                      retrieval: "vector",
-                    },
-                  })),
-                );
-              },
-            )
-          : [];
-        signal?.throwIfAborted();
-        const successfulResults = settledResults.filter(
-          (result): result is PromiseFulfilledResult<Source[]> =>
-            result.status === "fulfilled",
-        );
-        const failedResults = settledResults.filter(
-          (result): result is PromiseRejectedResult =>
-            result.status === "rejected",
-        );
-        const keywordResults = lexicalIndex
-          ? queries.flatMap((query) =>
-              searchKnowledgeLexicalIndex(lexicalIndex, query, topK),
-            )
-          : [];
-        if (
-          successfulResults.length === 0 &&
-          failedResults.length > 0 &&
-          keywordResults.length === 0
-        ) {
-          throw failedResults[0].reason;
-        }
-        failedResults.forEach((result) => {
-          logDevError(
-            "RAG query failed; preserving partial results",
-            result.reason,
-          );
+        const retrieval = await retrieveKnowledgeSources({
+          queries,
+          scopeAttachments: retrievalScopeAttachments,
+          collections: knowledgeCollections,
+          ragConfig,
+          signal,
         });
-
-        const vectorResults = successfulResults
-          .map((result) => result.value)
-          .flat()
-          .filter((source) =>
-            sourceMatchesSelectedRagScope(
-              source,
-              selectedCollectionIds,
-              indexedFileIdsByCollectionId,
-            ),
-          )
-          .filter((source) =>
-            sourceMatchesCurrentKnowledgeIndex(source, knowledgeCollections),
-          );
-        const scopedKeywordResults = keywordResults.filter((source) =>
-          sourceMatchesSelectedRagScope(
-            source,
-            selectedCollectionIds,
-            indexedFileIdsByCollectionId,
-          ),
-        );
-
-        const finalResults = reciprocalRankFuseKnowledgeSources({
-          vector: vectorResults,
-          keyword: scopedKeywordResults,
-          limit: topK,
-        });
+        const finalResults = retrieval.sources;
         ragSources = finalResults;
-        if (
-          failedResults.length > 0 &&
-          vectorResults.length === 0 &&
-          scopedKeywordResults.length > 0
-        ) {
-          ragError = {
-            code: "RAG_VECTOR_FALLBACK",
-            message:
-              "Vector retrieval was unavailable; local keyword results were used.",
-          };
-        }
+        ragError = retrieval.ragError;
 
         if (finalResults.length > 0) {
           const ragContextParts: string[] = [];

@@ -17,7 +17,11 @@ import {
   STORAGE_KEYS,
   STORAGE_VERSION,
 } from "../storage/storageConfig";
-import { normalizeMessage, normalizeMessages } from "../storage/migrations";
+import {
+  normalizeMessage,
+  normalizeMessages,
+  normalizeMessageTreeMessages,
+} from "../storage/migrations";
 import { normalizeChatConfig } from "@/lib/settings/appConfig";
 import {
   normalizeSession,
@@ -67,7 +71,7 @@ const normalizeStoredMessageTree = (
   stored: Message[] | SessionMessageTree | null | undefined,
 ) => {
   if (isSessionMessageTree(stored)) {
-    return normalizeSessionMessageTree(stored);
+    return normalizeMessageTreeMessages(normalizeSessionMessageTree(stored));
   }
 
   return normalizeSessionMessageTree(normalizeMessages(stored));
@@ -341,20 +345,20 @@ const applySessionConfig = (
   currentConfig: ChatConfig,
   sessionConfig?: SessionConfig,
 ): ChatConfig => {
-  if (!sessionConfig) return currentConfig;
   const hasReasoningConfig =
-    sessionConfig.reasoningMode !== undefined ||
-    sessionConfig.useReasoning !== undefined;
+    sessionConfig?.reasoningMode !== undefined ||
+    sessionConfig?.useReasoning !== undefined;
   const reasoningMode = hasReasoningConfig
     ? normalizeReasoningMode(
-        sessionConfig.reasoningMode,
-        sessionConfig.useReasoning,
+        sessionConfig?.reasoningMode,
+        sessionConfig?.useReasoning,
       )
     : currentConfig.reasoningMode;
 
   return normalizeChatConfig({
     ...currentConfig,
-    useSearch: sessionConfig.useSearch ?? currentConfig.useSearch,
+    useSearch: sessionConfig?.useSearch ?? currentConfig.useSearch,
+    useAgentMode: sessionConfig?.useAgentMode === true,
     useReasoning: isReasoningEnabled(reasoningMode),
     reasoningMode,
   });
@@ -429,14 +433,6 @@ export const useChatStore = create<ChatState>()(
 
         const initialMessageTree = createEmptyMessageTree();
 
-        // Apply config to global state if this becomes active
-        const sessionConfig = newSession.config;
-        if (sessionConfig) {
-          set({
-            chatConfig: applySessionConfig(get().chatConfig, sessionConfig),
-          });
-        }
-
         set((state) => ({
           sessions: [newSession, ...state.sessions],
           currentSessionId: newSession.id,
@@ -445,6 +441,7 @@ export const useChatStore = create<ChatState>()(
           isActiveSessionLoading: false,
           pendingSessionId: null,
           activeSessionLoadError: null,
+          chatConfig: applySessionConfig(state.chatConfig, newSession.config),
         }));
 
         return newSession.id;

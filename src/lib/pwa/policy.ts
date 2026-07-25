@@ -2,9 +2,13 @@ import type { DeploymentMode } from "@/lib/security/deployment";
 
 export const PWA_CACHE_PREFIX = "neo-chat-pwa-";
 export const PWA_SCRIPT_URL = "/sw.js";
+export const PWA_RUNTIME_SCRIPT_URL = "/sw-runtime.js";
 
-export function shouldEnablePwa(mode: DeploymentMode): boolean {
-  return mode === "local";
+export function shouldEnablePwa(
+  mode: DeploymentMode,
+  environment: string | undefined = process.env.NODE_ENV,
+): boolean {
+  return mode === "local" && environment === "production";
 }
 
 export function isNeoChatPwaCache(cacheName: string): boolean {

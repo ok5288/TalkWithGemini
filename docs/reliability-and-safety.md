@@ -34,6 +34,26 @@ active skills are injected directly. Skills must stay text-only and are
 normalized to reject script, external-tool, network, or file-system
 requirements.
 
+## Agent Mode Built-ins
+
+Agent mode is opt-in per chat and is enabled only for models whose metadata
+declares tool-call support. Its orchestration runs in the browser and registers
+five application-owned built-ins: `web_search`, `search_knowledge`,
+`load_skill`, `run_javascript`, and `update_task_plan`. They are classified as
+read-only and are auto-approved, so they do not enter the plugin confirmation
+flow described below.
+
+`load_skill` returns text-only instructions; it does not make a Skill
+executable. `run_javascript` accepts synchronous computation only and runs in a
+bounded browser sandbox without DOM or network access. Output and execution
+limits remain enforced before the result returns to the model.
+
+Agent `web_search` is registered only when effective search configuration uses
+an external provider. Native Google Search and OpenAI Web Search are model
+features and are not combined with Agent function calling. The composer keeps
+the Search control operable but exposes this incompatibility in its tooltip and
+accessible label instead of silently implying that `web_search` is available.
+
 ## Plugin Tool Safety
 
 Plugin functions carry risk metadata:

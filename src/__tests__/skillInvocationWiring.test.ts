@@ -23,5 +23,20 @@ describe("skill invocation wiring", () => {
     expect(countOccurrences(chatApp, "skillResolution.context")).toBe(
       streamCallCount - 1,
     );
+    expect(
+      countOccurrences(
+        chatApp,
+        "autoSelect: skillAutoSelect && !effectiveContext.agentModeEnabled",
+      ),
+    ).toBe(streamCallCount - 1);
+    expect(chatApp).toContain(
+      "skillAutoSelect && !effectiveContext.agentModeEnabled",
+    );
+    expect(countOccurrences(chatApp, "createAgentToolStreamOptions({")).toBe(
+      streamCallCount - 1,
+    );
+    expect(chatApp).toContain("onKnowledgeSources:");
+    expect(chatApp).toContain("onSkillInvocation:");
+    expect(chatApp).toContain("processedData.knowledgeScope");
   });
 });

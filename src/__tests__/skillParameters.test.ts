@@ -6,6 +6,7 @@ import {
   normalizeSkillBundles,
   normalizeTextSkill,
   renderSkillTemplate,
+  resolveSkillParameterValues,
   resolveSkillBundle,
   SkillParameterValidationError,
 } from "../lib/skills";
@@ -83,6 +84,27 @@ describe("parameterized skills", () => {
         parameters: [],
       }),
     ).toThrow(/Unknown skill parameter slot/);
+  });
+
+  it("resolves defaults and enforces option and length contracts", () => {
+    const skill = normalizeTextSkill(baseSkill)!;
+    expect(
+      resolveSkillParameterValues(skill, { audience: "operators" }),
+    ).toEqual({
+      audience: "operators",
+      tone: "concise",
+    });
+    expect(() =>
+      resolveSkillParameterValues(skill, {
+        audience: "operators",
+        tone: "verbose",
+      }),
+    ).toThrow(/Invalid option/);
+    expect(() =>
+      resolveSkillParameterValues(skill, {
+        audience: "x".repeat(81),
+      }),
+    ).toThrow(/exceeds 80 characters/);
   });
 
   it("expands an ordered non-nested bundle and records reproducible metadata", () => {

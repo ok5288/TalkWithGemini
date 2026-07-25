@@ -16,7 +16,10 @@ import SkillParameterDialog, {
   type SkillParameterRequest,
   type SkillParameterSubmission,
 } from "@/components/skill/SkillParameterDialog";
-import type { ModelInfo } from "@/services/api/chatService";
+import type {
+  ModelInfo,
+  StreamChatResponseOptions,
+} from "@/services/api/chatService";
 import {
   resolveRecordedSkillInvocations,
   resolveSkillsForMessage,
@@ -33,6 +36,7 @@ import {
   LobeAgent,
   SessionMessageTree,
   ToolCall,
+  AppliedSkillInvocation,
 } from "@/types";
 import { useChatStore } from "@/store/core/chatStore";
 import { useMemoryStore } from "@/store/core/memoryStore";
@@ -90,7 +94,7 @@ import {
   shouldResolveSelectedModelAfterBootstrap,
   shouldRunSettingsStartupEffects,
 } from "@/lib/app/startupEffects";
-import { buildSearchUpdate } from "@/lib/chat/searchUpdate";
+import { buildSearchUpdate, mergeSources } from "@/lib/chat/searchUpdate";
 import { createCitationSources } from "@/lib/utils/citations";
 import { resolveEffectiveSearchCapability } from "@/lib/settings/searchRag";
 import {
@@ -111,6 +115,7 @@ import {
   resolveSkillBundle,
   resolveSkillParameterValues,
 } from "@/lib/skills";
+import { MARKET_LIMITS, RAG_LIMITS } from "@/config/limits";
 
 const logChatAppError = logDevError;
 const EMPTY_MESSAGES: Message[] = [];
@@ -865,13 +870,14 @@ const ChatApp = () => {
     const skillsById = new Map(
       installedSkills.map((skill) => [skill.id, skill]),
     );
-    const activeManualSkills = skillAutoSelect
-      ? []
-      : effectiveContext.activeSkillIds
-          .map((id) => skillsById.get(id))
-          .filter((skill): skill is (typeof installedSkills)[number] =>
-            Boolean(skill),
-          );
+    const activeManualSkills =
+      skillAutoSelect && !effectiveContext.agentModeEnabled
+        ? []
+        : effectiveContext.activeSkillIds
+            .map((id) => skillsById.get(id))
+            .filter((skill): skill is (typeof installedSkills)[number] =>
+              Boolean(skill),
+            );
     const bundlesById = new Map(
       skillBundles.map((bundle) => [bundle.id, bundle]),
     );
@@ -990,6 +996,7 @@ const ChatApp = () => {
       customModelMetadata,
       ragConfig: rag,
       ragEnabled: chatConfig.useRAG !== false,
+      deferKnowledgeRetrieval: effectiveContext.agentModeEnabled,
       knowledgeCollections,
       workspaceKnowledgeCollectionIds:
         effectiveContext.workspaceKnowledgeCollectionIds,
@@ -1047,6 +1054,62 @@ const ChatApp = () => {
       injectedMemoryIds: directMemoryContext.injectedMemoryIds,
     };
   };
+
+  const createAgentToolStreamOptions = ({
+    sessionId,
+    modelMessageId,
+    knowledgeScope,
+    isActive,
+  }: {
+    sessionId: string;
+    modelMessageId: string;
+    knowledgeScope: Attachment[];
+    isActive: () => boolean;
+  }): StreamChatResponseOptions => ({
+    knowledgeScope: {
+      attachments: knowledgeScope.map((attachment) => ({ ...attachment })),
+      collections: knowledgeCollections,
+      ragConfig: { ...rag },
+    },
+    onKnowledgeSources: (sources, ragError) => {
+      if (!isActive()) return;
+      const current = useChatStore
+        .getState()
+        .activeMessages.find((message) => message.id === modelMessageId);
+      const ragSources = mergeSources([], sources).slice(0, RAG_LIMITS.maxTopK);
+      updateMessage(sessionId, modelMessageId, {
+        ragSources,
+        ragError,
+        citations: createCitationSources({
+          web: current?.searchSources,
+          knowledge: ragSources,
+        }),
+      });
+    },
+    onSkillInvocation: (invocation: AppliedSkillInvocation) => {
+      if (!isActive()) return;
+      const current = useChatStore
+        .getState()
+        .activeMessages.find((message) => message.id === modelMessageId);
+      const existing = current?.skillInvocations || [];
+      if (existing.some((item) => item.id === invocation.id)) return;
+      if (existing.length >= MARKET_LIMITS.maxActiveSkills) return;
+      const nextOrder =
+        existing.reduce(
+          (maximum, item, index) => Math.max(maximum, item.order ?? index),
+          -1,
+        ) + 1;
+      updateMessage(sessionId, modelMessageId, {
+        skillInvocations: [
+          ...existing,
+          {
+            ...invocation,
+            order: nextOrder,
+          },
+        ],
+      });
+    },
+  });
 
   const commitInjectedMemoryContext = (
     sessionId: string,
@@ -1236,7 +1299,7 @@ const ChatApp = () => {
         skillParameterValues: resolvedSkillParameters.skillParameterValues,
         skillBundleParameterValues:
           resolvedSkillParameters.skillBundleParameterValues,
-        autoSelect: skillAutoSelect,
+        autoSelect: skillAutoSelect && !effectiveContext.agentModeEnabled,
         signal: generation.controller.signal,
       });
       if (!isGenerationRunActive(generation)) return;
@@ -1340,6 +1403,9 @@ const ChatApp = () => {
                 currentMessage,
                 isSearching,
                 results,
+                {
+                  replaceResults: effectiveContext.agentModeEnabled,
+                },
               );
               updateMessage(targetSessionId!, currentBotMsgId, updates);
             },
@@ -1395,6 +1461,12 @@ const ChatApp = () => {
               );
             },
             toolConfirmationController,
+            createAgentToolStreamOptions({
+              sessionId: targetSessionId!,
+              modelMessageId: currentBotMsgId,
+              knowledgeScope: processedData.knowledgeScope,
+              isActive: () => isGenerationRunActive(generation),
+            }),
           ),
       });
 
@@ -1749,6 +1821,7 @@ const ChatApp = () => {
         ragSources,
         ragError,
         effectiveContext,
+        knowledgeScope,
         injectedMemoryIds,
       } = await processPromptForModel(
         sessionMeta,
@@ -1777,7 +1850,7 @@ const ChatApp = () => {
           activeSkillBundleIds,
           skillParameterValues: skillParameterValuesRef.current,
           skillBundleParameterValues: skillBundleParameterValuesRef.current,
-          autoSelect: skillAutoSelect,
+          autoSelect: skillAutoSelect && !effectiveContext.agentModeEnabled,
           signal: generation.controller.signal,
         }));
       if (!isGenerationRunActive(generation)) return;
@@ -1902,6 +1975,9 @@ const ChatApp = () => {
                 currentMessage,
                 isSearching,
                 results,
+                {
+                  replaceResults: effectiveContext.agentModeEnabled,
+                },
               );
               updateMessage(currentSessionId, branchMessageId, updates);
             },
@@ -1956,6 +2032,12 @@ const ChatApp = () => {
               );
             },
             toolConfirmationController,
+            createAgentToolStreamOptions({
+              sessionId: currentSessionId,
+              modelMessageId: branchMessageId,
+              knowledgeScope,
+              isActive: () => isGenerationRunActive(generation),
+            }),
           ),
       });
 
@@ -2418,6 +2500,7 @@ const ChatApp = () => {
         ragError,
         userMessage,
         effectiveContext,
+        knowledgeScope,
         injectedMemoryIds,
       } = await processPromptForModel(
         sessionMeta,
@@ -2442,7 +2525,7 @@ const ChatApp = () => {
         skillParameterValues: editSkillParameters.skillParameterValues,
         skillBundleParameterValues:
           editSkillParameters.skillBundleParameterValues,
-        autoSelect: skillAutoSelect,
+        autoSelect: skillAutoSelect && !effectiveContext.agentModeEnabled,
         signal: generation.controller.signal,
       });
       if (!isGenerationRunActive(generation)) return;
@@ -2593,6 +2676,9 @@ const ChatApp = () => {
                 currentMessage,
                 isSearching,
                 results,
+                {
+                  replaceResults: effectiveContext.agentModeEnabled,
+                },
               );
               updateMessage(sessionId, modelMessageId, updates);
             },
@@ -2654,6 +2740,13 @@ const ChatApp = () => {
               );
             },
             toolConfirmationController,
+            createAgentToolStreamOptions({
+              sessionId,
+              modelMessageId: modelMessageId!,
+              knowledgeScope,
+              isActive: () =>
+                isGenerationRunActive(generation) && Boolean(modelMessageId),
+            }),
           ),
       });
 

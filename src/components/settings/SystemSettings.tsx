@@ -739,6 +739,19 @@ const SystemSettings = () => {
         description={t("systemAutomationDesc")}
       >
         <ToggleRow
+          title={t("autoScroll")}
+          description={t("autoScrollDesc")}
+          ariaLabel={t("autoScrollAria")}
+          name="enableAutoScroll"
+          checked={system.enableAutoScroll === true}
+          onChange={() =>
+            updateSystemSettings({
+              enableAutoScroll: system.enableAutoScroll !== true,
+            })
+          }
+        />
+
+        <ToggleRow
           title={t("destructiveToolConfirmation")}
           description={t("destructiveToolConfirmationDesc")}
           ariaLabel={t("destructiveToolConfirmationAria")}

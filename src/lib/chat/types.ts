@@ -1,6 +1,7 @@
 import type { PluginFunctionRisk } from "../plugin/types";
 import type { CitationSource, ImageSource, Source } from "../search/types";
 import type { AppliedSkillInvocation } from "../skills/types";
+import type { TaskPlanStep } from "../agent/taskPlan";
 
 export interface Attachment {
   id: string;
@@ -65,6 +66,7 @@ export interface ToolCall {
     | "skipped"
     | "denied";
   result?: any;
+  resultImages?: Attachment[];
   isError?: boolean;
   risk?: PluginFunctionRisk;
   confirmation?: {
@@ -147,6 +149,12 @@ export type MessageOutputBlock =
       id: string;
       type: "image_generation_status";
       status: "generating";
+    }
+  | {
+      id: string;
+      type: "task_plan";
+      steps: TaskPlanStep[];
+      note?: string;
     }
   | {
       id: string;
@@ -315,6 +323,7 @@ export type ChatGenerationEvent =
 export interface SessionConfig {
   useSearch?: boolean;
   useReasoning?: boolean;
+  useAgentMode?: boolean;
   reasoningMode?: ReasoningMode;
   activePlugins?: string[];
   activeSkills?: string[];
@@ -369,6 +378,7 @@ export interface Assistant {
 export interface ChatConfig {
   useSearch: boolean;
   useReasoning: boolean;
+  useAgentMode?: boolean;
   reasoningMode: ReasoningMode;
   useRAG?: boolean;
   temperature: number;

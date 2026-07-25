@@ -1,5 +1,9 @@
 const CACHE_PREFIX = "neo-chat-pwa-";
-const CACHE_VERSION = "v3";
+const CACHE_VERSION =
+  typeof self.__NEO_CHAT_DEPLOYMENT_ID__ === "string" &&
+  self.__NEO_CHAT_DEPLOYMENT_ID__
+    ? self.__NEO_CHAT_DEPLOYMENT_ID__
+    : "unknown";
 const SHELL_CACHE = `${CACHE_PREFIX}shell-${CACHE_VERSION}`;
 const STATIC_CACHE = `${CACHE_PREFIX}static-${CACHE_VERSION}`;
 const OFFLINE_FALLBACK = "/offline.html";

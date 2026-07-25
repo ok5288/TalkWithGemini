@@ -1,6 +1,6 @@
 import type { ChatConfig } from "./types";
 import type { ModelMetadata } from "@/types";
-import { parseModelString } from "../utils/model";
+import { parseModelString, supportsToolCalls } from "../utils/model";
 import { isReasoningEnabled, resolveReasoningModeForModel } from "./reasoning";
 
 export function resolveEffectiveChatRequestConfig({
@@ -28,6 +28,9 @@ export function resolveEffectiveChatRequestConfig({
   return {
     ...chatConfig,
     useSearch: chatConfig.useSearch && (searchCompatibility?.enabled ?? true),
+    useAgentMode:
+      chatConfig.useAgentMode === true &&
+      supportsToolCalls(selectedModelMetadata),
     reasoningMode,
     useReasoning: isReasoningEnabled(reasoningMode),
   };

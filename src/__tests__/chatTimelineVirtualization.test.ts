@@ -6,7 +6,7 @@ const readProjectFile = (path: string) =>
   readFileSync(resolve(process.cwd(), path), "utf8");
 
 describe("chat timeline virtualization", () => {
-  it("uses stable dynamic rows with explicit scroll following", () => {
+  it("follows output only while the viewport remains at the end", () => {
     const source = readProjectFile(
       "src/components/chat/VirtualizedMessageTimeline.tsx",
     );
@@ -15,11 +15,19 @@ describe("chat timeline virtualization", () => {
     expect(source).toContain("getItemKey:");
     expect(source).toContain("ref={virtualizer.measureElement}");
     expect(source).toContain("overscan: 8");
-    expect(source).toContain('anchorTo: "start"');
-    expect(source).toContain("followOnAppend: false");
+    expect(source).toContain('anchorTo: "end"');
+    expect(source).toContain(
+      'followOnAppend: autoScrollEnabled ? "auto" : false',
+    );
+    expect(source).toContain("FOLLOW_END_THRESHOLD_PX = 48");
+    expect(source).toContain("DISABLED_FOLLOW_THRESHOLD_PX = -1");
+    expect(source).toContain("scrollEndThreshold: autoScrollEnabled");
+    expect(source).toContain("state.system.enableAutoScroll === true");
     expect(source).toContain("shouldAdjustScrollPositionOnItemSizeChange");
-    expect(source).toContain("FOLLOW_RESUME_DISTANCE_PX = 8");
-    expect(source).toContain("scrollElement.scrollTo({");
+    expect(source).toContain("virtualizer.scrollToIndex(index");
+    expect(source).not.toContain("scheduleFollowToEnd");
+    expect(source).not.toContain("requestAnimationFrame");
+    expect(source).not.toContain("scrollElement.scrollTo({");
     expect(source).not.toContain("virtualizer.scrollToEnd");
     expect(source).toContain("useFlushSync: false");
   });
@@ -47,7 +55,7 @@ describe("chat timeline virtualization", () => {
     expect(diagrams).toContain('rootMargin: "600px 0px"');
   });
 
-  it("keeps streaming scroll corrections immediate and reasoning lightweight", () => {
+  it("avoids smooth page scrolling while reasoning streams", () => {
     const shell = readProjectFile("src/components/app/ChatAppShell.tsx");
     const reasoning = readProjectFile(
       "src/components/content/ReasoningBlock.tsx",

@@ -70,4 +70,73 @@ describe("chat search updates", () => {
       },
     ]);
   });
+
+  it("replaces Agent search snapshots so provider order wins over completion order", () => {
+    const message = {
+      searchSources: [
+        {
+          title: "Second",
+          url: "https://second.test",
+          content: "completed first",
+        },
+      ],
+      searchImages: [
+        {
+          url: "https://images.test/second.png",
+          description: "completed first",
+        },
+      ],
+      ragSources: [
+        {
+          title: "Knowledge",
+          url: "knowledge://collection/file/0",
+          content: "local",
+        },
+      ],
+    } as Message;
+
+    const update = buildSearchUpdate(
+      message,
+      false,
+      {
+        sources: [
+          {
+            title: "First",
+            url: "https://first.test",
+            content: "provider first",
+          },
+          {
+            title: "Second",
+            url: "https://second.test",
+            content: "completed first",
+          },
+        ],
+        images: [
+          {
+            url: "https://images.test/first.png",
+            description: "provider first",
+          },
+          {
+            url: "https://images.test/second.png",
+            description: "completed first",
+          },
+        ],
+      },
+      { replaceResults: true },
+    );
+
+    expect(update.searchSources?.map((source) => source.title)).toEqual([
+      "First",
+      "Second",
+    ]);
+    expect(update.searchImages?.map((image) => image.description)).toEqual([
+      "provider first",
+      "completed first",
+    ]);
+    expect(update.citations?.map((citation) => citation.title)).toEqual([
+      "First",
+      "Second",
+      "Knowledge",
+    ]);
+  });
 });

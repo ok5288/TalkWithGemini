@@ -2,7 +2,11 @@
 
 import { useMemo } from "react";
 import type { ModelMetadata, ReasoningMode } from "@/types";
-import { parseModelString, supportsModality } from "@/lib/utils/model";
+import {
+  parseModelString,
+  supportsModality,
+  supportsToolCalls,
+} from "@/lib/utils/model";
 import {
   getAvailableReasoningModes,
   isReasoningEnabled,
@@ -17,7 +21,9 @@ export type ComposerCapabilityState = {
     audio: boolean;
     video: boolean;
     reasoning: boolean;
+    toolCall: boolean;
   };
+  agentModeEnabled: boolean;
   isReasoningSupported: boolean;
   currentReasoningMode: ReasoningMode;
   isReasoningEnabledForMode: boolean;
@@ -39,6 +45,7 @@ export function useComposerCapabilityState({
   customModelMetadata,
   reasoningMode,
   useReasoning,
+  useAgentMode,
   reasoningOptionLabels,
 }: {
   selectedModel: string;
@@ -46,6 +53,7 @@ export function useComposerCapabilityState({
   customModelMetadata: Record<string, ModelMetadata>;
   reasoningMode: ReasoningMode;
   useReasoning: boolean;
+  useAgentMode: boolean;
   reasoningOptionLabels: Record<
     ReasoningMode,
     { label: string; description: string }
@@ -66,6 +74,7 @@ export function useComposerCapabilityState({
         audio: false,
         video: false,
         reasoning: false,
+        toolCall: false,
       };
     }
 
@@ -75,6 +84,7 @@ export function useComposerCapabilityState({
       audio: supportsModality(selectedModelMetadata, "audio", "input"),
       video: supportsModality(selectedModelMetadata, "video", "input"),
       reasoning: selectedModelMetadata?.reasoning ?? false,
+      toolCall: supportsToolCalls(selectedModelMetadata),
     };
   }, [selectedModel, selectedModelMetadata]);
 
@@ -116,6 +126,7 @@ export function useComposerCapabilityState({
   return {
     selectedModelMetadata,
     modelCapabilities,
+    agentModeEnabled: useAgentMode && modelCapabilities.toolCall,
     isReasoningSupported,
     currentReasoningMode,
     isReasoningEnabledForMode,

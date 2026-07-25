@@ -176,6 +176,57 @@ describe("chat store persistence", () => {
     expect(appDbMock.setItem).not.toHaveBeenCalled();
   });
 
+  it("resets Agent mode when reusing a legacy empty chat", () => {
+    const existing = {
+      ...makeSession("empty"),
+      title: "New Chat",
+      messageCount: 0,
+    };
+    useChatStore.setState((state) => ({
+      sessions: [existing],
+      chatConfig: {
+        ...state.chatConfig,
+        useAgentMode: true,
+      },
+    }));
+
+    expect(useChatStore.getState().createSession()).toBe("empty");
+    expect(useChatStore.getState().chatConfig.useAgentMode).toBe(false);
+  });
+
+  it("resets Agent mode when creating a chat without session config", () => {
+    useChatStore.setState((state) => ({
+      sessions: [],
+      chatConfig: {
+        ...state.chatConfig,
+        useAgentMode: true,
+      },
+    }));
+
+    const sessionId = useChatStore.getState().createSession();
+
+    expect(useChatStore.getState().currentSessionId).toBe(sessionId);
+    expect(useChatStore.getState().chatConfig.useAgentMode).toBe(false);
+  });
+
+  it("resolves Agent mode only from the selected session", async () => {
+    useChatStore.setState({
+      sessions: [
+        {
+          ...makeSession("agent"),
+          config: { useAgentMode: true },
+        },
+        makeSession("legacy"),
+      ],
+    });
+
+    await useChatStore.getState().selectSession("agent");
+    expect(useChatStore.getState().chatConfig.useAgentMode).toBe(true);
+
+    await useChatStore.getState().selectSession("legacy");
+    expect(useChatStore.getState().chatConfig.useAgentMode).toBe(false);
+  });
+
   it("does not reuse titled or non-empty chats when creating a default chat", () => {
     useChatStore.setState({
       sessions: [
@@ -826,7 +877,7 @@ describe("chat store persistence", () => {
     expect(deleteFromOPFSMock).toHaveBeenCalledWith(orphanUrl);
   });
 
-  it("cleans generated image display cache files from deleted output blocks", async () => {
+  it("cleans generated image display cache files from deleted tool results", async () => {
     const cachedImageUrl = "opfs://images/generated/output-cache.png";
     useChatStore.setState({
       sessions: [makeSession("a")],
@@ -837,19 +888,30 @@ describe("chat store persistence", () => {
           outputBlocks: [
             {
               id: "block_1",
-              type: "image",
-              image: {
-                id: "img_1",
-                mimeType: "image/png",
-                data: "aW1hZ2U=",
-                fileName: "generated.png",
-                displayCache: {
-                  opfsUrl: cachedImageUrl,
-                  sourceKind: "data",
-                  sourceFingerprint: "fingerprint",
-                  createdAt: 1,
+              type: "tool_group",
+              toolCalls: [
+                {
+                  id: "call_1",
+                  name: "generate_image",
+                  args: {},
+                  status: "success",
+                  result: { imageBase64: "[image omitted]", imageCount: 1 },
+                  resultImages: [
+                    {
+                      id: "img_1",
+                      mimeType: "image/png",
+                      data: "aW1hZ2U=",
+                      fileName: "generated.png",
+                      displayCache: {
+                        opfsUrl: cachedImageUrl,
+                        sourceKind: "data",
+                        sourceFingerprint: "fingerprint",
+                        createdAt: 1,
+                      },
+                    },
+                  ],
                 },
-              },
+              ],
             },
           ],
         },

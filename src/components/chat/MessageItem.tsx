@@ -835,12 +835,12 @@ const MessageItem: React.FC<MessageItemProps> = ({
     setShowMoreMenu(false);
   };
 
-  const handleFileClick = (file: MarkdownGeneratedFile) => {
+  const handleFileClick = useCallback((file: MarkdownGeneratedFile) => {
     setFileToRead(normalizeMarkdownGeneratedFile(file));
     setAttachmentToRead(null);
     setReaderCopyStatus("idle");
     setReadingMode("file");
-  };
+  }, []);
 
   const handleDocumentAttachmentClick = (attachment: Attachment) => {
     if (!attachment.data || !isTextDocumentMimeType(attachment.mimeType))
@@ -1054,10 +1054,16 @@ const MessageItem: React.FC<MessageItemProps> = ({
   });
 
   // Search Data from Message
-  const sources = message.searchSources || [];
+  const sources = useMemo(
+    () => message.searchSources || [],
+    [message.searchSources],
+  );
 
   // RAG Data
-  const ragSources = message.ragSources || [];
+  const ragSources = useMemo(
+    () => message.ragSources || [],
+    [message.ragSources],
+  );
   const ragError = message.ragError?.message;
 
   // Tool Data

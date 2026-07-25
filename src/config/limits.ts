@@ -239,6 +239,12 @@ export const BROWSER_SANDBOX_LIMITS = {
   executionTimeoutMs: 3_000,
 } as const;
 
+export const TASK_PLAN_LIMITS = {
+  maxSteps: 20,
+  maxTitleChars: 200,
+  maxNoteChars: 500,
+} as const;
+
 export const TOOL_DISPLAY_LIMITS = {
   maxRenderedChars: 30_000,
   maxStringChars: 4_000,

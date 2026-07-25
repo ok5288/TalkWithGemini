@@ -39,16 +39,23 @@ export function buildSearchUpdate(
   message: Message | undefined,
   isSearching: boolean,
   results?: { sources: Source[]; images: ImageSource[] },
+  options: { replaceResults?: boolean } = {},
 ): Partial<Message> {
   const updates: Partial<Message> = { isSearching };
   if (results) {
-    const searchSources = mergeSources(message?.searchSources, results.sources);
+    const searchSources = mergeSources(
+      options.replaceResults ? [] : message?.searchSources,
+      results.sources,
+    );
     updates.searchSources = searchSources;
     updates.citations = createCitationSources({
       web: searchSources,
       knowledge: message?.ragSources,
     });
-    updates.searchImages = mergeImages(message?.searchImages, results.images);
+    updates.searchImages = mergeImages(
+      options.replaceResults ? [] : message?.searchImages,
+      results.images,
+    );
   }
   return updates;
 }

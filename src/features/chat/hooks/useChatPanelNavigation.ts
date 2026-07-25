@@ -26,6 +26,7 @@ interface UseChatPanelNavigationResult {
 }
 
 const DESKTOP_SIDEBAR_BREAKPOINT = 1024;
+const EXPANDED_SIDEBAR_BREAKPOINT = 1280;
 
 export function useChatPanelNavigation(): UseChatPanelNavigationResult {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -123,19 +124,20 @@ export function useChatPanelNavigation(): UseChatPanelNavigationResult {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    let previousIsNonDesktop: boolean | undefined;
+    let previousShouldExpandSidebar: boolean | undefined;
 
     const updateViewport = () => {
       const isNonDesktop = window.innerWidth < DESKTOP_SIDEBAR_BREAKPOINT;
-      const isDesktop = window.innerWidth >= DESKTOP_SIDEBAR_BREAKPOINT;
+      const shouldExpandSidebar =
+        window.innerWidth >= EXPANDED_SIDEBAR_BREAKPOINT;
       setIsNonDesktopViewport(isNonDesktop);
       if (
-        previousIsNonDesktop === undefined ||
-        previousIsNonDesktop !== isNonDesktop
+        previousShouldExpandSidebar === undefined ||
+        previousShouldExpandSidebar !== shouldExpandSidebar
       ) {
-        setIsSidebarOpen(isDesktop);
+        setIsSidebarOpen(shouldExpandSidebar);
       }
-      previousIsNonDesktop = isNonDesktop;
+      previousShouldExpandSidebar = shouldExpandSidebar;
     };
 
     updateViewport();

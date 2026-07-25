@@ -71,6 +71,10 @@ export function normalizeChatConfig(config: unknown): ChatConfig {
       typeof raw.useSearch === "boolean"
         ? raw.useSearch
         : DEFAULT_CHAT_CONFIG.useSearch,
+    useAgentMode:
+      typeof raw.useAgentMode === "boolean"
+        ? raw.useAgentMode
+        : DEFAULT_CHAT_CONFIG.useAgentMode,
     useReasoning: isReasoningEnabled(reasoningMode),
     reasoningMode,
     useRAG:
@@ -103,6 +107,10 @@ export function normalizeSystemSettings(
       raw.personality,
       defaults.personality,
     ),
+    enableAutoScroll:
+      typeof raw.enableAutoScroll === "boolean"
+        ? raw.enableAutoScroll
+        : defaults.enableAutoScroll,
     enableAutoTitle:
       typeof raw.enableAutoTitle === "boolean"
         ? raw.enableAutoTitle

@@ -8,6 +8,9 @@ import {
   ToolConfirmationController,
   ToolConfirmationDecision,
   ToolConfirmationRequest,
+  Source,
+  ImageSource,
+  AppliedSkillInvocation,
 } from "@/types";
 import { useSettingsStore, getTaskModel } from "@/store/core/settingsStore";
 import { useCoreSettingsStore } from "@/store/core/coreSettingsStore";
@@ -29,6 +32,7 @@ import {
   parseModelString,
   supportsImageGeneration,
   supportsTextOutput,
+  supportsToolCalls,
 } from "@/lib/utils/model";
 import {
   isGoogleProviderType,
@@ -79,24 +83,41 @@ import {
   MEMORY_RECORD_TOOL_NAME,
 } from "@/lib/memory/tools";
 import { logDevError, logDevWarn } from "@/lib/utils/devLogger";
-import { MEMORY_LIMITS, PLUGIN_EXECUTION_LIMITS } from "@/config/limits";
 import {
-  addInternalMemoryTools,
-  executeMemorySearchTool,
-  isBrowserMemoryStorePendingHydration,
-  isInternalMemoryTool,
-} from "./chat/memoryTools";
+  ATTACHMENT_LIMITS,
+  MEMORY_LIMITS,
+  PLUGIN_EXECUTION_LIMITS,
+  RAG_LIMITS,
+  SEARCH_RESULT_LIMITS,
+} from "@/config/limits";
+import {
+  collectBuiltinTools,
+  type BuiltinKnowledgeScope,
+  type BuiltinSearchEvent,
+} from "./chat/builtinTools";
+import { isBrowserMemoryStorePendingHydration } from "./chat/builtinTools/memorySearch";
 import {
   runExternalSearchPreflight,
   type SearchStatusResults,
 } from "./chat/externalSearchPreflight";
 import { resolveModelMetadata } from "./chat/modelSelection";
-import { compactPluginImageResultForHistory } from "./chat/pluginImageResults";
+import {
+  compactPluginImageResultForHistory,
+  extractPluginImageAttachments,
+} from "./chat/pluginImageResults";
 import type { ChatToolDefinition } from "./chat/types";
 import { mapWithConcurrency } from "@/lib/utils/concurrency";
 import { boundHistoryForRequest } from "@/lib/chat/requestContextBudget";
+import { mergeImages, mergeSources } from "@/lib/chat/searchUpdate";
+import {
+  appendAgentSystemInstruction,
+  buildAgentSystemInstruction,
+} from "@/lib/agent/systemPrompt";
+import type { RagQueryError } from "@/lib/knowledge/retrieveKnowledgeSources";
+import { buildSkillMetadataContext } from "@/lib/skills";
 
 type ChatUsagePayload = { usage?: unknown; usageMetadata?: unknown };
+const MAX_CHAT_TOOLS_PER_REQUEST = 64;
 
 export class IncompleteChatStreamError extends Error {
   readonly code = "INCOMPLETE_CHAT_STREAM";
@@ -537,6 +558,13 @@ export interface ModelInfo {
   providerName?: string;
 }
 
+export interface StreamChatResponseOptions {
+  disableTools?: boolean;
+  knowledgeScope?: BuiltinKnowledgeScope;
+  onKnowledgeSources?: (sources: Source[], ragError?: RagQueryError) => void;
+  onSkillInvocation?: (invocation: AppliedSkillInvocation) => void;
+}
+
 // Stream chat response from backend API
 export const streamChatResponse = async (
   sessionId: string,
@@ -563,7 +591,7 @@ export const streamChatResponse = async (
   skillsContext?: string,
   onOutputBlocks?: (outputBlocks: MessageOutputBlock[]) => void,
   toolConfirmationController?: ToolConfirmationController,
-  options?: { disableTools?: boolean },
+  options?: StreamChatResponseOptions,
 ): Promise<string> => {
   const enableDestructiveToolConfirmation =
     useSettingsStore.getState().system?.enableDestructiveToolConfirmation ===
@@ -577,6 +605,8 @@ export const streamChatResponse = async (
 
   if (!provider) throw new Error("No provider available");
   const selectedModelMetadata = resolveModelMetadata(modelName);
+  const agentModeEnabled =
+    config?.useAgentMode === true && supportsToolCalls(selectedModelMetadata);
 
   let effectiveNewMessage = newMessage;
   const { search } = useSettingsStore.getState();
@@ -592,6 +622,107 @@ export const streamChatResponse = async (
   const emitOutputBlocks = () => {
     onOutputBlocks?.(outputBlockBuilder.getBlocks());
   };
+  const builtinSearchStates = new Map<
+    string,
+    {
+      order: number;
+      phase: BuiltinSearchEvent["phase"];
+      sources: Source[];
+      images: ImageSource[];
+      error?: string;
+    }
+  >();
+  const emitBuiltinSearch = (
+    toolCallId: string,
+    order: number,
+    event: BuiltinSearchEvent,
+  ) => {
+    const previous = builtinSearchStates.get(toolCallId);
+    builtinSearchStates.set(toolCallId, {
+      order,
+      phase: event.phase,
+      sources:
+        event.phase === "complete" ? event.sources : previous?.sources || [],
+      images:
+        event.phase === "complete" ? event.images : previous?.images || [],
+      ...(event.phase === "error" ? { error: event.message } : {}),
+    });
+
+    const orderedStates = [...builtinSearchStates.values()].sort(
+      (left, right) => left.order - right.order,
+    );
+    const activeBuiltinSearches = orderedStates.filter(
+      (state) => state.phase === "start",
+    ).length;
+    let builtinSearchSources: Source[] = [];
+    let builtinSearchImages: ImageSource[] = [];
+    for (const state of orderedStates) {
+      if (state.phase !== "complete") continue;
+      builtinSearchSources = mergeSources(
+        builtinSearchSources,
+        state.sources,
+      ).slice(0, SEARCH_RESULT_LIMITS.maxSources);
+      builtinSearchImages = mergeImages(
+        builtinSearchImages,
+        state.images,
+      ).slice(0, SEARCH_RESULT_LIMITS.maxImages);
+    }
+    const latestSuccessOrder = orderedStates.reduce(
+      (latest, state) =>
+        state.phase === "complete" ? Math.max(latest, state.order) : latest,
+      -1,
+    );
+    const latestError = orderedStates
+      .filter(
+        (state) => state.phase === "error" && state.order > latestSuccessOrder,
+      )
+      .at(-1)?.error;
+    const results = {
+      sources: builtinSearchSources,
+      images: builtinSearchImages,
+    };
+    outputBlockBuilder.upsertSearch({
+      isSearching: activeBuiltinSearches > 0,
+      ...(latestError ? { error: latestError } : {}),
+      results,
+    });
+    emitOutputBlocks();
+    onSearchStatus?.(activeBuiltinSearches > 0, results);
+  };
+  const builtinKnowledgeStates = new Map<
+    string,
+    {
+      order: number;
+      sources: Source[];
+      ragError?: RagQueryError;
+    }
+  >();
+  const emitBuiltinKnowledgeSources = (
+    toolCallId: string,
+    order: number,
+    sources: Source[],
+    ragError?: RagQueryError,
+  ) => {
+    builtinKnowledgeStates.set(toolCallId, {
+      order,
+      sources,
+      ragError,
+    });
+    const orderedStates = [...builtinKnowledgeStates.values()].sort(
+      (left, right) => left.order - right.order,
+    );
+    let aggregatedSources: Source[] = [];
+    for (const state of orderedStates) {
+      aggregatedSources = mergeSources(aggregatedSources, state.sources).slice(
+        0,
+        RAG_LIMITS.maxTopK,
+      );
+    }
+    const latestRagError = orderedStates
+      .filter((state) => state.ragError)
+      .at(-1)?.ragError;
+    options?.onKnowledgeSources?.(aggregatedSources, latestRagError);
+  };
 
   if (config?.useSearch && !searchCompatibility.enabled) {
     onSearchStatus?.(false, { sources: [], images: [] });
@@ -600,6 +731,7 @@ export const streamChatResponse = async (
 
   if (
     config?.useSearch &&
+    !agentModeEnabled &&
     onSearchStatus &&
     searchCompatibility.mode === "external"
   ) {
@@ -620,12 +752,22 @@ export const streamChatResponse = async (
   }
 
   // Get plugin tools if activePlugins is provided
-  const { installedPlugins, pluginConfigs } = useSettingsStore.getState();
+  const { installedPlugins, pluginConfigs, installedSkills } =
+    useSettingsStore.getState();
   const tools: ChatToolDefinition[] = [];
   const toolNames = new Set<string>();
-
-  if (!options?.disableTools) {
-    addInternalMemoryTools(tools, toolNames, newMessage);
+  const collectedBuiltinTools = collectBuiltinTools({
+    message: newMessage,
+    disabled: options?.disableTools,
+    agentModeEnabled,
+    useSearch: config?.useSearch === true,
+    searchMode: searchCompatibility.mode,
+    knowledgeScope: options?.knowledgeScope,
+    installedSkills,
+  });
+  tools.push(...collectedBuiltinTools.definitions);
+  for (const name of collectedBuiltinTools.bindingsByName.keys()) {
+    toolNames.add(name);
   }
 
   if (!options?.disableTools && activePlugins && activePlugins.length > 0) {
@@ -638,6 +780,7 @@ export const streamChatResponse = async (
 
         // Convert to OpenAI tool format
         functionsToAdd.forEach((func) => {
+          if (tools.length >= MAX_CHAT_TOOLS_PER_REQUEST) return;
           if (toolNames.has(func.name)) return;
           toolNames.add(func.name);
 
@@ -654,6 +797,27 @@ export const streamChatResponse = async (
     });
   }
 
+  const hasAgentBuiltin = [
+    ...collectedBuiltinTools.bindingsByName.values(),
+  ].some((binding) => binding.agentOnly);
+  const effectiveSystemInstruction =
+    agentModeEnabled && hasAgentBuiltin
+      ? appendAgentSystemInstruction(
+          userSystemInstruction,
+          buildAgentSystemInstruction({
+            toolNames: tools.map((tool) => tool.function.name),
+            skillCatalogContext: collectedBuiltinTools.bindingsByName.has(
+              "load_skill",
+            )
+              ? buildSkillMetadataContext({
+                  skills: installedSkills,
+                  includeParameters: true,
+                })
+              : undefined,
+          }),
+        )
+      : userSystemInstruction;
+
   try {
     const allToolCalls: ToolCall[] = [];
     let committedContent = "";
@@ -669,16 +833,21 @@ export const streamChatResponse = async (
     let requestMessage = appendDiagramRequestInstructions(
       appendHtmlVisualRequestInstructions(
         messageWithSkills,
-        userSystemInstruction,
+        effectiveSystemInstruction,
       ),
-      userSystemInstruction,
+      effectiveSystemInstruction,
     );
     let requestAttachments =
       await stripAttachmentsDisplayCacheForModel(attachments);
-    let requestConfig: Partial<ChatConfig> = { ...config };
+    let requestConfig: Partial<ChatConfig> = {
+      ...config,
+      useAgentMode: agentModeEnabled,
+    };
     const maxToolRounds = PLUGIN_EXECUTION_LIMITS.maxToolRounds;
     let executedToolCallCount = 0;
     const functionFingerprintCache = new Map<string, Promise<string>>();
+    const pendingSkillInvocations = new Map<string, AppliedSkillInvocation>();
+    const emittedSkillIds = new Set<string>();
 
     if (
       requestConfig.imageCount === undefined &&
@@ -713,7 +882,7 @@ export const streamChatResponse = async (
       boundHistoryForRequest([], {
         newMessage: requestMessage,
         attachments: requestAttachments,
-        systemInstruction: userSystemInstruction,
+        systemInstruction: effectiveSystemInstruction,
         tools,
         modelInputTokenLimit: selectedModelMetadata?.limit?.context,
         reservedOutputTokens: selectedModelMetadata?.limit?.output,
@@ -785,7 +954,7 @@ export const streamChatResponse = async (
         attachments: requestAttachments,
         modelInputTokenLimit: selectedModelMetadata?.limit?.context,
         reservedOutputTokens: selectedModelMetadata?.limit?.output,
-        systemInstruction: userSystemInstruction,
+        systemInstruction: effectiveSystemInstruction,
         tools,
       });
       const response = await fetchWithByokRetry(async () =>
@@ -801,7 +970,7 @@ export const streamChatResponse = async (
             newMessage: requestMessage,
             attachments: requestAttachments,
             config: requestConfig,
-            systemInstruction: userSystemInstruction,
+            systemInstruction: effectiveSystemInstruction,
             tools,
             enableImageGeneration:
               supportsImageGeneration(selectedModelMetadata) &&
@@ -809,9 +978,11 @@ export const streamChatResponse = async (
                 isGoogleProviderType(provider.type)),
             enableGoogleSearch:
               requestConfig?.useSearch &&
+              !agentModeEnabled &&
               searchCompatibility.mode === "gemini-google",
             enableOpenAIWebSearch:
               requestConfig?.useSearch &&
+              !agentModeEnabled &&
               searchCompatibility.mode === "openai-web",
           }),
           signal,
@@ -1091,10 +1262,37 @@ export const streamChatResponse = async (
       const nonExecutedToolCalls: ToolCall[] = [];
 
       for (const toolCall of toolCallsToExecute) {
-        if (isInternalMemoryTool(toolCall.name)) {
+        if (!toolNames.has(toolCall.name)) {
+          const failed: ToolCall = {
+            ...toolCall,
+            status: "error",
+            isError: true,
+            errorInfo: {
+              code: "TOOL_FUNCTION_NOT_FOUND",
+              message: `Function ${toolCall.name} was not offered for this request.`,
+              recoverable: true,
+            },
+            result: {
+              error: {
+                code: "TOOL_FUNCTION_NOT_FOUND",
+                message: `Function ${toolCall.name} was not offered for this request.`,
+              },
+            },
+          };
+          outputBlockBuilder.updateToolCall(failed);
+          emitOutputBlocks();
+          upsertToolCall(failed);
+          nonExecutedToolCalls.push(failed);
+          continue;
+        }
+
+        const builtinBinding = collectedBuiltinTools.bindingsByName.get(
+          toolCall.name,
+        );
+        if (builtinBinding?.risk === "read") {
           const approvedToolCall: ToolCall = {
             ...toolCall,
-            risk: "read",
+            risk: builtinBinding.risk,
             confirmation: {
               required: false,
               state: "approved",
@@ -1274,13 +1472,47 @@ export const streamChatResponse = async (
         upsertToolCall(runningToolCall);
       });
 
+      const pluginImagesByToolCallId = new Map<string, Attachment[]>();
       const completedToolCalls = await mapWithConcurrency(
         approvedToolCalls,
         PLUGIN_EXECUTION_LIMITS.maxToolConcurrency,
         async (toolCall) => {
           try {
-            const resultData = isInternalMemoryTool(toolCall.name)
-              ? await executeMemorySearchTool(toolCall.args)
+            const builtinBinding = collectedBuiltinTools.bindingsByName.get(
+              toolCall.name,
+            );
+            const resultData = builtinBinding
+              ? await builtinBinding.execute(toolCall.args, {
+                  signal,
+                  sessionId,
+                  knowledgeScope: options?.knowledgeScope,
+                  emit: {
+                    search: (event) =>
+                      emitBuiltinSearch(
+                        toolCall.id,
+                        allToolCalls.findIndex(
+                          (candidate) => candidate.id === toolCall.id,
+                        ),
+                        event,
+                      ),
+                    knowledgeSources: (sources, ragError) =>
+                      emitBuiltinKnowledgeSources(
+                        toolCall.id,
+                        allToolCalls.findIndex(
+                          (candidate) => candidate.id === toolCall.id,
+                        ),
+                        sources,
+                        ragError,
+                      ),
+                    skillInvocation: (invocation) => {
+                      pendingSkillInvocations.set(toolCall.id, invocation);
+                    },
+                    taskPlan: (plan) => {
+                      outputBlockBuilder.upsertTaskPlan(plan);
+                      emitOutputBlocks();
+                    },
+                  },
+                })
               : await executePluginFunction(
                   toolCall.name,
                   toolCall.args,
@@ -1301,6 +1533,12 @@ export const streamChatResponse = async (
               !!resultData &&
               typeof resultData === "object" &&
               "error" in resultData;
+            if (!builtinBinding && !isError) {
+              const pluginImages = extractPluginImageAttachments(resultData);
+              if (pluginImages.length > 0) {
+                pluginImagesByToolCallId.set(toolCall.id, pluginImages);
+              }
+            }
             const storedResultData = isError
               ? resultData
               : compactPluginImageResultForHistory(resultData);
@@ -1332,12 +1570,56 @@ export const streamChatResponse = async (
           }
         },
       );
+      const roundPluginImages = approvedToolCalls
+        .flatMap((toolCall) => pluginImagesByToolCallId.get(toolCall.id) || [])
+        .slice(0, ATTACHMENT_LIMITS.maxCount);
       const completedById = new Map(
         [...completedToolCalls, ...nonExecutedToolCalls].map((toolCall) => [
           toolCall.id,
           toolCall,
         ]),
       );
+      if (roundPluginImages.length > 0) {
+        const displayImages = await cacheGeneratedImageAttachments(
+          roundPluginImages,
+          { signal },
+        );
+        let displayImageIndex = 0;
+        for (const toolCall of approvedToolCalls) {
+          const resultImageCount = Math.min(
+            pluginImagesByToolCallId.get(toolCall.id)?.length || 0,
+            displayImages.length - displayImageIndex,
+          );
+          if (resultImageCount === 0) continue;
+
+          const completed = completedById.get(toolCall.id);
+          if (!completed) continue;
+          const resultImages = displayImages.slice(
+            displayImageIndex,
+            displayImageIndex + resultImageCount,
+          );
+          displayImageIndex += resultImageCount;
+          outputBlockBuilder.updateToolCall({
+            ...completed,
+            resultImages,
+          });
+        }
+        onChunk(
+          committedContent + result.content,
+          committedReasoning + result.reasoning,
+          outputBlockBuilder.getBlocks(),
+        );
+      }
+      for (const toolCall of approvedToolCalls) {
+        const invocation = pendingSkillInvocations.get(toolCall.id);
+        pendingSkillInvocations.delete(toolCall.id);
+        if (!invocation || emittedSkillIds.has(invocation.id)) continue;
+        emittedSkillIds.add(invocation.id);
+        options?.onSkillInvocation?.({
+          ...invocation,
+          order: emittedSkillIds.size - 1,
+        });
+      }
       const executedToolCalls = [
         ...toolCallsToExecute.flatMap((toolCall) => {
           const completed = completedById.get(toolCall.id);
@@ -1372,8 +1654,10 @@ export const streamChatResponse = async (
         },
       ];
       requestMessage =
-        "Use the tool results above to answer the user's original request. Only call another tool if more external data is required.";
-      requestAttachments = [];
+        roundPluginImages.length > 0
+          ? "Use the tool results above and the attached image outputs to answer the user's original request. Only call another tool if more external data is required."
+          : "Use the tool results above to answer the user's original request. Only call another tool if more external data is required.";
+      requestAttachments = roundPluginImages;
     }
 
     return committedContent;

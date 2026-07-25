@@ -179,6 +179,54 @@ describe("skills domain", () => {
     expect(context.length).toBeLessThanOrEqual(800);
   });
 
+  it("adds bounded parameter contracts only when explicitly requested", () => {
+    const skill: TextSkill = {
+      ...baseSkill,
+      parameters: [
+        {
+          key: "tone",
+          label: "Tone",
+          input: "select",
+          required: true,
+          defaultValue: "concise",
+          options: [
+            { value: "concise", label: "Concise" },
+            { value: "warm", label: "Warm" },
+          ],
+          maxLength: 20,
+        },
+      ],
+    };
+    const defaultContext = buildSkillMetadataContext({
+      skills: [skill],
+      maxChars: 2_000,
+    });
+    expect(
+      buildSkillMetadataContext({
+        skills: [skill],
+        maxChars: 2_000,
+        includeParameters: false,
+      }),
+    ).toBe(defaultContext);
+    expect(defaultContext).not.toContain("parameter: key=");
+
+    const parameterContext = buildSkillMetadataContext({
+      skills: [skill],
+      maxChars: 2_000,
+      includeParameters: true,
+    });
+    expect(parameterContext).toContain(
+      'parameter: key=tone; required=true; default="concise"; options=["concise","warm"]; maxLength=20',
+    );
+    expect(
+      buildSkillMetadataContext({
+        skills: [skill],
+        maxChars: 40,
+        includeParameters: true,
+      }).length,
+    ).toBeLessThanOrEqual(40);
+  });
+
   it("stores skill descriptions in message invocation metadata", () => {
     expect(
       createSkillInvocations([{ skill: baseSkill, mode: "auto" }]),

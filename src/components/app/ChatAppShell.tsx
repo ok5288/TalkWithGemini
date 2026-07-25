@@ -197,6 +197,15 @@ const ChatAppShell = ({
   const [focusedMessageId, setFocusedMessageId] = React.useState<string>();
   const [replyTarget, setReplyTarget] = React.useState<MessageReplyReference>();
   const timelineRef = React.useRef<VirtualizedMessageTimelineRef>(null);
+  const [messagesScrollElement, setMessagesScrollElement] =
+    React.useState<HTMLDivElement | null>(null);
+  const attachMessagesScrollElement = React.useCallback(
+    (element: HTMLDivElement | null) => {
+      messagesScrollRef.current = element;
+      setMessagesScrollElement(element);
+    },
+    [messagesScrollRef],
+  );
   const [focusedWorkspaceId, setFocusedWorkspaceId] = React.useState<string>();
   const [focusedKnowledgeTarget, setFocusedKnowledgeTarget] = React.useState<{
     collectionId: string;
@@ -606,7 +615,7 @@ const ChatAppShell = ({
             </header>
 
             <div
-              ref={messagesScrollRef}
+              ref={attachMessagesScrollElement}
               data-chat-scroll-container
               className="relative flex-1 overflow-y-auto px-3 md:px-6"
             >
@@ -625,7 +634,7 @@ const ChatAppShell = ({
                   <VirtualizedMessageTimeline
                     key={currentSession?.id}
                     ref={timelineRef}
-                    scrollRef={messagesScrollRef}
+                    scrollElement={messagesScrollElement}
                     currentSession={currentSession}
                     messages={messages}
                     activeMessageTree={activeMessageTree}

@@ -167,6 +167,174 @@ test("loads the local chat shell", async ({ page }) => {
   await expect(page.locator('textarea[name="message"]')).toBeVisible();
 });
 
+test("uses expanded desktop and collapsed pad sidebar defaults", async ({
+  page,
+}) => {
+  const sidebar = page.locator(".glass-shell").first();
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+  await expect(sidebar).toHaveCSS("width", "288px");
+
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await expect(sidebar).toHaveCSS("width", "64px");
+
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await expect(sidebar).toHaveCSS("width", "288px");
+});
+
+test("gates Agent mode by tool support and isolates it per chat", async ({
+  page,
+}) => {
+  const agentSessionId = "agent-mode-enabled-session";
+  const legacySessionId = "agent-mode-legacy-session";
+  const now = Date.now();
+
+  await page.goto("/manifest.webmanifest");
+  await page.evaluate(
+    (value) => localStorage.setItem("neo-chat-core-settings", value),
+    persistedState({
+      theme: "light",
+      language: "en",
+      providers: [
+        {
+          id: "agent-provider",
+          name: "Agent Provider",
+          type: "OpenAI Compatible",
+          baseUrl: "https://agent-model.example.test/v1",
+          apiKey: "",
+          enabled: true,
+          models: ["tool-model", "plain-model"],
+          modelsList: ["tool-model", "plain-model"],
+        },
+      ],
+      defaultModels: {},
+    }),
+  );
+  await setIndexedDbValue(
+    page,
+    "neo-chat-settings",
+    persistedState({
+      system: {
+        enableAutoTitle: false,
+        enableRelatedQuestions: false,
+        enableAutoCompression: false,
+      },
+      customModelMetadata: {
+        "tool-model": {
+          id: "tool-model",
+          name: "Tool Model",
+          tool_call: true,
+        },
+        "plain-model": {
+          id: "plain-model",
+          name: "Plain Model",
+          tool_call: false,
+        },
+      },
+    }),
+  );
+  await setIndexedDbValue(
+    page,
+    "neo-chat-storage",
+    persistedState({
+      sessions: [
+        {
+          id: agentSessionId,
+          title: "Agent enabled chat",
+          messageCount: 0,
+          updatedAt: now,
+          model: "agent-provider:tool-model",
+          config: { useAgentMode: false },
+        },
+        {
+          id: legacySessionId,
+          title: "Legacy Agent chat",
+          messageCount: 0,
+          updatedAt: now - 1,
+          model: "agent-provider:tool-model",
+        },
+      ],
+      workspaces: [],
+      currentSessionId: agentSessionId,
+      selectedModel: "agent-provider:tool-model",
+      chatConfig: {
+        useSearch: false,
+        useAgentMode: false,
+        useReasoning: false,
+        reasoningMode: "off",
+        useRAG: false,
+        temperature: 1,
+      },
+    }),
+  );
+  await setIndexedDbValue(page, `session_messages_${agentSessionId}`, {
+    nodesById: {},
+    rootMessageIds: [],
+  });
+  await setIndexedDbValue(page, `session_messages_${legacySessionId}`, {
+    nodesById: {},
+    rootMessageIds: [],
+  });
+  await setIndexedDbValue(
+    page,
+    "neo-chat-memory",
+    persistedState({
+      settings: {
+        enabled: false,
+        searchEnabled: false,
+        autoRecordEnabled: false,
+        dreamEnabled: false,
+      },
+      memories: [],
+      dreamStatus: { isRunning: false },
+    }),
+  );
+
+  await page.goto("/");
+  const enableAgentMode = page.getByRole("button", {
+    name: "Enable Agent Mode",
+  });
+  await expect(enableAgentMode).toBeEnabled();
+  await expect(enableAgentMode).toHaveAttribute("aria-pressed", "false");
+  await enableAgentMode.click();
+  await expect(
+    page.getByRole("button", { name: "Disable Agent Mode" }),
+  ).toHaveAttribute("aria-pressed", "true");
+
+  const legacySession = page.getByRole("button", {
+    name: "Legacy Agent chat",
+    exact: true,
+  });
+  await legacySession.click();
+  await expect(legacySession).toHaveAttribute("aria-current", "page");
+  await expect(
+    page.getByRole("button", { name: "Enable Agent Mode" }),
+  ).toHaveAttribute("aria-pressed", "false");
+
+  const enabledSession = page.getByRole("button", {
+    name: "Agent enabled chat",
+    exact: true,
+  });
+  await enabledSession.click();
+  await expect(enabledSession).toHaveAttribute("aria-current", "page");
+  await expect(
+    page.getByRole("button", { name: "Disable Agent Mode" }),
+  ).toHaveAttribute("aria-pressed", "true");
+
+  await page.getByRole("button", { name: "Select model: Tool Model" }).click();
+  await page.getByRole("menuitemradio", { name: "Use Plain Model" }).click();
+
+  const unavailableAgentMode = page.getByRole("button", {
+    name: "Agent Mode requires a model that supports tool calls.",
+  });
+  await expect(unavailableAgentMode).toBeDisabled();
+  await expect(unavailableAgentMode).toHaveAttribute("aria-disabled", "true");
+  await expect(unavailableAgentMode).not.toHaveAttribute("aria-pressed");
+  await unavailableAgentMode.focus();
+  await expect(unavailableAgentMode).toBeFocused();
+});
+
 test("keeps a 500-message chat timeline DOM bounded while scrolling", async ({
   page,
 }) => {
@@ -232,7 +400,7 @@ test("keeps a 500-message chat timeline DOM bounded while scrolling", async ({
   expect(await renderedRows.count()).toBeLessThanOrEqual(50);
 });
 
-test("keeps manual scrolling stable while reasoning and content stream", async ({
+test("follows streamed output only when enabled and keeps manual scrolling stable", async ({
   page,
 }) => {
   test.setTimeout(45_000);
@@ -308,18 +476,25 @@ test("keeps manual scrolling stable while reasoning and content stream", async (
               fixture.phase = "reasoning-grown";
               await waitForGate("grow-content");
 
+              push({
+                type: "content",
+                content: "\n\n```typescript\n",
+              });
               for (let index = 0; index < 10; index += 1) {
+                const lines = Array.from(
+                  { length: 6 },
+                  (_, lineIndex) =>
+                    `const streamedValue${index}_${lineIndex} = "stable";`,
+                ).join("\n");
                 push({
                   type: "content",
-                  content:
-                    `\n\nContent segment ${index}. ` +
-                    "Streaming answer detail ".repeat(5),
+                  content: `${lines}\n`,
                 });
                 await wait(30);
               }
               push({
                 type: "content",
-                content: "\n\ncontent-tail-marker",
+                content: "// content-tail-marker\n```",
               });
               fixture.phase = "content-grown";
               await waitForGate("finish");
@@ -371,9 +546,11 @@ test("keeps manual scrolling stable while reasoning and content stream", async (
     "neo-chat-settings",
     persistedState({
       system: {
+        enableAutoScroll: true,
         enableAutoTitle: false,
         enableRelatedQuestions: false,
         enableAutoCompression: false,
+        enableCodeCollapse: true,
       },
       customModelMetadata: {
         "scroll-model": {
@@ -483,11 +660,47 @@ test("keeps manual scrolling stable while reasoning and content stream", async (
   await page.goto("/");
   const scroller = page.locator("[data-chat-scroll-container]");
   await expect(scroller).toBeVisible();
+  await expect(
+    page.locator('[data-message-id="scroll-history-0"]'),
+  ).toBeVisible({ timeout: 15_000 });
+
+  await page.getByRole("button", { name: "Open settings menu" }).click();
+  await page.getByRole("menuitem", { name: "Settings", exact: true }).click();
+  await expect(
+    page.getByLabel("Auto-scroll while messages are being generated"),
+  ).toBeChecked();
+  await page.getByRole("button", { name: "Close settings" }).click();
+
+  await expect(scroller).toBeVisible();
+  await expect(
+    page.locator('[data-message-id="scroll-history-0"]'),
+  ).toBeVisible({ timeout: 15_000 });
+  await expect
+    .poll(() =>
+      scroller.evaluate(
+        (element) => element.scrollHeight > element.clientHeight,
+      ),
+    )
+    .toBe(true);
   expect(
     await scroller.evaluate(
       (element) => getComputedStyle(element).scrollBehavior,
     ),
   ).toBe("auto");
+  await scroller.evaluate((element) =>
+    element.scrollTo({ top: element.scrollHeight, behavior: "auto" }),
+  );
+  await expect
+    .poll(() =>
+      scroller.evaluate(
+        (element) =>
+          element.scrollHeight - element.scrollTop - element.clientHeight,
+      ),
+    )
+    .toBeLessThanOrEqual(48);
+  await expect(
+    page.locator('[data-message-id="scroll-history-31"]'),
+  ).toBeVisible();
 
   await sendChatMessage(page, "Exercise streamed scrolling");
   await expect.poll(streamPhase).toBe("reasoning-ready");
@@ -501,7 +714,7 @@ test("keeps manual scrolling stable while reasoning and content stream", async (
           element.scrollHeight - element.scrollTop - element.clientHeight,
       ),
     )
-    .toBeLessThanOrEqual(8);
+    .toBeLessThanOrEqual(48);
 
   await scroller.hover();
   await page.mouse.wheel(0, -80);
@@ -554,7 +767,7 @@ test("keeps manual scrolling stable while reasoning and content stream", async (
           element.scrollHeight - element.scrollTop - element.clientHeight,
       ),
     )
-    .toBeLessThanOrEqual(8);
+    .toBeLessThanOrEqual(48);
 
   await releaseStream("grow-content");
   await expect.poll(streamPhase).toBe("content-grown");
@@ -574,10 +787,91 @@ test("keeps manual scrolling stable while reasoning and content stream", async (
           element.scrollHeight - element.scrollTop - element.clientHeight,
       ),
     )
-    .toBeLessThanOrEqual(8);
+    .toBeLessThanOrEqual(48);
+
+  const codeBlock = scroller.locator(".markdown-codeblock").last();
+  await expect(codeBlock).toBeVisible();
+  await expect(
+    codeBlock.getByRole("button", { name: "Expand code" }),
+  ).toHaveCount(0);
+  const codeContent = scroller.locator(".markdown-codeblock-content").last();
+  const expandedCodeBeforeFinish = await codeContent.evaluate((element) => {
+    (
+      window as typeof window & {
+        __streamCodeContentNode?: Element;
+      }
+    ).__streamCodeContentNode = element;
+    return {
+      clientHeight: element.clientHeight,
+      scrollHeight: element.scrollHeight,
+    };
+  });
+  expect(
+    Math.abs(
+      expandedCodeBeforeFinish.scrollHeight -
+        expandedCodeBeforeFinish.clientHeight,
+    ),
+  ).toBeLessThanOrEqual(2);
 
   await releaseStream("finish");
   await expect.poll(streamPhase).toBe("done");
+  const codeExpandToggle = codeBlock.getByRole("button", {
+    name: "Expand code",
+  });
+  await expect(codeExpandToggle).toBeVisible();
+  await expect(codeExpandToggle).toHaveAttribute("aria-expanded", "false");
+  await expect
+    .poll(() =>
+      codeContent.evaluate(
+        (element) =>
+          element ===
+          (
+            window as typeof window & {
+              __streamCodeContentNode?: Element;
+            }
+          ).__streamCodeContentNode,
+      ),
+    )
+    .toBe(true);
+  await expect
+    .poll(() =>
+      codeContent.evaluate(
+        (element) => element.scrollHeight - element.clientHeight,
+      ),
+    )
+    .toBeGreaterThan(0);
+  await expect
+    .poll(() =>
+      scroller.evaluate(
+        (element) =>
+          element.scrollHeight - element.scrollTop - element.clientHeight,
+      ),
+    )
+    .toBeLessThanOrEqual(48);
+
+  await codeExpandToggle.click();
+  const codeCollapseToggle = codeBlock.getByRole("button", {
+    name: "Collapse code",
+  });
+  await expect(codeCollapseToggle).toHaveAttribute("aria-expanded", "true");
+  await expect
+    .poll(() =>
+      codeContent.evaluate((element) =>
+        Math.abs(element.scrollHeight - element.clientHeight),
+      ),
+    )
+    .toBeLessThanOrEqual(2);
+  await codeCollapseToggle.click();
+  await expect(
+    codeBlock.getByRole("button", { name: "Expand code" }),
+  ).toHaveAttribute("aria-expanded", "false");
+  await expect
+    .poll(() =>
+      codeContent.evaluate(
+        (element) => element.scrollHeight - element.clientHeight,
+      ),
+    )
+    .toBeGreaterThan(0);
 });
 
 test("applies stable gutters to the primary app scroll regions", async ({
@@ -742,9 +1036,16 @@ test("renders the destructive confirmation setting across themes and viewports",
   const confirmationToggle = page.getByLabel(
     "Require confirmation for destructive tool calls",
   );
+  const autoScrollToggle = page.getByLabel(
+    "Auto-scroll while messages are being generated",
+  );
   const themeControl = page.getByRole("group", { name: "Appearance theme" });
   await expect(confirmationToggle).toBeVisible();
   await expect(confirmationToggle).not.toBeChecked();
+  await expect(autoScrollToggle).toBeVisible();
+  await expect(autoScrollToggle).not.toBeChecked();
+  await autoScrollToggle.press("Space");
+  await expect(autoScrollToggle).toBeChecked();
   await expect(page.locator("html")).not.toHaveClass(/dark/);
   await themeControl.getByRole("button", { name: "Dark" }).click();
   await expect(page.locator("html")).toHaveClass(/dark/);

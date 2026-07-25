@@ -30,6 +30,7 @@ import {
   PencilSparkles,
   Sparkles,
   Quote,
+  Bot,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { Attachment, MessageReplyReference, ReasoningMode } from "@/types";
@@ -521,6 +522,7 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
     );
     const {
       modelCapabilities,
+      agentModeEnabled,
       isReasoningSupported,
       currentReasoningMode,
       isReasoningEnabledForMode,
@@ -532,8 +534,41 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
       customModelMetadata,
       reasoningMode: chatConfig.reasoningMode,
       useReasoning: chatConfig.useReasoning,
+      useAgentMode: chatConfig.useAgentMode ?? false,
       reasoningOptionLabels,
     });
+    const agentModeTooltip = !modelCapabilities.toolCall
+      ? t("agentModeUnavailable")
+      : agentModeEnabled
+        ? t("disableAgentMode")
+        : t("enableAgentMode");
+    const agentSearchRequiresExternalProvider =
+      agentModeEnabled &&
+      isSearchEnabled &&
+      searchCompatibility.mode !== "external";
+    const searchToggleTooltip = agentSearchRequiresExternalProvider
+      ? t("agentSearchRequiresExternalProvider")
+      : searchTooltip;
+    const searchToggleAriaLabel = agentSearchRequiresExternalProvider
+      ? t("agentSearchRequiresExternalProvider")
+      : !searchCompatibility.enabled
+        ? getSearchUnavailableMessage(searchCompatibility.reason)
+        : isSearchEnabled
+          ? t("disableSearchAria")
+          : t("enableSearchAria");
+
+    const handleAgentModeToggle = () => {
+      if (!modelCapabilities.toolCall) {
+        setErrorMsg(t("agentModeUnavailable"));
+        return;
+      }
+
+      const useAgentMode = !agentModeEnabled;
+      setChatConfig({ useAgentMode });
+      if (currentSessionId) {
+        updateSessionConfig(currentSessionId, { useAgentMode });
+      }
+    };
 
     // Filter plugins to show only those ready for use
     const validPlugins = useMemo(() => {
@@ -1788,18 +1823,10 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
             {/* Search Button */}
             {onToggleSearch && (
               <div>
-                <Tooltip content={searchTooltip} position="top">
+                <Tooltip content={searchToggleTooltip} position="top">
                   <button
                     type="button"
-                    aria-label={
-                      !searchCompatibility.enabled
-                        ? getSearchUnavailableMessage(
-                            searchCompatibility.reason,
-                          )
-                        : isSearchEnabled
-                          ? t("disableSearchAria")
-                          : t("enableSearchAria")
-                    }
+                    aria-label={searchToggleAriaLabel}
                     aria-pressed={
                       isSearchEnabled && searchCompatibility.enabled
                     }
@@ -1818,6 +1845,31 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
                 </Tooltip>
               </div>
             )}
+
+            {/* Agent Mode Button */}
+            <div>
+              <Tooltip content={agentModeTooltip} position="top">
+                <button
+                  type="button"
+                  aria-label={agentModeTooltip}
+                  aria-pressed={
+                    modelCapabilities.toolCall ? agentModeEnabled : undefined
+                  }
+                  aria-disabled={!modelCapabilities.toolCall ? true : undefined}
+                  className={`${iconButtonBaseClass} transition-colors ${iconButtonFocusClass} ${
+                    agentModeEnabled
+                      ? "text-blue-500 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                      : !modelCapabilities.toolCall
+                        ? "text-gray-400 dark:text-muted-foreground/60"
+                        : "text-gray-500 dark:text-muted-foreground hover:text-gray-700 dark:hover:text-foreground hover:bg-gray-100 dark:hover:bg-accent/50"
+                  }`}
+                  onClick={handleAgentModeToggle}
+                  disabled={isInputBusy}
+                >
+                  <Bot size={16} aria-hidden="true" />
+                </button>
+              </Tooltip>
+            </div>
           </div>
 
           <div className="flex shrink-0 items-center gap-0.5">

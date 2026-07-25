@@ -61,6 +61,7 @@ export async function registerNeoChatPwa(
 ): Promise<ServiceWorkerRegistration> {
   const registration = await serviceWorker.register(PWA_SCRIPT_URL, {
     scope: "/",
+    updateViaCache: "none",
   });
   const readyRegistration = await serviceWorker.ready;
   const loadedAssets = getLoadedShellAssetUrls(

@@ -4,6 +4,7 @@ import { useCallback, useRef, useState } from "react";
 
 import {
   createActiveGenerationSyncSnapshot,
+  createInterruptedGenerationUpdate,
   getNextGenerationRunId,
   isCurrentGenerationRun,
   type ActiveGenerationSyncSnapshot,
@@ -65,13 +66,11 @@ export function useChatGenerationController({
       .reverse()
       .find((message) => message.generation?.status === "streaming");
     if (state.currentSessionId && streamingMessage?.generation) {
-      state.updateMessage(state.currentSessionId, streamingMessage.id, {
-        generation: {
-          ...streamingMessage.generation,
-          status: "interrupted",
-          checkpointAt: Date.now(),
-        },
-      });
+      state.updateMessage(
+        state.currentSessionId,
+        streamingMessage.id,
+        createInterruptedGenerationUpdate(streamingMessage),
+      );
       state = useChatStore.getState();
     }
     const syncSnapshot = createActiveGenerationSyncSnapshot({

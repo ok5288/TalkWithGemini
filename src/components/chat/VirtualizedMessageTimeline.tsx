@@ -14,14 +14,14 @@ import type {
   SessionMessageTree,
   ToolConfirmationDecision,
 } from "@/types";
+import { useSettingsStore } from "@/store/core/settingsStore";
 
 export interface VirtualizedMessageTimelineRef {
   scrollToMessage: (messageId: string, behavior?: "auto" | "smooth") => boolean;
-  scrollToEnd: (behavior?: "auto" | "smooth") => void;
 }
 
 interface VirtualizedMessageTimelineProps {
-  scrollRef: React.RefObject<HTMLDivElement | null>;
+  scrollElement: HTMLDivElement | null;
   currentSession?: Session;
   messages: Message[];
   activeMessageTree: SessionMessageTree;
@@ -63,8 +63,10 @@ const estimateMessageSize = (message: Message) => {
   return Math.min(720, Math.max(112, 88 + textHeight + attachmentHeight));
 };
 
-const FOLLOW_RESUME_DISTANCE_PX = 8;
-const SCROLL_DIRECTION_EPSILON_PX = 1;
+const FOLLOW_END_THRESHOLD_PX = 48;
+// Virtual distances clamp to zero, so -1 disables output following while
+// retaining end anchoring for stable rows.
+const DISABLED_FOLLOW_THRESHOLD_PX = -1;
 
 const VirtualizedMessageTimeline = React.forwardRef<
   VirtualizedMessageTimelineRef,
@@ -72,7 +74,7 @@ const VirtualizedMessageTimeline = React.forwardRef<
 >(
   (
     {
-      scrollRef,
+      scrollElement,
       currentSession,
       messages,
       activeMessageTree,
@@ -99,16 +101,9 @@ const VirtualizedMessageTimeline = React.forwardRef<
     },
     ref,
   ) => {
-    const isFollowingRef = React.useRef(true);
-    const isTouchingRef = React.useRef(false);
-    const pausedByTouchGestureRef = React.useRef(false);
-    const wasFollowingBeforeTouchRef = React.useRef(true);
-    const touchStartClientYRef = React.useRef(0);
-    const touchStartScrollTopRef = React.useRef(0);
-    const previousScrollTopRef = React.useRef(0);
-    const expectedFollowScrollTopRef = React.useRef<number | null>(null);
-    const followFrameRef = React.useRef<number | null>(null);
-
+    const autoScrollEnabled = useSettingsStore(
+      (state) => state.system.enableAutoScroll === true,
+    );
     const rows = React.useMemo<TimelineRow[]>(() => {
       const nextRows: TimelineRow[] = [];
       if (
@@ -148,15 +143,18 @@ const VirtualizedMessageTimeline = React.forwardRef<
 
     const virtualizer = useVirtualizer<HTMLDivElement, HTMLDivElement>({
       count: rows.length,
-      getScrollElement: () => scrollRef.current,
+      getScrollElement: () => scrollElement,
       getItemKey: (index) => rows[index]?.key || index,
       estimateSize: (index) => {
         const row = rows[index];
         return row?.kind === "message" ? estimateMessageSize(row.message) : 96;
       },
       overscan: 8,
-      anchorTo: "start",
-      followOnAppend: false,
+      anchorTo: "end",
+      followOnAppend: autoScrollEnabled ? "auto" : false,
+      scrollEndThreshold: autoScrollEnabled
+        ? FOLLOW_END_THRESHOLD_PX
+        : DISABLED_FOLLOW_THRESHOLD_PX,
       paddingStart: 8,
       paddingEnd: 144,
       useFlushSync: false,
@@ -165,9 +163,7 @@ const VirtualizedMessageTimeline = React.forwardRef<
       item,
       _delta,
       instance,
-    ) =>
-      !isFollowingRef.current &&
-      item.end <= (scrollRef.current?.scrollTop ?? instance.scrollOffset ?? 0);
+    ) => item.end <= (scrollElement?.scrollTop ?? instance.scrollOffset ?? 0);
 
     const virtualItems = virtualizer.getVirtualItems();
     const totalSize = virtualizer.getTotalSize();
@@ -180,211 +176,12 @@ const VirtualizedMessageTimeline = React.forwardRef<
         : virtualItems.find((item) => item.index === pendingToolRowIndex);
     const scrollOffset = virtualizer.scrollOffset ?? 0;
     const viewportHeight =
-      virtualizer.scrollRect?.height || scrollRef.current?.clientHeight || 0;
+      virtualizer.scrollRect?.height || scrollElement?.clientHeight || 0;
     const isPendingToolMessageVisible = Boolean(
       pendingToolVirtualRow &&
       pendingToolVirtualRow.end > scrollOffset &&
       pendingToolVirtualRow.start < scrollOffset + viewportHeight,
     );
-
-    const cancelFollowFrame = React.useCallback(() => {
-      if (followFrameRef.current === null) return;
-      window.cancelAnimationFrame(followFrameRef.current);
-      followFrameRef.current = null;
-    }, []);
-
-    const scheduleFollowToEnd = React.useCallback(() => {
-      if (
-        !isFollowingRef.current ||
-        isTouchingRef.current ||
-        followFrameRef.current !== null
-      ) {
-        return;
-      }
-      followFrameRef.current = window.requestAnimationFrame(() => {
-        followFrameRef.current = null;
-        const scrollElement = scrollRef.current;
-        if (
-          !scrollElement ||
-          !isFollowingRef.current ||
-          isTouchingRef.current
-        ) {
-          return;
-        }
-        const targetScrollTop = Math.max(
-          scrollElement.scrollHeight - scrollElement.clientHeight,
-          0,
-        );
-        expectedFollowScrollTopRef.current = targetScrollTop;
-        scrollElement.scrollTo({
-          top: targetScrollTop,
-          behavior: "auto",
-        });
-      });
-    }, [scrollRef]);
-
-    React.useEffect(() => {
-      const scrollElement = scrollRef.current;
-      cancelFollowFrame();
-      isFollowingRef.current = true;
-      isTouchingRef.current = false;
-      expectedFollowScrollTopRef.current = null;
-      previousScrollTopRef.current = scrollElement?.scrollTop ?? 0;
-    }, [cancelFollowFrame, currentSession?.id, scrollRef]);
-
-    React.useEffect(() => {
-      const scrollElement = scrollRef.current;
-      if (!scrollElement) return;
-
-      previousScrollTopRef.current = scrollElement.scrollTop;
-      const pauseFollowing = () => {
-        isFollowingRef.current = false;
-        expectedFollowScrollTopRef.current = null;
-        cancelFollowFrame();
-      };
-      const handleWheel = (event: WheelEvent) => {
-        if (event.deltaY < 0) pauseFollowing();
-      };
-      const handleTouchStart = (event: TouchEvent) => {
-        pausedByTouchGestureRef.current = false;
-        wasFollowingBeforeTouchRef.current = isFollowingRef.current;
-        touchStartClientYRef.current = event.touches[0]?.clientY ?? 0;
-        touchStartScrollTopRef.current = scrollElement.scrollTop;
-        isTouchingRef.current = true;
-        expectedFollowScrollTopRef.current = null;
-        cancelFollowFrame();
-      };
-      const handleTouchMove = (event: TouchEvent) => {
-        const currentClientY = event.touches[0]?.clientY;
-        if (
-          currentClientY !== undefined &&
-          currentClientY >
-            touchStartClientYRef.current + SCROLL_DIRECTION_EPSILON_PX
-        ) {
-          pausedByTouchGestureRef.current = true;
-          pauseFollowing();
-        }
-      };
-      const handleTouchEnd = () => {
-        const moved =
-          Math.abs(scrollElement.scrollTop - touchStartScrollTopRef.current) >
-          SCROLL_DIRECTION_EPSILON_PX;
-        isTouchingRef.current = false;
-        const distanceFromEnd = Math.max(
-          scrollElement.scrollHeight -
-            scrollElement.scrollTop -
-            scrollElement.clientHeight,
-          0,
-        );
-        if (pausedByTouchGestureRef.current && !isFollowingRef.current) {
-          cancelFollowFrame();
-        } else if (moved && distanceFromEnd > FOLLOW_RESUME_DISTANCE_PX) {
-          pauseFollowing();
-        } else if (
-          distanceFromEnd <= FOLLOW_RESUME_DISTANCE_PX ||
-          (!moved && wasFollowingBeforeTouchRef.current)
-        ) {
-          isFollowingRef.current = true;
-          scheduleFollowToEnd();
-        }
-      };
-      const handleKeyDown = (event: KeyboardEvent) => {
-        const target = event.target;
-        if (
-          target instanceof HTMLElement &&
-          target.matches('input, textarea, [contenteditable="true"]')
-        ) {
-          return;
-        }
-        if (
-          event.key === "ArrowUp" ||
-          event.key === "PageUp" ||
-          event.key === "Home" ||
-          (event.key === " " && event.shiftKey)
-        ) {
-          pauseFollowing();
-        }
-      };
-      const handleScroll = () => {
-        const nextScrollTop = scrollElement.scrollTop;
-        const movedUp =
-          nextScrollTop <
-          previousScrollTopRef.current - SCROLL_DIRECTION_EPSILON_PX;
-        const expectedFollowScrollTop = expectedFollowScrollTopRef.current;
-        const reachedExpectedFollowPosition =
-          expectedFollowScrollTop !== null &&
-          Math.abs(nextScrollTop - expectedFollowScrollTop) <=
-            SCROLL_DIRECTION_EPSILON_PX;
-        if (reachedExpectedFollowPosition) {
-          expectedFollowScrollTopRef.current = null;
-        }
-        const distanceFromEnd = Math.max(
-          scrollElement.scrollHeight -
-            nextScrollTop -
-            scrollElement.clientHeight,
-          0,
-        );
-        const maximumScrollTop = Math.max(
-          scrollElement.scrollHeight - scrollElement.clientHeight,
-          0,
-        );
-        const clampedToEndAfterResize =
-          movedUp &&
-          isFollowingRef.current &&
-          previousScrollTopRef.current >
-            maximumScrollTop + SCROLL_DIRECTION_EPSILON_PX &&
-          Math.abs(nextScrollTop - maximumScrollTop) <=
-            SCROLL_DIRECTION_EPSILON_PX;
-
-        if (
-          movedUp &&
-          !reachedExpectedFollowPosition &&
-          !clampedToEndAfterResize
-        ) {
-          pauseFollowing();
-        } else if (distanceFromEnd <= FOLLOW_RESUME_DISTANCE_PX) {
-          isFollowingRef.current = true;
-        }
-        previousScrollTopRef.current = nextScrollTop;
-      };
-
-      scrollElement.addEventListener("wheel", handleWheel, { passive: true });
-      scrollElement.addEventListener("touchstart", handleTouchStart, {
-        passive: true,
-      });
-      scrollElement.addEventListener("touchmove", handleTouchMove, {
-        passive: true,
-      });
-      scrollElement.addEventListener("touchend", handleTouchEnd, {
-        passive: true,
-      });
-      scrollElement.addEventListener("touchcancel", handleTouchEnd, {
-        passive: true,
-      });
-      scrollElement.addEventListener("keydown", handleKeyDown);
-      scrollElement.addEventListener("scroll", handleScroll, { passive: true });
-      return () => {
-        scrollElement.removeEventListener("wheel", handleWheel);
-        scrollElement.removeEventListener("touchstart", handleTouchStart);
-        scrollElement.removeEventListener("touchmove", handleTouchMove);
-        scrollElement.removeEventListener("touchend", handleTouchEnd);
-        scrollElement.removeEventListener("touchcancel", handleTouchEnd);
-        scrollElement.removeEventListener("keydown", handleKeyDown);
-        scrollElement.removeEventListener("scroll", handleScroll);
-      };
-    }, [cancelFollowFrame, currentSession?.id, scheduleFollowToEnd, scrollRef]);
-
-    React.useEffect(() => {
-      scheduleFollowToEnd();
-    }, [
-      currentSession?.id,
-      isGenerating,
-      rows.length,
-      scheduleFollowToEnd,
-      totalSize,
-    ]);
-
-    React.useEffect(() => cancelFollowFrame, [cancelFollowFrame]);
 
     React.useEffect(() => {
       onPendingToolVisibilityChange?.(isPendingToolMessageVisible);
@@ -396,9 +193,6 @@ const VirtualizedMessageTimeline = React.forwardRef<
         scrollToMessage(messageId, behavior) {
           const index = messageRowIndex.get(messageId);
           if (index === undefined) return false;
-          isFollowingRef.current = false;
-          expectedFollowScrollTopRef.current = null;
-          cancelFollowFrame();
           const reduceMotion = window.matchMedia(
             "(prefers-reduced-motion: reduce)",
           ).matches;
@@ -409,35 +203,8 @@ const VirtualizedMessageTimeline = React.forwardRef<
           });
           return true;
         },
-        scrollToEnd(behavior = "auto") {
-          isFollowingRef.current = true;
-          cancelFollowFrame();
-          const scrollElement = scrollRef.current;
-          if (!scrollElement) return;
-          const reduceMotion = window.matchMedia(
-            "(prefers-reduced-motion: reduce)",
-          ).matches;
-          const targetScrollTop = Math.max(
-            scrollElement.scrollHeight - scrollElement.clientHeight,
-            0,
-          );
-          expectedFollowScrollTopRef.current = targetScrollTop;
-          scrollElement.scrollTo({
-            top: targetScrollTop,
-            behavior:
-              isGenerating || reduceMotion || behavior === "auto"
-                ? "auto"
-                : "smooth",
-          });
-        },
       }),
-      [
-        cancelFollowFrame,
-        isGenerating,
-        messageRowIndex,
-        scrollRef,
-        virtualizer,
-      ],
+      [isGenerating, messageRowIndex, virtualizer],
     );
 
     return (

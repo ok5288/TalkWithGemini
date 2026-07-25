@@ -210,6 +210,15 @@ const streamingMarkdownRehypePlugins = [
   rehypeSanitizeInlineStyles,
 ] as any;
 
+const COLLAPSED_CODE_MAX_HEIGHT = "40vh";
+interface CodeBlockRenderOptions {
+  forceExpandCodeBlocks?: boolean;
+  isStreaming?: boolean;
+}
+
+const CodeBlockRenderOptionsContext =
+  React.createContext<CodeBlockRenderOptions>({});
+
 const mergeClassName = (...classNames: Array<string | undefined>) =>
   classNames.filter(Boolean).join(" ") || undefined;
 
@@ -644,6 +653,7 @@ const ArtifactBlock = ({
   }, [isJS, isPython, selectedProvider?.type, t]);
 
   React.useEffect(() => {
+    isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
       clearTimeoutRef(copyResetTimerRef);
@@ -786,7 +796,7 @@ const ArtifactBlock = ({
           collapseFrameRef.current = null;
           collapseTimerRef.current = setTimeout(() => {
             if (isMountedRef.current) {
-              setMaxHeight("40vh");
+              setMaxHeight(COLLAPSED_CODE_MAX_HEIGHT);
             }
             collapseTimerRef.current = null;
           }, 10);
@@ -844,7 +854,7 @@ const ArtifactBlock = ({
           setCanCollapse(true);
           if (shouldAutoCollapse) {
             setIsCollapsed(true);
-            setMaxHeight("40vh");
+            setMaxHeight(COLLAPSED_CODE_MAX_HEIGHT);
           }
         }
         hasCheckedHeight.current = true;
@@ -1175,6 +1185,52 @@ const ArtifactBlock = ({
   );
 };
 
+const MarkdownCode = ({ node, className = "", children, ...props }: any) => {
+  const { forceExpandCodeBlocks, isStreaming } = React.useContext(
+    CodeBlockRenderOptionsContext,
+  );
+  const match = /language-(\w+)/.exec(className || "");
+  const language = match ? match[1] : "";
+  const isBlockCode = node?.position?.start?.line !== node?.position?.end?.line;
+
+  const getRawText = (currentNode: any): string => {
+    if (!currentNode) return "";
+    if (currentNode.type === "text") return currentNode.value;
+    if (currentNode.children) {
+      return currentNode.children.map(getRawText).join("");
+    }
+    return "";
+  };
+  const rawCode = getRawText(node);
+
+  if (match) {
+    return (
+      <ArtifactBlock
+        language={language}
+        rawCode={rawCode}
+        isStreaming={isStreaming}
+        forceExpandCodeBlocks={forceExpandCodeBlocks}
+      >
+        {children}
+      </ArtifactBlock>
+    );
+  }
+
+  return (
+    <code
+      className={mergeClassName(
+        isBlockCode
+          ? "font-mono text-sm"
+          : "markdown-inline-code rounded px-1 py-0.5 text-sm break-all font-mono",
+        className,
+      )}
+      {...props}
+    >
+      {children}
+    </code>
+  );
+};
+
 const MarkdownImage = ({
   src,
   alt,
@@ -1304,6 +1360,10 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
     () => [...(searchSources || []), ...(ragSources || [])],
     [ragSources, searchSources],
   );
+  const codeBlockRenderOptions = useMemo<CodeBlockRenderOptions>(
+    () => ({ forceExpandCodeBlocks, isStreaming }),
+    [forceExpandCodeBlocks, isStreaming],
+  );
   const shouldUseHeavyMarkdown =
     !isStreaming && (forceExpandCodeBlocks || isNearViewport);
 
@@ -1349,48 +1409,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
 
         return <pre {...props}>{children}</pre>;
       },
-      code({ node, className = "", children, ...props }: any) {
-        const match = /language-(\w+)/.exec(className || "");
-        const language = match ? match[1] : "";
-        const isBlockCode =
-          node?.position?.start?.line !== node?.position?.end?.line;
-
-        // Extract raw text for copy functionality
-        const getRawText = (node: any): string => {
-          if (!node) return "";
-          if (node.type === "text") return node.value;
-          if (node.children) return node.children.map(getRawText).join("");
-          return "";
-        };
-        const rawCode = getRawText(node);
-
-        if (match) {
-          return (
-            <ArtifactBlock
-              language={language}
-              rawCode={rawCode}
-              isStreaming={isStreaming}
-              forceExpandCodeBlocks={forceExpandCodeBlocks}
-            >
-              {children}
-            </ArtifactBlock>
-          );
-        }
-
-        return (
-          <code
-            className={mergeClassName(
-              isBlockCode
-                ? "font-mono text-sm"
-                : "markdown-inline-code rounded px-1 py-0.5 text-sm break-all font-mono",
-              className,
-            )}
-            {...props}
-          >
-            {children}
-          </code>
-        );
-      },
+      code: MarkdownCode,
       a: ({ href, children }: any) => {
         return (
           <CitationLink href={href} sources={citationSources}>
@@ -1484,7 +1503,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
         );
       },
     }),
-    [citationSources, imageGallery, isStreaming, forceExpandCodeBlocks, t],
+    [citationSources, imageGallery, t],
   );
 
   // Process content line by line for <file> tags
@@ -1547,12 +1566,14 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
   ]);
 
   return (
-    <div
-      ref={rendererRef}
-      className={`markdown-body text-(length:--neo-font-size-base) leading-relaxed wrap-break-word w-full overflow-hidden ${finalClass}`}
-    >
-      {renderContent}
-    </div>
+    <CodeBlockRenderOptionsContext.Provider value={codeBlockRenderOptions}>
+      <div
+        ref={rendererRef}
+        className={`markdown-body text-(length:--neo-font-size-base) leading-relaxed wrap-break-word w-full overflow-hidden ${finalClass}`}
+      >
+        {renderContent}
+      </div>
+    </CodeBlockRenderOptionsContext.Provider>
   );
 };
 

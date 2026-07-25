@@ -55,6 +55,7 @@ export interface DefaultModels {
 export interface SystemSettings {
   systemPrompt: string;
   personality: SystemPersonality;
+  enableAutoScroll: boolean;
   enableAutoTitle: boolean;
   enableRelatedQuestions: boolean;
   enableAutoCompression: boolean;

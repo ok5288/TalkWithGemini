@@ -15,6 +15,7 @@ describe("app config normalization", () => {
       normalizeChatConfig({
         useSearch: "yes",
         useReasoning: true,
+        useAgentMode: "yes",
         reasoningMode: "medium",
         useRAG: true,
         temperature: 99,
@@ -22,6 +23,7 @@ describe("app config normalization", () => {
     ).toEqual({
       useSearch: false,
       useReasoning: true,
+      useAgentMode: false,
       reasoningMode: "medium",
       useRAG: true,
       temperature: CHAT_CONFIG_LIMITS.maxTemperature,
@@ -30,6 +32,7 @@ describe("app config normalization", () => {
     expect(normalizeChatConfig({ temperature: Number.NaN }).temperature).toBe(
       DEFAULT_CHAT_CONFIG.temperature,
     );
+    expect(normalizeChatConfig({ useAgentMode: true }).useAgentMode).toBe(true);
   });
 
   it("uses shared defaults for missing app config fields", () => {
@@ -39,6 +42,7 @@ describe("app config normalization", () => {
     expect(DEFAULT_SYSTEM_SETTINGS.enableDestructiveToolConfirmation).toBe(
       true,
     );
+    expect(DEFAULT_SYSTEM_SETTINGS.enableAutoScroll).toBe(false);
     expect(DEFAULT_SYSTEM_SETTINGS.personality).toBe("default");
   });
 
@@ -75,6 +79,7 @@ describe("app config normalization", () => {
       enableCodeCollapse: true,
       enableHtmlVisualPrompt: true,
       enableDestructiveToolConfirmation: true,
+      enableAutoScroll: true,
     });
 
     expect(system.systemPrompt).toHaveLength(
@@ -92,12 +97,19 @@ describe("app config normalization", () => {
     expect(system.enableCodeCollapse).toBe(true);
     expect(system.enableHtmlVisualPrompt).toBe(true);
     expect(system.enableDestructiveToolConfirmation).toBe(true);
+    expect(system.enableAutoScroll).toBe(true);
     expect(
       normalizeSystemSettings({ enableDestructiveToolConfirmation: "yes" }),
     ).toMatchObject({ enableDestructiveToolConfirmation: true });
     expect(
       normalizeSystemSettings({ enableDestructiveToolConfirmation: false }),
     ).toMatchObject({ enableDestructiveToolConfirmation: false });
+    expect(normalizeSystemSettings({ enableAutoScroll: "yes" })).toMatchObject({
+      enableAutoScroll: false,
+    });
+    expect(normalizeSystemSettings({ enableAutoScroll: true })).toMatchObject({
+      enableAutoScroll: true,
+    });
   });
 
   it("normalizes system font size", () => {

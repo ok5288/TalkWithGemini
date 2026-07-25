@@ -70,6 +70,20 @@ describe("MessageInput composition", () => {
     expect(messageInput).toContain("handlePolishInput");
     expect(messageInput).toContain("reasoningOptions");
     expect(messageInput).toContain("reasoningMode");
+    expect(messageInput).toContain("Bot");
+    expect(messageInput).toContain("agentModeEnabled");
+    expect(messageInput).toContain("handleAgentModeToggle");
+    expect(messageInput).toContain("!modelCapabilities.toolCall");
+    expect(messageInput).toContain("setChatConfig({ useAgentMode });");
+    expect(messageInput).toContain(
+      "updateSessionConfig(currentSessionId, { useAgentMode });",
+    );
+    expect(messageInput).toContain('t("agentModeUnavailable")');
+    expect(messageInput).toContain("agentSearchRequiresExternalProvider");
+    expect(messageInput).toContain('searchCompatibility.mode !== "external"');
+    expect(messageInput).toContain("searchToggleTooltip");
+    expect(messageInput).toContain("searchToggleAriaLabel");
+    expect(messageInput).toContain('t("agentSearchRequiresExternalProvider")');
     expect(messageInput).toContain("DropdownMenuRadioGroup");
     expect(messageInput).toContain('t("reasoningModeAuto")');
     expect(messageInput).toContain('t("reasoningModeHigh")');
@@ -115,6 +129,9 @@ describe("MessageInput composition", () => {
       messageInput.indexOf("{/* Search Button */}"),
     );
     expect(messageInput.indexOf("{/* Search Button */}")).toBeLessThan(
+      messageInput.indexOf("{/* Agent Mode Button */}"),
+    );
+    expect(messageInput.indexOf("{/* Agent Mode Button */}")).toBeLessThan(
       messageInput.indexOf("{/* Model Selector */}"),
     );
     expect(messageInput.indexOf("{/* Model Selector */}")).toBeLessThan(

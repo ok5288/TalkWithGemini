@@ -36,6 +36,7 @@ export interface ProcessMessageOptions {
     serverVectorStoreAvailable?: boolean;
   };
   ragEnabled?: boolean;
+  deferKnowledgeRetrieval?: boolean;
   knowledgeCollections: any[];
   workspaceKnowledgeCollectionIds?: string[];
   signal?: AbortSignal;
@@ -44,6 +45,7 @@ export interface ProcessMessageOptions {
 export interface ProcessedMessageData {
   finalText: string;
   finalAttachments: Attachment[];
+  knowledgeScope: Attachment[];
   ragSources: Source[];
   ragError?: RagQueryError;
   userMessage: Message;
@@ -63,6 +65,7 @@ export async function processMessageForSending(
     customModelMetadata,
     ragConfig,
     ragEnabled = true,
+    deferKnowledgeRetrieval = false,
     knowledgeCollections,
     workspaceKnowledgeCollectionIds = [],
     signal,
@@ -106,7 +109,10 @@ export async function processMessageForSending(
   };
   const isRagServiceEnabled = effectiveRagConfig.enabled;
 
-  if (hasKB && isRagServiceEnabled) {
+  if (hasKB && deferKnowledgeRetrieval) {
+    // Agent mode keeps these selectors as the boundary for search_knowledge.
+    // It must not eagerly retrieve or inject the selected knowledge here.
+  } else if (hasKB && isRagServiceEnabled) {
     const fileAttachments = allKBAttachments.filter(isKnowledgeFileAttachment);
 
     const ragResult = await processRAGAttachments(
@@ -169,6 +175,7 @@ export async function processMessageForSending(
   return {
     finalText,
     finalAttachments,
+    knowledgeScope: allKBAttachments.map((attachment) => ({ ...attachment })),
     ragSources,
     ragError,
     userMessage,

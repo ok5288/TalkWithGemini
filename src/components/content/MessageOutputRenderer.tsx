@@ -21,6 +21,7 @@ import ReasoningBlock from "./ReasoningBlock";
 import SourceBlock from "./SourceBlock";
 import ToolCallBlock from "./ToolCallBlock";
 import MemorySearchBlock from "./MemorySearchBlock";
+import TaskPlanBlock from "./TaskPlanBlock";
 import SafeImage from "../ui/SafeImage";
 
 interface MessageOutputRendererProps {
@@ -212,6 +213,14 @@ const MessageOutputRenderer: React.FC<MessageOutputRendererProps> = ({
                 durationMs={block.durationMs}
               />
             );
+          case "task_plan":
+            return (
+              <TaskPlanBlock
+                key={block.id}
+                steps={block.steps}
+                note={block.note}
+              />
+            );
           case "search":
             return (
               <SourceBlock
@@ -267,4 +276,4 @@ const MessageOutputRenderer: React.FC<MessageOutputRendererProps> = ({
   );
 };
 
-export default MessageOutputRenderer;
+export default React.memo(MessageOutputRenderer);

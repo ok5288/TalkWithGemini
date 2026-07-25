@@ -28,6 +28,11 @@ when the matching tag is pushed.
 - **Message workflows:** Added reply snapshots and jump navigation, explicit
   interrupted-generation ownership, and model-selectable sibling-branch
   regeneration while preserving the existing context-compression pipeline.
+- **Agent mode:** Added a per-chat, tool-capability-gated client orchestration
+  mode with localized web search, knowledge search, text-only skill loading,
+  bounded sandboxed JavaScript, and task-plan tools. The five read-only
+  built-ins are auto-approved, and Agent web search requires an external search
+  provider rather than native Google Search or OpenAI Web Search.
 - **Parameterized Skills:** Upgraded custom Skills to a compatible schema with
   validated text, textarea, and select parameters; reproducible invocation
   metadata; and ordered bundles of up to four non-nested Skills with fixed or

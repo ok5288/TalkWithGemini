@@ -30,6 +30,8 @@ Neo Chat 是一个可自托管、本地优先的 AI 对话应用，基于 Next.j
   收敛同步；恢复密钥、凭据、本地基线、搜索缓存和向量不会进入远端或 ZIP。
 - 新增长对话虚拟列表、流式 checkpoint、首字前有限重试、部分输出续写、消息
   引用回复，以及重新生成兄弟分支时的显式模型选择。
+- 新增面向支持工具调用模型的会话级 Agent 模式，由浏览器编排五个本地化、
+  只读且自动授权的内置工具。
 - 技能升级为参数化 schema，并支持最多四个普通技能组成的有序 bundle；参数在
   发送前校验，调用记录可复现。
 - 新增集合级分块策略、Markdown 标题感知预览、显式重建索引、关键词与向量混合
@@ -69,6 +71,8 @@ Neo Chat 是一个可自托管、本地优先的 AI 对话应用，基于 Next.j
 - 显式启用的 WebDAV 或 S3/MinIO 端到端加密同步，包含设备身份、恢复代码、
   可收敛 CRDT 文档和加密 OPFS 分块。
 - 支持 LobeHub Agent Registry 助理预设，也支持本地自定义助理。
+- 支持面向工具调用模型的会话级 Agent 模式，由浏览器编排网页搜索、知识库搜索、
+  纯文本技能加载、沙箱 JavaScript 和任务计划更新。
 - 支持参数化文本技能：本地化公共目录、安装/卸载、编辑内置技能、本地自定义
   技能、自动选择、工作区预设，以及最多四个普通技能组成的有序非嵌套 bundle。
 - 支持 OpenAPI 风格插件工具和 remote streamable HTTP MCP 服务器，两者共用插件控制、鉴权、服务端执行、风险下限和可选的破坏性调用确认；本地 Docker 部署还可通过独立鉴权桥接使用 allowlist 中的 stdio 服务器。
@@ -381,9 +385,16 @@ flowchart LR
 
 技能是纯文本的提示词上下文模块。应用会从 `public/data/skills` 加载本地化元数据目录，只在需要时获取完整技能定义，并把已安装、已编辑和自定义技能保存在本地。活跃技能可以手动选择，也可以来自工作区预设，或在发送消息时自动选择。
 
+Agent 模式是按会话显式启用、面向支持工具调用模型的客户端编排模式。它提供
+`web_search`、`search_knowledge`、`load_skill`、`run_javascript` 和
+`update_task_plan` 五个只读、自动授权的内置工具。JavaScript 只能在有边界的
+浏览器沙箱内同步运行，不能访问网络或 DOM；加载的技能仍是纯文本。Agent
+网页搜索要求使用外部搜索供应商，不能把 Google 原生搜索或 OpenAI Web Search
+与 Agent 函数调用组合使用。
+
 插件是可执行工具，可以来自 OpenAPI manifest、内置定义，或从官方 MCP Registry 发现的 remote streamable HTTP MCP 服务器。启用的插件函数会以 tool 形式暴露给兼容模型，再由服务端插件路由执行。应用侧 MCP transport 仍为 Streamable HTTP；本地 Docker 用户可通过独立鉴权的 [MCP stdio 桥接](docs/mcp-stdio-bridge.md)暴露预配置 stdio 服务器。用户配置的 MCP server URL 可使用 HTTP 或 HTTPS，并可在任一部署模式下指向 localhost 或私网；官方 Registry 本身仍保持 HTTPS-only。内置图片处理插件结果保留在工具详情和压缩后的对话历史中，由模型决定是否以及如何在后续回复中引用生成或编辑后的图片。OpenAI 兼容 Images API 和 OpenAI Responses 图片处理是两个独立插件，便于分别管理密钥和启用状态。受支持的内置媒体插件提供插件级 API Base URL 与 Model ID 字段、可选图片数量参数、Agnes 图生图编辑，以及基于公开 HTTPS 图片 URL 的 Agnes 图生视频；Agnes 视频仍保持显式 `create_video` / `get_video_result` 两步流程。工具调用编排使用较高但有边界的循环上限，既允许多步任务，也避免递归工具调用失控。
 
-搜索可以使用 Google 模型的原生 Google Search、OpenAI Web Search，也可以对包括 Anthropic 在内的其他模型族使用外部搜索供应商。Firecrawl 公共服务无需 API key 即可使用，配置 key 只会提高请求速率。独立的本地全局搜索中心会在浏览器内存中索引活跃对话分支、附件、工作区、知识库和记忆，并排除推理、工具 payload 和凭据。
+搜索可以使用 Google 模型的原生 Google Search、OpenAI Web Search，也可以对包括 Anthropic 在内的其他模型族使用外部搜索供应商。Agent 模式启用时，需要选择外部供应商才能暴露 `web_search`；输入区仍允许操作搜索开关，并会解释原生搜索配置为什么无法提供该工具。Firecrawl 公共服务无需 API key 即可使用，配置 key 只会提高请求速率。独立的本地全局搜索中心会在浏览器内存中索引活跃对话分支、附件、工作区、知识库和记忆，并排除推理、工具 payload 和凭据。
 
 知识库 RAG 会分别保留上传原文件和可编辑、可索引的提取文本，可选使用 Mineru 或 LlamaParse 解析文档，并可把 chunks 索引到外部向量服务。失败文件可以重试、重新解析、重建索引、取消或对账，不会丢弃仍可使用的原文件。
 

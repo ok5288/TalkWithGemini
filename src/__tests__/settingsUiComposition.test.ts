@@ -92,6 +92,20 @@ describe("settings UI primitives", () => {
     expect(systemSettings).toContain(
       'ariaLabel={t("destructiveToolConfirmationAria")}',
     );
+    expect(systemSettings).toContain('name="enableAutoScroll"');
+    expect(systemSettings).toContain('ariaLabel={t("autoScrollAria")}');
+    expect(systemSettings).toContain(
+      "checked={system.enableAutoScroll === true}",
+    );
+    expect(
+      systemSettings.indexOf('title={t("systemAutomationTitle")}'),
+    ).toBeLessThan(systemSettings.indexOf('name="enableAutoScroll"'));
+    expect(systemSettings.indexOf('name="enableAutoScroll"')).toBeLessThan(
+      systemSettings.indexOf('name="enableDestructiveToolConfirmation"'),
+    );
+    expect(en.System.autoScroll).toBe("Auto-scroll output");
+    expect(zh.System.autoScroll).toBe("自动输出滚动");
+    expect(ja.System.autoScroll).toBe("出力中に自動スクロール");
     expect(en.System.systemInterfaceTitle).toBeTruthy();
     expect(zh.System.systemInterfaceTitle).toBeTruthy();
     expect(ja.System.systemInterfaceTitle).toBeTruthy();

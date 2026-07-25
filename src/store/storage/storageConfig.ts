@@ -16,7 +16,7 @@ import {
   isSessionMessageTree,
   normalizeSessionMessageTree,
 } from "@/lib/chat/messageTree";
-import { normalizeMessages } from "./migrations";
+import { normalizeMessages, normalizeMessageTreeMessages } from "./migrations";
 
 /**
  * Storage Configuration
@@ -123,7 +123,7 @@ function validateStoredMessageTree(value: unknown, key: string): void {
   }
   const normalized = Array.isArray(parsed)
     ? normalizeSessionMessageTree(normalizeMessages(parsed))
-    : normalizeSessionMessageTree(parsed);
+    : normalizeMessageTreeMessages(normalizeSessionMessageTree(parsed));
 
   for (const [nodeId, node] of Object.entries(normalized.nodesById)) {
     if (

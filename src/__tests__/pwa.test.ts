@@ -1,10 +1,16 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { GET as getServiceWorker } from "@/app/sw.js/route";
+import {
+  normalizeDeploymentId,
+  resolveDeploymentId,
+} from "@/lib/pwa/deploymentId";
 import {
   disableNeoChatPwa,
   getLoadedShellAssetUrls,
+  registerNeoChatPwa,
 } from "@/lib/pwa/lifecycle";
 import {
   isCacheableShellAsset,
@@ -12,10 +18,26 @@ import {
   shouldEnablePwa,
 } from "@/lib/pwa/policy";
 
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
+});
+
 describe("PWA deployment policy", () => {
-  it("only enables offline support for local deployments", () => {
-    expect(shouldEnablePwa("local")).toBe(true);
-    expect(shouldEnablePwa("hosted")).toBe(false);
+  it("only enables offline support for production local deployments", () => {
+    expect(shouldEnablePwa("local", "production")).toBe(true);
+    expect(shouldEnablePwa("local", "development")).toBe(false);
+    expect(shouldEnablePwa("hosted", "production")).toBe(false);
+  });
+
+  it("uses a stable safe deployment id with a per-build fallback", () => {
+    expect(normalizeDeploymentId(" release/2026.07.25 ")).toBe(
+      "release-2026.07.25",
+    );
+    expect(
+      resolveDeploymentId({ GITHUB_SHA: "abc123" }, "fallback-build"),
+    ).toBe("abc123");
+    expect(resolveDeploymentId({}, "fallback-build")).toBe("fallback-build");
   });
 
   it("only accepts same-origin versioned shell assets", () => {
@@ -85,17 +107,103 @@ describe("PWA deployment policy", () => {
     expect(deleteCache).not.toHaveBeenCalledWith("unrelated-cache");
     expect(isNeoChatPwaCache("neo-chat-pwa-static-v3")).toBe(true);
   });
+
+  it("bypasses the HTTP cache when registering and primes loaded assets", async () => {
+    const postMessage = vi.fn();
+    const registration = {} as ServiceWorkerRegistration;
+    const register = vi.fn().mockResolvedValue(registration);
+    const serviceWorker = {
+      register,
+      ready: Promise.resolve({
+        active: { postMessage },
+      }),
+    } as unknown as ServiceWorkerContainer;
+
+    vi.stubGlobal("performance", {
+      getEntriesByType: vi
+        .fn()
+        .mockReturnValue([
+          { name: "https://chat.example.com/_next/static/app.js" },
+        ]),
+    });
+    vi.stubGlobal("window", {
+      location: { origin: "https://chat.example.com" },
+    });
+
+    await expect(registerNeoChatPwa(serviceWorker)).resolves.toBe(registration);
+    expect(register).toHaveBeenCalledWith("/sw.js", {
+      scope: "/",
+      updateViaCache: "none",
+    });
+    expect(postMessage).toHaveBeenCalledWith({
+      type: "CACHE_SHELL_ASSETS",
+      urls: ["https://chat.example.com/_next/static/app.js"],
+    });
+  });
+
+  it("serves a no-store worker bootstrap tied to the deployment id", async () => {
+    vi.stubEnv("NEXT_PUBLIC_DEPLOYMENT_ID", "release-abc123");
+
+    const response = getServiceWorker();
+    const worker = await response.text();
+
+    expect(response.headers.get("Cache-Control")).toBe(
+      "no-cache, no-store, must-revalidate",
+    );
+    expect(response.headers.get("Service-Worker-Allowed")).toBe("/");
+    expect(worker).toContain(
+      'self.__NEO_CHAT_DEPLOYMENT_ID__ = "release-abc123"',
+    );
+    expect(worker).toContain(
+      'importScripts("/sw-runtime.js?dpl=release-abc123")',
+    );
+  });
 });
 
 describe("service worker cache boundary", () => {
   it("keeps APIs, event streams, external URLs, and user files network-only", () => {
-    const worker = readFileSync(resolve(process.cwd(), "public/sw.js"), "utf8");
+    const worker = readFileSync(
+      resolve(process.cwd(), "public/sw-runtime.js"),
+      "utf8",
+    );
 
+    expect(worker).toContain("self.__NEO_CHAT_DEPLOYMENT_ID__");
     expect(worker).toContain("url.origin !== self.location.origin");
     expect(worker).toContain('url.pathname.startsWith("/api/")');
     expect(worker).toContain('accept.includes("text/event-stream")');
     expect(worker).toContain('url.pathname.startsWith("/_next/image")');
     expect(worker).toContain('url.pathname.startsWith("/files/")');
+  });
+
+  it("checks for updates during long sessions and reloads controlled tabs", () => {
+    const lifecycle = readFileSync(
+      resolve(process.cwd(), "src/components/pwa/PwaLifecycle.tsx"),
+      "utf8",
+    );
+    const nextConfig = readFileSync(
+      resolve(process.cwd(), "next.config.ts"),
+      "utf8",
+    );
+
+    expect(lifecycle).toContain("PWA_UPDATE_INTERVAL_MS");
+    expect(lifecycle).toContain("registration.update()");
+    expect(lifecycle).toContain('"visibilitychange"');
+    expect(lifecycle).toContain('"controllerchange"');
+    expect(lifecycle).toContain("hadControllerAtMount");
+    expect(nextConfig).toContain("deploymentId,");
+    expect(nextConfig).toContain("NEXT_PUBLIC_DEPLOYMENT_ID: deploymentId");
+  });
+
+  it("overrides the Cloudflare static-asset cache header for the worker runtime", () => {
+    const cloudflareHeaders = readFileSync(
+      resolve(process.cwd(), "public/_headers"),
+      "utf8",
+    );
+
+    expect(cloudflareHeaders).toContain("/sw-runtime.js");
+    expect(cloudflareHeaders).toContain(
+      "Cache-Control: no-cache, no-store, must-revalidate",
+    );
   });
 
   it("keeps offline history navigation read-only without exposing tool decisions", () => {
