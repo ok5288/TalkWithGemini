@@ -93,6 +93,17 @@ function getProviderBaseUrlPlaceholder(
   return t("openaiBaseUrlPlaceholder");
 }
 
+function getProviderBaseUrlPreview(
+  baseUrl: string,
+  type: ProviderType,
+): string | null {
+  try {
+    return getEffectiveBaseUrl(baseUrl, type);
+  } catch {
+    return null;
+  }
+}
+
 const ProviderSettings = () => {
   const t = useTranslations("Providers");
   const { modelMetadata, customModelMetadata } = useSettingsStore();
@@ -125,21 +136,28 @@ const ProviderSettings = () => {
     null,
   );
 
+  const firstProviderId = providers[0]?.id ?? null;
+  const selectedProviderExists = selectedProviderId
+    ? providers.some((provider) => provider.id === selectedProviderId)
+    : false;
+
   // Ensure selection validity - wait for hydration
   useEffect(() => {
     if (!_hasHydrated) return;
 
-    if (providers.length > 0) {
-      if (
-        !selectedProviderId ||
-        !providers.find((p) => p.id === selectedProviderId)
-      ) {
-        setSelectedProviderId(providers[0].id);
-      }
+    if (firstProviderId && !selectedProviderExists) {
+      setSelectedProviderId(firstProviderId);
     }
-  }, [_hasHydrated, providers, selectedProviderId]);
+  }, [
+    _hasHydrated,
+    firstProviderId,
+    selectedProviderExists,
+    selectedProviderId,
+  ]);
 
   const currentProvider = providers.find((p) => p.id === selectedProviderId);
+  const currentProviderId = currentProvider?.id ?? null;
+  const currentProviderBaseUrl = currentProvider?.baseUrl ?? "";
   const isServerDefaultProvider = Boolean(currentProvider?.isServerDefault);
   const isFetchingCurrentProvider = fetchingProviderId === currentProvider?.id;
   const currentProviderDomId = currentProvider
@@ -151,6 +169,9 @@ const ProviderSettings = () => {
   const providerApiKeyInputId = `${currentProviderDomId}-provider-api-key`;
   const providerEnabledInputId = `${currentProviderDomId}-provider-enabled`;
   const providerApiKeyHelpUrl = getProviderApiKeyHelpUrl(currentProvider?.type);
+  const providerBaseUrlPreview = currentProvider
+    ? getProviderBaseUrlPreview(currentProviderBaseUrl, currentProvider.type)
+    : null;
   const providerTypeOptions: ProviderTypeOption[] = [
     {
       value: OPENAI_COMPATIBLE_PROVIDER_TYPE,
@@ -189,16 +210,16 @@ const ProviderSettings = () => {
   useEffect(() => {
     selectedProviderIdRef.current = selectedProviderId;
     setFetchError(null);
-    const selectedProvider = providers.find(
-      (provider) => provider.id === selectedProviderId,
-    );
-    setBaseUrlDraft(selectedProvider?.baseUrl || "");
-    setBaseUrlError(null);
     fetchAbortRef.current?.abort();
     fetchAbortRef.current = null;
     setFetchingProviderId(null);
     clearDeleteConfirmation();
-  }, [providers, selectedProviderId]);
+  }, [selectedProviderId]);
+
+  useEffect(() => {
+    setBaseUrlDraft(currentProviderBaseUrl);
+    setBaseUrlError(null);
+  }, [currentProviderBaseUrl, currentProviderId]);
 
   const handleBaseUrlBlur = () => {
     if (!currentProvider) return;
@@ -584,14 +605,10 @@ const ProviderSettings = () => {
                         <AlertCircle size={12} aria-hidden="true" />
                         {baseUrlError}
                       </p>
-                    ) : currentProvider.baseUrl ? (
+                    ) : providerBaseUrlPreview ? (
                       <div className="text-[11px] text-gray-400 font-mono pl-1 flex items-start gap-1">
                         <span className="break-all text-gray-500 dark:text-muted-foreground">
-                          {t("preview")}{" "}
-                          {getEffectiveBaseUrl(
-                            currentProvider.baseUrl,
-                            currentProvider.type,
-                          )}
+                          {t("preview")} {providerBaseUrlPreview}
                         </span>
                       </div>
                     ) : null}
@@ -617,6 +634,7 @@ const ProviderSettings = () => {
                   </label>
                   <div className="relative">
                     <SecretInput
+                      key={currentProvider.id}
                       id={providerApiKeyInputId}
                       name="providerApiKey"
                       maxLength={PROVIDER_CONFIG_LIMITS.maxApiKeyChars}

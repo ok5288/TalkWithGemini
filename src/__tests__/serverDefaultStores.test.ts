@@ -235,6 +235,181 @@ describe("server default store injection", () => {
     ).toEqual(apiKeySecret);
   });
 
+  it("preserves dynamic default-provider models and task defaults across config refreshes", async () => {
+    const { useCoreSettingsStore } =
+      await import("../store/core/coreSettingsStore");
+    const { encryptLocalSecret, LOCAL_SECRET_CONTEXTS } =
+      await import("../lib/security/localSecrets");
+    const apiKeySecret = await encryptLocalSecret(
+      "browser-key",
+      LOCAL_SECRET_CONTEXTS.providerApiKey(SERVER_DEFAULT_PROVIDER_ID),
+    );
+
+    useCoreSettingsStore.setState((state) => ({
+      ...state,
+      providers: [
+        {
+          id: SERVER_DEFAULT_PROVIDER_ID,
+          name: "Hosted Default",
+          type: "Google",
+          baseUrl: "default",
+          apiKey: "",
+          apiKeySecret,
+          enabled: true,
+          models: ["gemini-dynamic"],
+          modelsList: ["gemini-dynamic"],
+          isServerDefault: true,
+        },
+      ],
+      defaultModels: {
+        ...state.defaultModels,
+        titleGeneration: "SERVER_DEFAULT:gemini-dynamic",
+      },
+    }));
+
+    useCoreSettingsStore.getState().applyServerConfig({
+      ...serverConfig,
+      modelProvider: {
+        ...serverConfig.modelProvider,
+        models: [],
+        defaultModels: {},
+      },
+    });
+
+    expect(
+      useCoreSettingsStore
+        .getState()
+        .providers.find(
+          (provider) => provider.id === SERVER_DEFAULT_PROVIDER_ID,
+        ),
+    ).toMatchObject({
+      apiKeySecret,
+      models: ["gemini-dynamic"],
+      modelsList: ["gemini-dynamic"],
+    });
+    expect(useCoreSettingsStore.getState().defaultModels.titleGeneration).toBe(
+      "SERVER_DEFAULT:gemini-dynamic",
+    );
+
+    useCoreSettingsStore.getState().updateProvider(SERVER_DEFAULT_PROVIDER_ID, {
+      models: ["gemini-dynamic", "gemini-new"],
+      modelsList: ["gemini-dynamic", "gemini-new"],
+    });
+
+    expect(useCoreSettingsStore.getState().defaultModels.titleGeneration).toBe(
+      "SERVER_DEFAULT:gemini-dynamic",
+    );
+  });
+
+  it("drops saved default-provider credentials and models when its type changes", async () => {
+    const { useCoreSettingsStore } =
+      await import("../store/core/coreSettingsStore");
+    const { encryptLocalSecret, LOCAL_SECRET_CONTEXTS } =
+      await import("../lib/security/localSecrets");
+    const apiKeySecret = await encryptLocalSecret(
+      "browser-key",
+      LOCAL_SECRET_CONTEXTS.providerApiKey(SERVER_DEFAULT_PROVIDER_ID),
+    );
+
+    useCoreSettingsStore.setState((state) => ({
+      ...state,
+      providers: [
+        {
+          id: SERVER_DEFAULT_PROVIDER_ID,
+          name: "Hosted Default",
+          type: "Google",
+          baseUrl: "default",
+          apiKey: "",
+          apiKeySecret,
+          enabled: true,
+          models: ["gemini-dynamic"],
+          modelsList: ["gemini-dynamic"],
+          isServerDefault: true,
+        },
+      ],
+      defaultModels: {
+        ...state.defaultModels,
+        titleGeneration: "SERVER_DEFAULT:gemini-dynamic",
+      },
+    }));
+
+    useCoreSettingsStore.getState().applyServerConfig({
+      ...serverConfig,
+      modelProvider: {
+        ...serverConfig.modelProvider,
+        type: "Anthropic",
+        models: [],
+        defaultModels: {},
+      },
+    });
+
+    const provider = useCoreSettingsStore
+      .getState()
+      .providers.find((item) => item.id === SERVER_DEFAULT_PROVIDER_ID);
+    expect(provider).toMatchObject({
+      type: "Anthropic",
+      models: [],
+      modelsList: [],
+    });
+    expect(provider?.apiKeySecret).toBeUndefined();
+    expect(useCoreSettingsStore.getState().defaultModels.titleGeneration).toBe(
+      "",
+    );
+  });
+
+  it("lets static server models replace stale dynamic models and seed task defaults", async () => {
+    const { useCoreSettingsStore } =
+      await import("../store/core/coreSettingsStore");
+
+    useCoreSettingsStore.setState((state) => ({
+      ...state,
+      providers: [
+        {
+          id: SERVER_DEFAULT_PROVIDER_ID,
+          name: "Hosted Default",
+          type: "Google",
+          baseUrl: "default",
+          apiKey: "",
+          enabled: true,
+          models: ["gemini-dynamic"],
+          modelsList: ["gemini-dynamic"],
+          isServerDefault: true,
+        },
+      ],
+      defaultModels: {
+        ...state.defaultModels,
+        titleGeneration: "SERVER_DEFAULT:gemini-dynamic",
+        relatedQuestions: "SERVER_DEFAULT:gemini-dynamic",
+      },
+    }));
+
+    useCoreSettingsStore.getState().applyServerConfig({
+      ...serverConfig,
+      modelProvider: {
+        ...serverConfig.modelProvider,
+        models: ["gemini-static"],
+        defaultModels: {
+          titleGeneration: "gemini-static",
+        },
+      },
+    });
+
+    expect(
+      useCoreSettingsStore
+        .getState()
+        .providers.find(
+          (provider) => provider.id === SERVER_DEFAULT_PROVIDER_ID,
+        ),
+    ).toMatchObject({
+      models: ["gemini-static"],
+      modelsList: ["gemini-static"],
+    });
+    expect(useCoreSettingsStore.getState().defaultModels).toMatchObject({
+      titleGeneration: "SERVER_DEFAULT:gemini-static",
+      relatedQuestions: "",
+    });
+  });
+
   it("persists the default provider local key like a regular provider", async () => {
     const { useCoreSettingsStore } =
       await import("../store/core/coreSettingsStore");
