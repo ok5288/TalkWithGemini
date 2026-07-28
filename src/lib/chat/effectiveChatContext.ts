@@ -29,6 +29,7 @@ import { buildDiagramPromptInstruction } from "./diagramPrompt";
 import { buildHtmlVisualPromptInstruction } from "./htmlVisualPrompt";
 import {
   parseModelString,
+  resolveProviderModelMetadata,
   supportsModality,
   supportsToolCalls,
 } from "../utils/model";
@@ -197,8 +198,13 @@ function getModelCapabilities({
   ResolveEffectiveChatContextOptions,
   "selectedModel" | "modelMetadata" | "customModelMetadata"
 >): ModelCapabilities {
-  const { modelName } = parseModelString(selectedModel);
-  const meta = customModelMetadata[modelName] || modelMetadata[modelName];
+  const { providerId, modelName } = parseModelString(selectedModel);
+  const meta = resolveProviderModelMetadata({
+    providerId,
+    modelName,
+    modelMetadata,
+    customModelMetadata,
+  });
   const lower = modelName.toLowerCase();
   const reasoningByName =
     lower.includes("thinking") ||

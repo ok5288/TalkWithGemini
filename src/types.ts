@@ -78,6 +78,7 @@ export type {
   CitationSourceKind,
   SearchProviderID,
   SearchServiceConfig,
+  SearchTimeRange,
   Source,
 } from "./lib/search/types";
 export type {

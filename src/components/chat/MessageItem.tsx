@@ -89,15 +89,18 @@ import {
   isTextDocumentMimeType,
 } from "@/lib/utils/documentAttachments";
 import { hasUnsafeContinuationToolState } from "@/lib/chat/streamResilience";
+import type { MessageBranchOption } from "@/lib/chat/messageTree";
 
 interface MessageItemProps {
   message: Message;
   actionsDisabled?: boolean;
   mutationsDisabled?: boolean;
+  toolActionsDisabled?: boolean;
   branchInfo?: {
     index: number;
     count: number;
   };
+  branchOptions?: MessageBranchOption[];
   onEdit: (id: string, newContent: string) => void;
   onDelete: (id: string) => void;
   availableModels?: ModelInfo[];
@@ -109,6 +112,7 @@ interface MessageItemProps {
   canEditUserMessage?: boolean;
   onSubmitUserEdit?: (id: string, newContent: string) => void | Promise<void>;
   onVersionChange?: (id: string, direction: "prev" | "next") => void;
+  onVersionSelect?: (targetId: string) => void;
   isLast: boolean;
   isTyping?: boolean;
   onToolConfirmationDecision?: (
@@ -302,7 +306,9 @@ const MessageItem: React.FC<MessageItemProps> = ({
   message,
   actionsDisabled = false,
   mutationsDisabled = false,
+  toolActionsDisabled = false,
   branchInfo,
+  branchOptions = [],
   onEdit,
   onDelete,
   availableModels = [],
@@ -314,11 +320,13 @@ const MessageItem: React.FC<MessageItemProps> = ({
   canEditUserMessage = false,
   onSubmitUserEdit,
   onVersionChange,
+  onVersionSelect,
   isTyping = false,
   onToolConfirmationDecision,
   onRevokeToolSessionApproval,
 }) => {
   const mutationActionsDisabled = actionsDisabled || mutationsDisabled;
+  const confirmationActionsDisabled = actionsDisabled || toolActionsDisabled;
   const t = useTranslations("Message");
   const locale = useLocale();
   const durationFormatter = useMemo(
@@ -1344,12 +1352,12 @@ const MessageItem: React.FC<MessageItemProps> = ({
                     ragSources={readingMode === "message" ? ragSources : []}
                     onFileClick={handleFileClick}
                     onToolConfirmationDecision={
-                      mutationActionsDisabled
+                      confirmationActionsDisabled
                         ? undefined
                         : onToolConfirmationDecision
                     }
                     onRevokeToolSessionApproval={
-                      mutationActionsDisabled
+                      confirmationActionsDisabled
                         ? undefined
                         : onRevokeToolSessionApproval
                     }
@@ -1575,12 +1583,12 @@ const MessageItem: React.FC<MessageItemProps> = ({
                   onFileClick={handleFileClick}
                   onImageCached={persistCachedOutputImage}
                   onToolConfirmationDecision={
-                    mutationActionsDisabled
+                    confirmationActionsDisabled
                       ? undefined
                       : onToolConfirmationDecision
                   }
                   onRevokeToolSessionApproval={
-                    mutationActionsDisabled
+                    confirmationActionsDisabled
                       ? undefined
                       : onRevokeToolSessionApproval
                   }
@@ -1677,22 +1685,93 @@ const MessageItem: React.FC<MessageItemProps> = ({
                         icon={<ChevronLeft size={13} />}
                         tooltip={t("previousVersion")}
                         onClick={() => onVersionChange(message.id, "prev")}
-                        disabled={actionsDisabled || currentBranchIndex === 0}
+                        disabled={
+                          mutationActionsDisabled || currentBranchIndex === 0
+                        }
                         className={
                           currentBranchIndex === 0
                             ? "opacity-30 cursor-not-allowed"
                             : ""
                         }
                       />
-                      <span className="hidden md:inline text-[9px] font-mono px-0.5 select-none text-gray-400">
-                        {currentBranchIndex + 1}/{branchCount}
-                      </span>
+                      {onVersionSelect ? (
+                        <DropdownMenu>
+                          <Tooltip
+                            content={t("openBranchNavigator")}
+                            position="top"
+                          >
+                            <DropdownMenuTrigger asChild>
+                              <button
+                                type="button"
+                                aria-label={t("openBranchNavigator")}
+                                className="inline-flex rounded px-1 py-0.5 font-mono text-[9px] text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/50 dark:hover:bg-accent dark:hover:text-foreground"
+                              >
+                                {currentBranchIndex + 1}/{branchCount}
+                              </button>
+                            </DropdownMenuTrigger>
+                          </Tooltip>
+                          <DropdownMenuContent
+                            side="top"
+                            align="center"
+                            className="max-h-72 w-80 overflow-y-auto"
+                          >
+                            <DropdownMenuLabel>
+                              {t("branchNavigatorTitle")}
+                            </DropdownMenuLabel>
+                            {branchOptions.map((option, optionIndex) => (
+                              <DropdownMenuItem
+                                key={option.id}
+                                onSelect={() => onVersionSelect(option.id)}
+                                className="items-start gap-2 py-2"
+                              >
+                                <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center">
+                                  {option.active ? (
+                                    <Check size={13} aria-hidden="true" />
+                                  ) : (
+                                    <span className="text-[10px] text-muted-foreground">
+                                      {optionIndex + 1}
+                                    </span>
+                                  )}
+                                </span>
+                                <span className="min-w-0 flex-1">
+                                  <span className="flex items-center justify-between gap-2 text-[10px] text-muted-foreground">
+                                    <span>
+                                      {option.message.role === "user"
+                                        ? t("branchRoleUser")
+                                        : option.message.model ||
+                                          t("branchRoleAssistant")}
+                                    </span>
+                                    <span>
+                                      {new Intl.DateTimeFormat(locale, {
+                                        month: "short",
+                                        day: "numeric",
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                      }).format(
+                                        new Date(option.message.timestamp),
+                                      )}
+                                    </span>
+                                  </span>
+                                  <span className="mt-0.5 block truncate text-xs text-foreground">
+                                    {option.message.content.trim() ||
+                                      t("branchEmptyContent")}
+                                  </span>
+                                </span>
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      ) : (
+                        <span className="px-0.5 font-mono text-[9px] text-gray-400">
+                          {currentBranchIndex + 1}/{branchCount}
+                        </span>
+                      )}
                       <ActionButton
                         icon={<ChevronRight size={13} />}
                         tooltip={t("nextVersion")}
                         onClick={() => onVersionChange(message.id, "next")}
                         disabled={
-                          actionsDisabled ||
+                          mutationActionsDisabled ||
                           currentBranchIndex === branchCount - 1
                         }
                         className={

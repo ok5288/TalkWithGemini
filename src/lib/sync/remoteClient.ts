@@ -11,6 +11,9 @@ import type {
 } from "./types";
 import type { LocalEncryptedSecretEnvelope } from "@/lib/security/localSecrets";
 
+export const SYNC_REMOTE_LIST_MAX_PAGES = 256;
+export const SYNC_REMOTE_LIST_MAX_OBJECTS = 100_000;
+
 export interface SyncRemoteClient {
   test(signal?: AbortSignal): Promise<void>;
   list(
@@ -65,19 +68,54 @@ export async function createSyncRemoteClient(
     );
   };
 
+  const throwIfListAborted = (signal?: AbortSignal): void => {
+    if (!signal?.aborted) return;
+    if (signal.reason instanceof Error) throw signal.reason;
+    const error = new Error("The sync object listing was aborted.");
+    error.name = "AbortError";
+    throw error;
+  };
+
   return {
     async test(signal) {
       await request({ operation: "test" }, signal);
     },
     async list(prefix, signal) {
       const objects: SyncRemoteObjectMetadata[] = [];
+      const seenCursors = new Set<string>();
       let cursor: string | undefined;
+      let pageCount = 0;
       do {
+        throwIfListAborted(signal);
+        if (pageCount >= SYNC_REMOTE_LIST_MAX_PAGES) {
+          throw new Error(
+            `Encrypted sync object listing exceeded ${SYNC_REMOTE_LIST_MAX_PAGES} pages.`,
+          );
+        }
+        if (cursor) seenCursors.add(cursor);
         const response = await request(
           { operation: "list", path: prefix, cursor },
           signal,
         );
-        objects.push(...(response.objects || []));
+        pageCount += 1;
+        const pageObjects = response.objects || [];
+        if (
+          objects.length + pageObjects.length >
+          SYNC_REMOTE_LIST_MAX_OBJECTS
+        ) {
+          throw new Error(
+            `Encrypted sync object listing exceeded ${SYNC_REMOTE_LIST_MAX_OBJECTS} objects.`,
+          );
+        }
+        objects.push(...pageObjects);
+        if (
+          response.cursor &&
+          (response.cursor === cursor || seenCursors.has(response.cursor))
+        ) {
+          throw new Error(
+            "Encrypted sync object listing returned a repeated cursor.",
+          );
+        }
         cursor = response.cursor;
       } while (cursor);
       return objects;

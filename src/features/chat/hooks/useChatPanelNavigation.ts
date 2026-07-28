@@ -21,6 +21,7 @@ interface UseChatPanelNavigationResult {
     panel: ChatPanel,
     nextSettingsTab?: SettingsTabId | null,
     historyMode?: "push" | "replace",
+    options?: { keepSidebarOpen?: boolean },
   ) => void;
   handleSettingsTabChange: (tab: SettingsTabId) => void;
 }
@@ -76,6 +77,7 @@ export function useChatPanelNavigation(): UseChatPanelNavigationResult {
       panel: ChatPanel,
       nextSettingsTab?: SettingsTabId | null,
       historyMode: "push" | "replace" = "push",
+      options?: { keepSidebarOpen?: boolean },
     ) => {
       const resolvedSettingsTab =
         panel === "settings" ? (nextSettingsTab ?? settingsTab) : null;
@@ -85,7 +87,7 @@ export function useChatPanelNavigation(): UseChatPanelNavigationResult {
         setSettingsTab(resolvedSettingsTab);
       }
       updatePanelUrl(panel, resolvedSettingsTab, historyMode);
-      if (isNonDesktopViewport) {
+      if (isNonDesktopViewport && !options?.keepSidebarOpen) {
         setIsSidebarOpen(false);
       }
     },

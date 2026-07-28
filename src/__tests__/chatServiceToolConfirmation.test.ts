@@ -97,6 +97,24 @@ vi.mock("@/lib/utils/model", () => ({
     const [providerId, modelName] = model.split(":");
     return { providerId, modelName };
   }),
+  resolveProviderModelMetadata: vi.fn(
+    ({
+      providerId,
+      modelName,
+      modelMetadata,
+      customModelMetadata,
+    }: {
+      providerId?: string;
+      modelName: string;
+      modelMetadata?: Record<string, ModelMetadata>;
+      customModelMetadata?: Record<string, ModelMetadata>;
+    }) =>
+      (providerId
+        ? customModelMetadata?.[`${providerId}:${modelName}`]
+        : undefined) ||
+      customModelMetadata?.[modelName] ||
+      modelMetadata?.[modelName],
+  ),
   supportsImageGeneration: mocks.supportsImageGeneration,
   supportsTextOutput: mocks.supportsTextOutput,
   supportsToolCalls: mocks.supportsToolCalls,
@@ -2060,6 +2078,7 @@ describe("chat service tool execution", () => {
       .mockImplementationOnce(async (_url, init) => {
         const body = JSON.parse(String(init?.body));
         expect(body.config.useAgentMode).toBe(false);
+        expect(body.tools).toEqual([]);
         return sseResponse([
           { type: "content", content: "Ordinary response" },
           { type: "done" },
@@ -2075,6 +2094,13 @@ describe("chat service tool execution", () => {
       [],
       { useAgentMode: true },
       () => undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      ["writer"],
     );
 
     expect(result).toBe("Ordinary response");

@@ -36,6 +36,7 @@ export function useChatShellState() {
       addMessageVersion: state.addMessageVersion,
       createEditedUserMessageBranch: state.createEditedUserMessageBranch,
       switchMessageVersion: state.switchMessageVersion,
+      selectMessageVersion: state.selectMessageVersion,
       deleteMessage: state.deleteMessage,
       deleteMessageAndSubsequent: state.deleteMessageAndSubsequent,
       setSuggestedQuestions: state.setSuggestedQuestions,

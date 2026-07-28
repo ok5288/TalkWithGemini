@@ -30,6 +30,7 @@ import {
 } from "@/lib/plugin/confirmation";
 import {
   parseModelString,
+  resolveProviderModelMetadata,
   supportsImageGeneration,
   supportsTextOutput,
   supportsToolCalls,
@@ -623,9 +624,9 @@ export const streamChatResponse = async (
     : providers.find((p) => p.enabled);
 
   if (!provider) throw new Error("No provider available");
-  const selectedModelMetadata = resolveModelMetadata(modelName);
-  const agentModeEnabled =
-    config?.useAgentMode === true && supportsToolCalls(selectedModelMetadata);
+  const selectedModelMetadata = resolveModelMetadata(modelName, providerId);
+  const toolCallsSupported = supportsToolCalls(selectedModelMetadata);
+  const agentModeEnabled = config?.useAgentMode === true && toolCallsSupported;
 
   let effectiveNewMessage = newMessage;
   const { search } = useSettingsStore.getState();
@@ -777,7 +778,7 @@ export const streamChatResponse = async (
   const toolNames = new Set<string>();
   const collectedBuiltinTools = collectBuiltinTools({
     message: newMessage,
-    disabled: options?.disableTools,
+    disabled: options?.disableTools || !toolCallsSupported,
     agentModeEnabled,
     useSearch: config?.useSearch === true,
     searchMode: searchCompatibility.mode,
@@ -789,7 +790,12 @@ export const streamChatResponse = async (
     toolNames.add(name);
   }
 
-  if (!options?.disableTools && activePlugins && activePlugins.length > 0) {
+  if (
+    !options?.disableTools &&
+    toolCallsSupported &&
+    activePlugins &&
+    activePlugins.length > 0
+  ) {
     activePlugins.forEach((pluginId) => {
       const plugin = installedPlugins.find((p) => p.id === pluginId);
       const pluginConfig = pluginConfigs[pluginId];
@@ -883,7 +889,7 @@ export const streamChatResponse = async (
         .flatMap((item) =>
           item.models.map((availableModelName) => ({
             id: `${item.id}:${availableModelName}`,
-            metadata: resolveModelMetadata(availableModelName),
+            metadata: resolveModelMetadata(availableModelName, item.id),
           })),
         );
       const imageOptions = await resolveImageGenerationOptions({
@@ -1776,8 +1782,13 @@ export const prepareHistoryForLLM = async (
   // 3. Construct Compressed Message Placeholder
   // Check model capability for attachment
   const { modelMetadata, customModelMetadata } = useSettingsStore.getState();
-  const { modelName: modelId } = parseModelString(model);
-  const meta = customModelMetadata[modelId] || modelMetadata[modelId];
+  const { providerId, modelName } = parseModelString(model);
+  const meta = resolveProviderModelMetadata({
+    providerId,
+    modelName,
+    modelMetadata,
+    customModelMetadata,
+  });
   const supportAttachment = meta ? (meta.attachment ?? false) : true;
 
   let compressedMsg: Message;
@@ -1877,8 +1888,13 @@ export const performBackgroundCompression = async (
   const textToCompress = compressionSource.text;
 
   const { modelMetadata, customModelMetadata } = useSettingsStore.getState();
-  const { modelName: modelId } = parseModelString(model);
-  const meta = customModelMetadata[modelId] || modelMetadata[modelId];
+  const { providerId, modelName } = parseModelString(model);
+  const meta = resolveProviderModelMetadata({
+    providerId,
+    modelName,
+    modelMetadata,
+    customModelMetadata,
+  });
   const supportAttachment = meta ? (meta.attachment ?? false) : true;
 
   let nextCompressedContent = textToCompress;

@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import type { ModelMetadata, ReasoningMode } from "@/types";
 import {
   parseModelString,
+  resolveProviderModelMetadata,
   supportsModality,
   supportsToolCalls,
 } from "@/lib/utils/model";
@@ -62,8 +63,13 @@ export function useComposerCapabilityState({
   const selectedModelMetadata = useMemo(() => {
     if (!selectedModel) return undefined;
 
-    const { modelName: modelId } = parseModelString(selectedModel);
-    return customModelMetadata[modelId] || modelMetadata[modelId];
+    const { providerId, modelName } = parseModelString(selectedModel);
+    return resolveProviderModelMetadata({
+      providerId,
+      modelName,
+      modelMetadata,
+      customModelMetadata,
+    });
   }, [selectedModel, modelMetadata, customModelMetadata]);
 
   const modelCapabilities = useMemo(() => {

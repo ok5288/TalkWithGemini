@@ -7,6 +7,7 @@ import { MessageSquarePlus, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 
 import Sidebar from "@/components/layout/Sidebar";
 import MessageInput, { MessageInputRef } from "@/components/chat/MessageInput";
+import SessionUsageSummary from "@/components/chat/SessionUsageSummary";
 import type { ComposerSkillParameterValues } from "@/components/skill/SkillParameterDialog";
 import VirtualizedMessageTimeline, {
   type VirtualizedMessageTimelineRef,
@@ -27,9 +28,15 @@ import type {
   ToolConfirmationRequest,
 } from "@/types";
 import { getActiveMessagePath } from "@/lib/chat/messageTree";
+import { getSessionDisplayTitle } from "@/lib/chat/sessionTitle";
 import { getReplyExcerpt } from "@/lib/chat/streamResilience";
 import type { GlobalSearchNavigationTarget } from "@/lib/global-search";
 import { useChatStore } from "@/store/core/chatStore";
+import { useSettingsStore } from "@/store/core/settingsStore";
+import {
+  parseModelString,
+  resolveProviderModelMetadata,
+} from "@/lib/utils/model";
 import { getSyncDeviceId } from "@/lib/sync/deviceIdentity";
 import {
   KNOWLEDGE_SOURCE_NAVIGATE_EVENT,
@@ -81,6 +88,7 @@ interface ChatAppShellProps {
   isGenerating: boolean;
   isActiveSessionLoading: boolean;
   availableModels: ModelInfo[];
+  isModelBootstrapReady: boolean;
   selectedModel: string;
   isSearchEnabled: boolean;
   viewMode: ChatPanel;
@@ -99,6 +107,7 @@ interface ChatAppShellProps {
     panel: ChatPanel,
     nextSettingsTab?: SettingsTabId | null,
     historyMode?: "push" | "replace",
+    options?: { keepSidebarOpen?: boolean },
   ) => void;
   handleSettingsTabChange: (tab: SettingsTabId) => void;
   stopActiveGenerationWithFeedback: () => Promise<void>;
@@ -121,6 +130,7 @@ interface ChatAppShellProps {
   handleRegenerate: (messageId: string, model?: string) => Promise<void>;
   handleContinueGeneration: (messageId: string) => Promise<void>;
   handleVersionChange: (msgId: string, direction: "prev" | "next") => void;
+  handleVersionSelect: (msgId: string, targetId: string) => void;
   handleSendMessage: (
     text: string,
     attachments: Attachment[],
@@ -150,6 +160,7 @@ const ChatAppShell = ({
   isGenerating,
   isActiveSessionLoading,
   availableModels,
+  isModelBootstrapReady,
   selectedModel,
   isSearchEnabled,
   viewMode,
@@ -183,6 +194,7 @@ const ChatAppShell = ({
   handleRegenerate,
   handleContinueGeneration,
   handleVersionChange,
+  handleVersionSelect,
   handleSendMessage,
   prepareComposerSkillParameters,
   handleSuggestionClick,
@@ -195,6 +207,7 @@ const ChatAppShell = ({
 }: ChatAppShellProps) => {
   const t = useTranslations("ChatApp");
   const [focusedMessageId, setFocusedMessageId] = React.useState<string>();
+  const searchReturnFocusRef = React.useRef<HTMLElement | null>(null);
   const [replyTarget, setReplyTarget] = React.useState<MessageReplyReference>();
   const timelineRef = React.useRef<VirtualizedMessageTimelineRef>(null);
   const [messagesScrollElement, setMessagesScrollElement] =
@@ -216,6 +229,20 @@ const ChatAppShell = ({
   const [focusedMemoryId, setFocusedMemoryId] = React.useState<string>();
   const [isOnline, setIsOnline] = React.useState(true);
   const [streamClock, setStreamClock] = React.useState(() => Date.now());
+  const modelMetadata = useSettingsStore((state) => state.modelMetadata);
+  const customModelMetadata = useSettingsStore(
+    (state) => state.customModelMetadata,
+  );
+  const contextWindow = React.useMemo(() => {
+    if (!selectedModel) return undefined;
+    const { providerId, modelName } = parseModelString(selectedModel);
+    return resolveProviderModelMetadata({
+      providerId,
+      modelName,
+      modelMetadata,
+      customModelMetadata,
+    })?.limit?.context;
+  }, [customModelMetadata, modelMetadata, selectedModel]);
   const localDeviceId = React.useMemo(() => getSyncDeviceId(), []);
   const hasForeignActiveGeneration = React.useMemo(
     () =>
@@ -286,6 +313,10 @@ const ChatAppShell = ({
   ]);
 
   const openGlobalSearch = React.useCallback(() => {
+    searchReturnFocusRef.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
     navigateToPanel("search");
   }, [navigateToPanel]);
 
@@ -406,6 +437,21 @@ const ChatAppShell = ({
     [handleVersionChange, messages],
   );
 
+  const handleTimelineVersionSelect = React.useCallback(
+    (messageId: string, targetId: string) => {
+      const messageIndex = messages.findIndex(
+        (message) => message.id === messageId,
+      );
+      handleVersionSelect(messageId, targetId);
+      requestAnimationFrame(() => {
+        const nextMessage =
+          useChatStore.getState().activeMessages[messageIndex];
+        if (nextMessage) setFocusedMessageId(nextMessage.id);
+      });
+    },
+    [handleVersionSelect, messages],
+  );
+
   const handleGlobalSearchNavigate = React.useCallback(
     async (target: GlobalSearchNavigationTarget) => {
       if (target.type === "session" || target.type === "message") {
@@ -434,7 +480,7 @@ const ChatAppShell = ({
       if (target.type === "workspace") {
         setFocusedWorkspaceId(target.workspaceId);
         setIsSidebarOpen(true);
-        navigateToPanel("chat");
+        navigateToPanel("chat", null, "push", { keepSidebarOpen: true });
         window.setTimeout(() => setFocusedWorkspaceId(undefined), 2400);
         return true;
       }
@@ -451,7 +497,12 @@ const ChatAppShell = ({
     ],
   );
   return (
-    <div className="relative flex h-dvh w-full overflow-hidden bg-background font-sans text-foreground transition-colors duration-300">
+    <div
+      data-chat-app-shell
+      inert={viewMode === "search" ? true : undefined}
+      aria-hidden={viewMode === "search" ? true : undefined}
+      className="relative flex h-dvh w-full overflow-hidden bg-background font-sans text-foreground transition-colors duration-300"
+    >
       <ImagePreview />
 
       {isSidebarDrawerOpen && (
@@ -532,12 +583,7 @@ const ChatAppShell = ({
             </button>
           </div>
         ) : null}
-        {viewMode === "search" ? (
-          <GlobalSearchCenter
-            onClose={() => navigateToPanel("chat")}
-            onNavigate={handleGlobalSearchNavigate}
-          />
-        ) : viewMode === "plugins" ? (
+        {viewMode === "plugins" ? (
           <PluginMarket onClose={() => navigateToPanel("chat")} />
         ) : viewMode === "skills" ? (
           <SkillMarket onClose={() => navigateToPanel("chat")} />
@@ -594,11 +640,17 @@ const ChatAppShell = ({
                   suppressHydrationWarning
                   className="absolute left-1/2 top-1/2 max-w-[50%] -translate-x-1/2 -translate-y-1/2 truncate text-center font-bold text-foreground"
                 >
-                  {currentSession?.title || t("newChat")}
+                  {currentSession
+                    ? getSessionDisplayTitle(currentSession.title, t("newChat"))
+                    : t("newChat")}
                 </div>
               )}
 
-              <div className="flex items-center justify-end min-w-10">
+              <div className="flex min-w-10 items-center justify-end gap-1">
+                <SessionUsageSummary
+                  messages={messages}
+                  contextWindow={contextWindow}
+                />
                 {!isSidebarOpen && (
                   <Tooltip content={t("newChat")} position="left">
                     <button
@@ -642,6 +694,12 @@ const ChatAppShell = ({
                     isGenerating={isGenerating}
                     actionsDisabled={isActiveSessionLoading}
                     mutationsDisabled={
+                      isGenerating ||
+                      isActiveSessionLoading ||
+                      !isOnline ||
+                      hasForeignActiveGeneration
+                    }
+                    toolActionsDisabled={
                       isActiveSessionLoading ||
                       !isOnline ||
                       hasForeignActiveGeneration
@@ -668,6 +726,7 @@ const ChatAppShell = ({
                     onReply={selectReplyTarget}
                     onNavigateToMessage={focusMessage}
                     onVersionChange={handleTimelineVersionChange}
+                    onVersionSelect={handleTimelineVersionSelect}
                     onSuggestionClick={handleSuggestionClick}
                     onToolConfirmationDecision={onToolConfirmationDecision}
                     onRevokeToolSessionApproval={onRevokeToolSessionApproval}
@@ -720,6 +779,28 @@ const ChatAppShell = ({
                     </h1>
                   </div>
                 )}
+                {isModelBootstrapReady && availableModels.length === 0 && (
+                  <div
+                    role="status"
+                    className="mb-2 flex w-full flex-col gap-2 rounded-xl border border-border bg-card/95 px-3 py-2.5 text-left shadow-sm sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-foreground">
+                        {t("noModelsTitle")}
+                      </p>
+                      <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                        {t("noModelsDescription")}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => navigateToPanel("settings", "providers")}
+                      className="shrink-0 self-start rounded-lg bg-brand px-3 py-1.5 text-xs font-medium text-brand-foreground transition-colors hover:bg-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50 focus-visible:ring-offset-2 focus-visible:ring-offset-card sm:self-auto"
+                    >
+                      {t("configureProviders")}
+                    </button>
+                  </div>
+                )}
                 <MessageInput
                   ref={messageInputRef}
                   variant={messageInputVariant}
@@ -737,10 +818,10 @@ const ChatAppShell = ({
                   disabled={
                     isGenerating ||
                     isActiveSessionLoading ||
-                    !isOnline ||
                     hasForeignActiveGeneration ||
                     availableModels.length === 0
                   }
+                  offline={!isOnline}
                   availableModels={availableModels}
                   selectedModel={selectedModel}
                   onSelectModel={setModel}
@@ -755,6 +836,13 @@ const ChatAppShell = ({
           </>
         )}
       </main>
+      {viewMode === "search" && (
+        <GlobalSearchCenter
+          onClose={() => navigateToPanel("chat")}
+          returnFocusRef={searchReturnFocusRef}
+          onNavigate={handleGlobalSearchNavigate}
+        />
+      )}
     </div>
   );
 };

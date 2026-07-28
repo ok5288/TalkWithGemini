@@ -50,6 +50,7 @@ export async function createSearchProvider(
           provider,
           query,
           scope,
+          timeRange: search.timeRange,
           config: await buildSearchRuntimeConfig(provider, config, signal),
           maxResult,
         }),

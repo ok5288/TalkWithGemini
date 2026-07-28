@@ -231,7 +231,7 @@ describe("server default store injection", () => {
     });
 
     expect(useSettingsStore.getState().customModelMetadata).toMatchObject({
-      "server-new": {
+      [`${SERVER_DEFAULT_PROVIDER_ID}:server-new`]: {
         id: "server-new",
         name: "Server New",
         tool_call: true,
@@ -240,6 +240,34 @@ describe("server default store injection", () => {
         id: "user-edited",
         name: "User Edited Name",
         reasoning: false,
+      },
+    });
+  });
+
+  it("stores new custom model metadata under provider-qualified keys", async () => {
+    const { useSettingsStore } = await import("../store/core/settingsStore");
+
+    useSettingsStore.getState().setCustomModelMetadata("provider-a", "shared", {
+      id: "shared",
+      name: "Provider A Shared",
+      tool_call: true,
+    });
+    useSettingsStore.getState().setCustomModelMetadata("provider-b", "shared", {
+      id: "shared",
+      name: "Provider B Shared",
+      tool_call: false,
+    });
+
+    expect(useSettingsStore.getState().customModelMetadata).toMatchObject({
+      "provider-a:shared": {
+        id: "shared",
+        name: "Provider A Shared",
+        tool_call: true,
+      },
+      "provider-b:shared": {
+        id: "shared",
+        name: "Provider B Shared",
+        tool_call: false,
       },
     });
   });

@@ -6,7 +6,10 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import AssistantHeader from "@/components/assistant/AssistantHeader";
 import FollowUpQuestions from "@/components/chat/FollowUpQuestions";
 import MessageItem from "@/components/chat/MessageItem";
-import { getMessageBranchInfo } from "@/lib/chat/messageTree";
+import {
+  getMessageBranchInfo,
+  getMessageBranchOptions,
+} from "@/lib/chat/messageTree";
 import type { ModelInfo } from "@/services/api/chatService";
 import type {
   Message,
@@ -29,6 +32,7 @@ interface VirtualizedMessageTimelineProps {
   isGenerating: boolean;
   actionsDisabled: boolean;
   mutationsDisabled: boolean;
+  toolActionsDisabled: boolean;
   availableModels: ModelInfo[];
   onUpdateInstruction: (instruction: string) => void;
   onEdit: (id: string, content: string) => void;
@@ -40,6 +44,7 @@ interface VirtualizedMessageTimelineProps {
   onReply: (message: Message) => void;
   onNavigateToMessage: (messageId: string) => void;
   onVersionChange: (id: string, direction: "prev" | "next") => void;
+  onVersionSelect: (id: string, targetId: string) => void;
   onSuggestionClick: (question: string) => void;
   onToolConfirmationDecision: (
     toolCallId: string,
@@ -82,6 +87,7 @@ const VirtualizedMessageTimeline = React.forwardRef<
       isGenerating,
       actionsDisabled,
       mutationsDisabled,
+      toolActionsDisabled,
       availableModels,
       onUpdateInstruction,
       onEdit,
@@ -93,6 +99,7 @@ const VirtualizedMessageTimeline = React.forwardRef<
       onReply,
       onNavigateToMessage,
       onVersionChange,
+      onVersionSelect,
       onSuggestionClick,
       onToolConfirmationDecision,
       onRevokeToolSessionApproval,
@@ -250,7 +257,12 @@ const VirtualizedMessageTimeline = React.forwardRef<
                     message={row.message}
                     actionsDisabled={actionsDisabled}
                     mutationsDisabled={mutationsDisabled}
+                    toolActionsDisabled={toolActionsDisabled}
                     branchInfo={getMessageBranchInfo(
+                      activeMessageTree,
+                      row.message.id,
+                    )}
+                    branchOptions={getMessageBranchOptions(
                       activeMessageTree,
                       row.message.id,
                     )}
@@ -279,6 +291,9 @@ const VirtualizedMessageTimeline = React.forwardRef<
                     onReply={() => onReply(row.message)}
                     onNavigateToMessage={onNavigateToMessage}
                     onVersionChange={onVersionChange}
+                    onVersionSelect={(targetId) =>
+                      onVersionSelect(row.message.id, targetId)
+                    }
                     onToolConfirmationDecision={onToolConfirmationDecision}
                     onRevokeToolSessionApproval={onRevokeToolSessionApproval}
                   />

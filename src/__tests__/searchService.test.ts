@@ -114,6 +114,7 @@ describe("search service", () => {
         provider: "firecrawl",
         configs: { firecrawl: {} },
         resultsLimit: 7,
+        timeRange: "month",
       },
     });
     mocks.signedApiFetch.mockResolvedValue(
@@ -125,6 +126,9 @@ describe("search service", () => {
     await createSearchProvider({ query: "neo chat" });
 
     const request = mocks.signedApiFetch.mock.calls[0]?.[1] as RequestInit;
-    expect(JSON.parse(String(request.body))).toMatchObject({ maxResult: 7 });
+    expect(JSON.parse(String(request.body))).toMatchObject({
+      maxResult: 7,
+      timeRange: "month",
+    });
   });
 });

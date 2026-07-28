@@ -32,6 +32,7 @@ const DefaultModelSettings = () => {
             mId,
             modelMetadata,
             customModelMetadata,
+            p.id,
           );
           return {
             value: `${p.id}:${mId}`,

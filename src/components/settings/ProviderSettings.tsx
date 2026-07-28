@@ -49,7 +49,11 @@ import {
   encryptLocalSecret,
   LOCAL_SECRET_CONTEXTS,
 } from "@/lib/security/localSecrets";
-import { supportsImageGeneration, supportsModality } from "@/lib/utils/model";
+import {
+  resolveProviderModelMetadata,
+  supportsImageGeneration,
+  supportsModality,
+} from "@/lib/utils/model";
 
 type ProviderTypeOption = {
   value: ProviderType;
@@ -317,7 +321,13 @@ const ProviderSettings = () => {
       : currentProvider?.models || [];
 
   const renderModelCapabilities = (id: string) => {
-    const meta = customModelMetadata[id] || modelMetadata[id];
+    if (!currentProvider) return null;
+    const meta = resolveProviderModelMetadata({
+      providerId: currentProvider.id,
+      modelName: id,
+      modelMetadata,
+      customModelMetadata,
+    });
     if (!meta) return null;
 
     const capabilities = [];
@@ -410,8 +420,9 @@ const ProviderSettings = () => {
 
       {_hasHydrated && (
         <>
-          {editingModelId && (
+          {editingModelId && currentProvider && (
             <ModelEditor
+              providerId={currentProvider.id}
               modelId={editingModelId}
               onClose={() => setEditingModelId(null)}
             />
@@ -736,6 +747,7 @@ const ProviderSettings = () => {
                                 model,
                                 modelMetadata,
                                 customModelMetadata,
+                                currentProvider.id,
                               )}
                             </span>
                             {renderModelCapabilities(model)}
@@ -748,6 +760,7 @@ const ProviderSettings = () => {
                               model,
                               modelMetadata,
                               customModelMetadata,
+                              currentProvider.id,
                             ),
                           })}
                           onClick={(e) => {

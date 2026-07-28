@@ -72,6 +72,13 @@ import { withResolvedObjectUrl } from "@/lib/utils/objectUrlLifecycle";
 import { logDevError } from "@/lib/utils/devLogger";
 import { buildKnowledgeVectorItems } from "@/lib/utils/knowledgeVectors";
 import { createKnowledgeChunkingRevision } from "@/lib/knowledge/entities";
+import {
+  filterKnowledgeFiles,
+  getKnowledgeFileStatusFilter,
+  runKnowledgeFileBatch,
+  type KnowledgeFileBatchResult,
+  type KnowledgeFileStatusFilter,
+} from "@/lib/knowledge/fileProductivity";
 
 const formatBytes = (bytes: number, decimals = 2) => {
   if (!+bytes) return "0 Bytes";
@@ -110,6 +117,7 @@ const COLLECTION_COLORS = [
 ];
 
 type CopyStatus = "idle" | "copied" | "error";
+type KnowledgeBatchAction = "retry" | "reindex" | "download" | "delete";
 
 type CollectionModalData = {
   name: string;
@@ -900,6 +908,14 @@ const getIndexDisplayStatus = (
   return null;
 };
 
+const getOriginalKnowledgeFilePath = (
+  file: KnowledgeFile,
+): string | undefined =>
+  file.sourcePath ||
+  (file.contentKind === "source_text"
+    ? file.contentPath || file.path
+    : undefined);
+
 // --- File Row ---
 const FileRow: React.FC<{
   file: KnowledgeFile;
@@ -915,6 +931,9 @@ const FileRow: React.FC<{
   onDownloadOriginal?: () => void | Promise<void>;
   isReindexing?: boolean;
   isBusy?: boolean;
+  isSelected?: boolean;
+  onSelectedChange?: (selected: boolean) => void;
+  selectionDisabled?: boolean;
   readOnly?: boolean;
 }> = ({
   file,
@@ -930,6 +949,9 @@ const FileRow: React.FC<{
   onDownloadOriginal,
   isReindexing = false,
   isBusy = false,
+  isSelected = false,
+  onSelectedChange,
+  selectionDisabled = false,
   readOnly = false,
 }) => {
   const t = useTranslations("Knowledge");
@@ -990,17 +1012,29 @@ const FileRow: React.FC<{
     <div
       ref={rowRef}
       data-knowledge-file-id={file.id}
-      className={`group flex items-center justify-between gap-3 rounded-xl border p-3 transition-[background-color,border-color,box-shadow] ${
+      className={`group flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3 transition-[background-color,border-color,box-shadow] ${
         isHighlighted
           ? "border-purple-400 bg-purple-50 ring-2 ring-purple-500/30 dark:border-purple-700 dark:bg-purple-950/30"
-          : "border-transparent hover:border-gray-100 hover:bg-gray-50 dark:hover:border-border dark:hover:bg-muted/50"
+          : isSelected
+            ? "border-blue-200 bg-blue-50/60 dark:border-blue-900/60 dark:bg-blue-950/20"
+            : "border-transparent hover:border-gray-100 hover:bg-gray-50 dark:hover:border-border dark:hover:bg-muted/50"
       }`}
     >
+      {onSelectedChange ? (
+        <input
+          type="checkbox"
+          checked={isSelected}
+          disabled={selectionDisabled}
+          aria-label={t("selectFileAria", { name: file.name })}
+          onChange={(event) => onSelectedChange(event.target.checked)}
+          className="h-4 w-4 shrink-0 rounded border-gray-300 text-blue-600 focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:cursor-not-allowed disabled:opacity-50 dark:border-border dark:bg-muted"
+        />
+      ) : null}
       <button
         type="button"
         onClick={onClick}
         aria-label={t("openFileAria", { name: file.name })}
-        className="flex min-w-0 flex-1 items-center gap-3 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-background"
+        className="flex min-w-0 basis-64 flex-1 items-center gap-3 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-background"
       >
         <div className="w-9 h-9 rounded-lg bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 flex items-center justify-center shrink-0 text-blue-500 dark:text-blue-400">
           <FileIcon size={18} aria-hidden="true" />
@@ -1025,7 +1059,7 @@ const FileRow: React.FC<{
         </div>
       </button>
 
-      <div className="flex shrink-0 items-center gap-3">
+      <div className="ml-auto flex max-w-full flex-wrap items-center justify-end gap-1.5 sm:gap-2">
         <div className="flex max-w-44 items-center gap-1.5 rounded-md border border-gray-100 bg-gray-50 px-2 py-1 dark:border-border dark:bg-muted">
           <span
             className={`w-2 h-2 rounded-full ${storageStatusConfig.color} ${["uploading", "parsing"].includes(storageStatus) ? "animate-pulse" : ""}`}
@@ -1096,11 +1130,12 @@ const FileRow: React.FC<{
             <button
               type="button"
               aria-label={t("downloadOriginalAria", { name: file.name })}
+              disabled={isBusy}
               onClick={(event) => {
                 event.stopPropagation();
                 void onDownloadOriginal();
               }}
-              className="shrink-0 rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-blue-50 hover:text-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:hover:bg-blue-900/20"
+              className="shrink-0 rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-blue-50 hover:text-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-blue-900/20"
             >
               <Download size={16} aria-hidden="true" />
             </button>
@@ -1287,6 +1322,17 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
     null,
   );
   const [searchTerm, setSearchTerm] = useState("");
+  const [fileSearchTerm, setFileSearchTerm] = useState("");
+  const [fileStatusFilter, setFileStatusFilter] =
+    useState<KnowledgeFileStatusFilter>("all");
+  const [selectedFileIds, setSelectedFileIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [batchResults, setBatchResults] = useState<KnowledgeFileBatchResult[]>(
+    [],
+  );
+  const [isBatchRunning, setIsBatchRunning] = useState(false);
+  const [isBatchDeleteConfirming, setIsBatchDeleteConfirming] = useState(false);
   const [showNewModal, setShowNewModal] = useState(false);
   const [editingCollection, setEditingCollection] = useState<Collection | null>(
     null,
@@ -1319,6 +1365,8 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const fileContentInputRef = useRef<HTMLTextAreaElement>(null);
   const highlightedFileRef = useRef<HTMLDivElement | null>(null);
+  const selectVisibleFilesRef = useRef<HTMLInputElement | null>(null);
+  const batchDeleteConfirmRef = useRef<HTMLButtonElement | null>(null);
   const locatedTargetRef = useRef("");
   const openedTargetRef = useRef("");
   const fileViewerDialogRef = useRef<HTMLDivElement | null>(null);
@@ -1330,6 +1378,8 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
   const fileViewerTitleId = `${knowledgeId}-file-viewer-title`;
   const fileContentInputId = `${knowledgeId}-file-content`;
   const collectionSearchInputId = `${knowledgeId}-collection-search`;
+  const fileSearchInputId = `${knowledgeId}-file-search`;
+  const fileStatusFilterId = `${knowledgeId}-file-status-filter`;
   const uploadInputId = `${knowledgeId}-upload-input`;
   const uploadTitleId = `${knowledgeId}-upload-title`;
   const uploadDescriptionId = `${knowledgeId}-upload-description`;
@@ -1338,6 +1388,72 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
 
   const activeCollection = collections.find((c) => c.id === activeCollectionId);
   const viewingFileId = viewingFile?.id;
+  const filteredFiles = useMemo(
+    () =>
+      filterKnowledgeFiles(
+        activeCollection?.files || [],
+        fileSearchTerm,
+        fileStatusFilter,
+      ),
+    [activeCollection?.files, fileSearchTerm, fileStatusFilter],
+  );
+  const selectedFiles = useMemo(
+    () =>
+      (activeCollection?.files || []).filter((file) =>
+        selectedFileIds.has(file.id),
+      ),
+    [activeCollection?.files, selectedFileIds],
+  );
+  const allVisibleFilesSelected =
+    filteredFiles.length > 0 &&
+    filteredFiles.every((file) => selectedFileIds.has(file.id));
+  const someVisibleFilesSelected =
+    filteredFiles.some((file) => selectedFileIds.has(file.id)) &&
+    !allVisibleFilesSelected;
+  const canRetrySelected = selectedFiles.some(
+    (file) => getKnowledgeFileStatusFilter(file) === "error",
+  );
+  const canReindexSelected =
+    rag.enabled &&
+    selectedFiles.some((file) => Boolean(file.contentPath || file.path));
+  const canDownloadSelected = selectedFiles.some((file) =>
+    Boolean(getOriginalKnowledgeFilePath(file)),
+  );
+
+  useEffect(() => {
+    setFileSearchTerm("");
+    setFileStatusFilter("all");
+    setSelectedFileIds(new Set());
+    setBatchResults([]);
+    setIsBatchDeleteConfirming(false);
+  }, [activeCollectionId]);
+
+  useEffect(() => {
+    const fileIds = new Set(
+      activeCollection?.files.map((file) => file.id) || [],
+    );
+    setSelectedFileIds((current) => {
+      const next = new Set(
+        [...current].filter((fileId) => fileIds.has(fileId)),
+      );
+      return next.size === current.size ? current : next;
+    });
+  }, [activeCollection?.files]);
+
+  useEffect(() => {
+    if (selectVisibleFilesRef.current) {
+      selectVisibleFilesRef.current.indeterminate = someVisibleFilesSelected;
+    }
+  }, [someVisibleFilesSelected]);
+
+  useEffect(() => {
+    setIsBatchDeleteConfirming(false);
+  }, [selectedFileIds]);
+
+  useEffect(() => {
+    if (!isBatchDeleteConfirming) return;
+    batchDeleteConfirmRef.current?.focus({ preventScroll: true });
+  }, [isBatchDeleteConfirming]);
 
   useEffect(() => {
     const updateOnlineStatus = () => setIsOnline(navigator.onLine);
@@ -1700,28 +1816,118 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
     );
   };
 
-  const handleDownloadOriginal = async (file: KnowledgeFile) => {
-    const sourcePath =
-      file.sourcePath ||
-      (file.contentKind === "source_text"
-        ? file.contentPath || file.path
-        : undefined);
-    if (!sourcePath) return;
+  const downloadOriginalKnowledgeFile = async (file: KnowledgeFile) => {
+    const sourcePath = getOriginalKnowledgeFilePath(file);
+    if (!sourcePath) {
+      throw new Error(t("batchDownloadUnavailable"));
+    }
 
+    const downloaded = await withResolvedObjectUrl({
+      source: sourcePath,
+      resolveObjectUrl: resolveOPFSUrl,
+      read: async (objectUrl) => {
+        const anchor = document.createElement("a");
+        anchor.href = objectUrl;
+        anchor.download = file.name;
+        anchor.click();
+        return true;
+      },
+    });
+    if (!downloaded) {
+      throw new Error(t("downloadOriginalFailed"));
+    }
+  };
+
+  const handleDownloadOriginal = async (file: KnowledgeFile) => {
     try {
-      await withResolvedObjectUrl({
-        source: sourcePath,
-        resolveObjectUrl: resolveOPFSUrl,
-        read: async (objectUrl) => {
-          const anchor = document.createElement("a");
-          anchor.href = objectUrl;
-          anchor.download = file.name;
-          anchor.click();
-        },
-      });
+      await downloadOriginalKnowledgeFile(file);
     } catch (error) {
       logDevError("Failed to download original knowledge file", error);
       setUploadNotice(t("downloadOriginalFailed"));
+    }
+  };
+
+  const handleFileSelection = (fileId: string, selected: boolean) => {
+    setSelectedFileIds((current) => {
+      const next = new Set(current);
+      if (selected) {
+        next.add(fileId);
+      } else {
+        next.delete(fileId);
+      }
+      return next;
+    });
+  };
+
+  const handleSelectVisibleFiles = (selected: boolean) => {
+    setSelectedFileIds((current) => {
+      const next = new Set(current);
+      for (const file of filteredFiles) {
+        if (selected) {
+          next.add(file.id);
+        } else {
+          next.delete(file.id);
+        }
+      }
+      return next;
+    });
+  };
+
+  const handleBatchAction = async (action: KnowledgeBatchAction) => {
+    if (!activeCollection || selectedFiles.length === 0 || isBatchRunning) {
+      return;
+    }
+    if (!isOnline && action !== "download") return;
+
+    const collectionId = activeCollection.id;
+    const files = [...selectedFiles];
+    setIsBatchRunning(true);
+    setIsBatchDeleteConfirming(false);
+    setUploadNotice("");
+    setBatchResults([]);
+
+    try {
+      const results = await runKnowledgeFileBatch(
+        files,
+        async (file) => {
+          switch (action) {
+            case "retry":
+              if (getKnowledgeFileStatusFilter(file) !== "error") {
+                throw new Error(t("batchRetryUnavailable"));
+              }
+              await retryFile(collectionId, file.id);
+              return;
+            case "reindex":
+              if (!(file.contentPath || file.path)) {
+                throw new Error(t("batchReindexUnavailable"));
+              }
+              await reindexFile(collectionId, file.id);
+              return;
+            case "download":
+              await downloadOriginalKnowledgeFile(file);
+              return;
+            case "delete":
+              await deleteFile(collectionId, file.id);
+          }
+        },
+        setBatchResults,
+      );
+
+      setBatchResults(results);
+      if (action === "delete") {
+        const deletedIds = new Set(
+          results
+            .filter((result) => result.status === "succeeded")
+            .map((result) => result.fileId),
+        );
+        setSelectedFileIds((current) => {
+          const next = new Set(current);
+          deletedIds.forEach((fileId) => next.delete(fileId));
+          return next;
+        });
+      }
+    } finally {
+      setIsBatchRunning(false);
     }
   };
 
@@ -2155,95 +2361,369 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
 
                 {/* File List */}
                 <div className="bg-white dark:bg-card/50 border border-gray-200 dark:border-border rounded-xl overflow-hidden">
-                  <div className="flex items-center justify-between gap-3 border-b border-gray-100 bg-gray-50/80 p-4 backdrop-blur-sm dark:border-border dark:bg-muted/80">
-                    <h3 className="min-w-0 truncate text-sm font-bold text-gray-700 dark:text-foreground">
-                      {t("documentsHeading", {
-                        count: activeCollection.files.length,
-                      })}
-                    </h3>
+                  <div
+                    aria-busy={isBatchRunning || undefined}
+                    className="border-b border-gray-100 bg-gray-50/80 p-4 backdrop-blur-sm dark:border-border dark:bg-muted/80"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <h3 className="min-w-0 truncate text-sm font-bold text-gray-700 dark:text-foreground">
+                        {t("documentsHeading", {
+                          count: activeCollection.files.length,
+                        })}
+                      </h3>
+                      {(fileSearchTerm || fileStatusFilter !== "all") && (
+                        <span className="text-xs text-gray-500 dark:text-muted-foreground">
+                          {t("filteredDocumentsCount", {
+                            count: filteredFiles.length,
+                          })}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_11rem]">
+                      <div className="relative min-w-0">
+                        <label htmlFor={fileSearchInputId} className="sr-only">
+                          {t("searchFilesLabel")}
+                        </label>
+                        <Search
+                          size={15}
+                          aria-hidden="true"
+                          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                        />
+                        <input
+                          id={fileSearchInputId}
+                          type="search"
+                          name="knowledge-file-search"
+                          autoComplete="off"
+                          spellCheck={false}
+                          value={fileSearchTerm}
+                          onChange={(event) =>
+                            setFileSearchTerm(event.target.value)
+                          }
+                          placeholder={t("searchFilesPlaceholder")}
+                          className="h-9 w-full rounded-lg border border-gray-200 bg-white pl-9 pr-3 text-sm text-gray-800 outline-none transition-[border-color,box-shadow] placeholder:text-gray-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20 dark:border-border dark:bg-background dark:text-foreground"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor={fileStatusFilterId} className="sr-only">
+                          {t("fileStatusFilterLabel")}
+                        </label>
+                        <select
+                          id={fileStatusFilterId}
+                          value={fileStatusFilter}
+                          onChange={(event) =>
+                            setFileStatusFilter(
+                              event.target.value as KnowledgeFileStatusFilter,
+                            )
+                          }
+                          className="h-9 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none transition-[border-color,box-shadow] focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20 dark:border-border dark:bg-background dark:text-foreground"
+                        >
+                          <option value="all">{t("fileStatusAll")}</option>
+                          <option value="ready">{t("fileStatusReady")}</option>
+                          <option value="processing">
+                            {t("fileStatusProcessing")}
+                          </option>
+                          <option value="error">{t("fileStatusError")}</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {activeCollection.files.length > 0 && (
+                      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-gray-200/70 pt-3 dark:border-border">
+                        <label className="mr-auto inline-flex min-h-8 cursor-pointer items-center gap-2 rounded-lg px-2 text-xs font-medium text-gray-600 hover:bg-white focus-within:ring-2 focus-within:ring-blue-500/50 dark:text-muted-foreground dark:hover:bg-background">
+                          <input
+                            ref={selectVisibleFilesRef}
+                            type="checkbox"
+                            checked={allVisibleFilesSelected}
+                            disabled={
+                              filteredFiles.length === 0 || isBatchRunning
+                            }
+                            onChange={(event) =>
+                              handleSelectVisibleFiles(event.target.checked)
+                            }
+                            className="h-4 w-4 rounded border-gray-300 text-blue-600 disabled:cursor-not-allowed disabled:opacity-50 dark:border-border dark:bg-muted"
+                          />
+                          <span>
+                            {t("selectVisibleFiles", {
+                              count: filteredFiles.length,
+                            })}
+                          </span>
+                        </label>
+
+                        {selectedFiles.length > 0 && (
+                          <>
+                            <span
+                              role="status"
+                              className="w-full text-xs font-medium text-blue-700 dark:text-blue-300 sm:w-auto"
+                            >
+                              {t("selectedFilesCount", {
+                                count: selectedFiles.length,
+                              })}
+                            </span>
+                            {isBatchRunning && (
+                              <span
+                                role="status"
+                                aria-live="polite"
+                                className="text-xs text-gray-500 dark:text-muted-foreground"
+                              >
+                                {t("batchRunning")}
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              disabled={isBatchRunning}
+                              onClick={() => setSelectedFileIds(new Set())}
+                              className="inline-flex min-h-8 items-center gap-1 rounded-lg px-2 text-xs font-medium text-gray-500 transition-colors hover:bg-white hover:text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 disabled:cursor-not-allowed disabled:opacity-50 dark:text-muted-foreground dark:hover:bg-background dark:hover:text-foreground"
+                            >
+                              <X size={13} aria-hidden="true" />
+                              {t("clearSelection")}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={
+                                !isOnline || isBatchRunning || !canRetrySelected
+                              }
+                              onClick={() => void handleBatchAction("retry")}
+                              className="inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 text-xs font-medium text-gray-700 transition-colors hover:border-blue-200 hover:text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-border dark:bg-background dark:text-foreground"
+                            >
+                              <RotateCcw size={14} aria-hidden="true" />
+                              {t("batchRetry")}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={
+                                !isOnline ||
+                                isBatchRunning ||
+                                !canReindexSelected
+                              }
+                              onClick={() => void handleBatchAction("reindex")}
+                              className="inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 text-xs font-medium text-gray-700 transition-colors hover:border-blue-200 hover:text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-border dark:bg-background dark:text-foreground"
+                            >
+                              <RefreshCw size={14} aria-hidden="true" />
+                              {t("batchReindex")}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={isBatchRunning || !canDownloadSelected}
+                              onClick={() => void handleBatchAction("download")}
+                              className="inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 text-xs font-medium text-gray-700 transition-colors hover:border-blue-200 hover:text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-border dark:bg-background dark:text-foreground"
+                            >
+                              <Download size={14} aria-hidden="true" />
+                              {t("batchDownload")}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={!isOnline || isBatchRunning}
+                              onClick={() => setIsBatchDeleteConfirming(true)}
+                              className="inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-red-200 bg-white px-2.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-900/60 dark:bg-background dark:text-red-300 dark:hover:bg-red-950/30"
+                            >
+                              <Trash2 size={14} aria-hidden="true" />
+                              {t("batchDelete")}
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
+
+                    {isBatchDeleteConfirming && (
+                      <div
+                        role="alert"
+                        className="mt-3 flex flex-col gap-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-900 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-100 sm:flex-row sm:items-center"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="font-semibold">
+                            {t("confirmBatchDelete", {
+                              count: selectedFiles.length,
+                            })}
+                          </p>
+                          <p className="mt-0.5 text-xs text-red-700 dark:text-red-200/80">
+                            {t("confirmBatchDeleteDescription")}
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setIsBatchDeleteConfirming(false)}
+                            className="min-h-8 rounded-lg px-3 text-xs font-medium text-red-700 hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50 dark:text-red-200 dark:hover:bg-red-900/40"
+                          >
+                            {t("cancel")}
+                          </button>
+                          <button
+                            ref={batchDeleteConfirmRef}
+                            type="button"
+                            onClick={() => void handleBatchAction("delete")}
+                            className="min-h-8 rounded-lg bg-red-600 px-3 text-xs font-semibold text-white hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60 focus-visible:ring-offset-2 focus-visible:ring-offset-red-50 dark:focus-visible:ring-offset-red-950"
+                          >
+                            {t("confirmBatchDeleteAction")}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {batchResults.length > 0 && (
+                      <div
+                        role="status"
+                        aria-live="polite"
+                        className="mt-3 rounded-lg border border-gray-200 bg-white p-3 text-xs dark:border-border dark:bg-background"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="font-semibold text-gray-700 dark:text-foreground">
+                            {t("batchResultSummary", {
+                              success: batchResults.filter(
+                                (result) => result.status === "succeeded",
+                              ).length,
+                              failed: batchResults.filter(
+                                (result) => result.status === "failed",
+                              ).length,
+                            })}
+                          </p>
+                          <button
+                            type="button"
+                            aria-label={t("dismissBatchResults")}
+                            onClick={() => setBatchResults([])}
+                            className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 dark:hover:bg-muted dark:hover:text-foreground"
+                          >
+                            <X size={14} aria-hidden="true" />
+                          </button>
+                        </div>
+                        <ul className="mt-2 max-h-36 space-y-1 overflow-y-auto custom-scrollbar">
+                          {batchResults.map((result) => (
+                            <li
+                              key={result.fileId}
+                              className="flex items-start gap-2 rounded-md px-2 py-1.5 text-gray-600 dark:text-muted-foreground"
+                            >
+                              {result.status === "succeeded" ? (
+                                <Check
+                                  size={14}
+                                  aria-hidden="true"
+                                  className="mt-0.5 shrink-0 text-green-600 dark:text-green-400"
+                                />
+                              ) : (
+                                <AlertCircle
+                                  size={14}
+                                  aria-hidden="true"
+                                  className="mt-0.5 shrink-0 text-red-600 dark:text-red-400"
+                                />
+                              )}
+                              <span className="min-w-0">
+                                <span className="font-medium text-gray-700 dark:text-foreground">
+                                  {result.fileName}
+                                </span>
+                                <span className="ml-2">
+                                  {result.status === "succeeded"
+                                    ? t("batchSucceeded")
+                                    : result.error || t("fileActionFailed")}
+                                </span>
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
                   <div className="p-1">
                     {activeCollection.files.length > 0 ? (
-                      <div className="space-y-1">
-                        {activeCollection.files.map((file) => (
-                          <FileRow
-                            key={file.id}
-                            file={file}
-                            rowRef={
-                              highlightedFileId === file.id
-                                ? highlightedFileRef
-                                : undefined
-                            }
-                            isHighlighted={highlightedFileId === file.id}
-                            onClick={() => handleFileClick(file)}
-                            onDelete={() =>
-                              handleDeleteFile(activeCollection.id, file.id)
-                            }
-                            onReindex={
-                              file.contentPath || file.path
-                                ? () =>
-                                    handleReindexFile(activeCollection.id, file)
-                                : undefined
-                            }
-                            onCancel={
-                              file.storageStatus === "uploading" ||
-                              file.storageStatus === "parsing" ||
-                              file.status === "uploading" ||
-                              file.status === "parsing"
-                                ? () =>
-                                    handleKnowledgeFileAction(file, () =>
-                                      cancelUpload(
+                      filteredFiles.length > 0 ? (
+                        <div className="space-y-1">
+                          {filteredFiles.map((file) => (
+                            <FileRow
+                              key={file.id}
+                              file={file}
+                              rowRef={
+                                highlightedFileId === file.id
+                                  ? highlightedFileRef
+                                  : undefined
+                              }
+                              isHighlighted={highlightedFileId === file.id}
+                              onClick={() => handleFileClick(file)}
+                              onDelete={() =>
+                                handleDeleteFile(activeCollection.id, file.id)
+                              }
+                              onReindex={
+                                file.contentPath || file.path
+                                  ? () =>
+                                      handleReindexFile(
                                         activeCollection.id,
-                                        file.id,
-                                      ),
-                                    )
-                                : undefined
-                            }
-                            onRetry={
-                              file.storageStatus === "error" ||
-                              file.indexStatus === "error" ||
-                              file.status === "error"
-                                ? () =>
-                                    handleKnowledgeFileAction(
-                                      file,
-                                      () =>
-                                        retryFile(activeCollection.id, file.id),
-                                      t("retrySuccess", { name: file.name }),
-                                    )
-                                : undefined
-                            }
-                            onReparse={
-                              file.contentKind === "extracted_text" &&
-                              file.sourcePath &&
-                              !file.sourceMissing
-                                ? () =>
-                                    handleReparseFile(activeCollection.id, file)
-                                : undefined
-                            }
-                            onReplaceSource={
-                              file.contentKind === "extracted_text" &&
-                              (!file.sourcePath || file.sourceMissing)
-                                ? (replacement) =>
-                                    handleReparseFile(
-                                      activeCollection.id,
-                                      file,
-                                      replacement,
-                                    )
-                                : undefined
-                            }
-                            onDownloadOriginal={
-                              file.sourcePath ||
-                              (file.contentKind === "source_text" &&
-                                (file.contentPath || file.path))
-                                ? () => handleDownloadOriginal(file)
-                                : undefined
-                            }
-                            isReindexing={reindexingFileId === file.id}
-                            isBusy={busyFileId === file.id}
-                            readOnly={!isOnline}
-                          />
-                        ))}
-                      </div>
+                                        file,
+                                      )
+                                  : undefined
+                              }
+                              onCancel={
+                                file.storageStatus === "uploading" ||
+                                file.storageStatus === "parsing" ||
+                                file.status === "uploading" ||
+                                file.status === "parsing"
+                                  ? () =>
+                                      handleKnowledgeFileAction(file, () =>
+                                        cancelUpload(
+                                          activeCollection.id,
+                                          file.id,
+                                        ),
+                                      )
+                                  : undefined
+                              }
+                              onRetry={
+                                file.storageStatus === "error" ||
+                                file.indexStatus === "error" ||
+                                file.status === "error"
+                                  ? () =>
+                                      handleKnowledgeFileAction(
+                                        file,
+                                        () =>
+                                          retryFile(
+                                            activeCollection.id,
+                                            file.id,
+                                          ),
+                                        t("retrySuccess", { name: file.name }),
+                                      )
+                                  : undefined
+                              }
+                              onReparse={
+                                file.contentKind === "extracted_text" &&
+                                file.sourcePath &&
+                                !file.sourceMissing
+                                  ? () =>
+                                      handleReparseFile(
+                                        activeCollection.id,
+                                        file,
+                                      )
+                                  : undefined
+                              }
+                              onReplaceSource={
+                                file.contentKind === "extracted_text" &&
+                                (!file.sourcePath || file.sourceMissing)
+                                  ? (replacement) =>
+                                      handleReparseFile(
+                                        activeCollection.id,
+                                        file,
+                                        replacement,
+                                      )
+                                  : undefined
+                              }
+                              onDownloadOriginal={
+                                getOriginalKnowledgeFilePath(file)
+                                  ? () => handleDownloadOriginal(file)
+                                  : undefined
+                              }
+                              isReindexing={reindexingFileId === file.id}
+                              isBusy={isBatchRunning || busyFileId === file.id}
+                              isSelected={selectedFileIds.has(file.id)}
+                              onSelectedChange={(selected) =>
+                                handleFileSelection(file.id, selected)
+                              }
+                              selectionDisabled={isBatchRunning}
+                              readOnly={!isOnline || isBatchRunning}
+                            />
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="flex h-36 flex-col items-center justify-center gap-2 px-4 text-center text-gray-400">
+                          <Search size={22} aria-hidden="true" />
+                          <p className="text-sm font-medium">
+                            {t("noFilesMatch")}
+                          </p>
+                        </div>
+                      )
                     ) : (
                       <div className="flex flex-col items-center justify-center h-48 text-gray-400 gap-2">
                         <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-muted flex items-center justify-center">

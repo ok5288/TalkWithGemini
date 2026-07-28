@@ -32,6 +32,7 @@ import {
   resolveOPFSBlob,
   resolveOPFSUrl,
   saveToOPFS,
+  writeBlobToOPFS,
   writeToOPFS,
 } from "@/utils/opfs";
 import {
@@ -281,12 +282,58 @@ async function cleanupKnowledgeFileResources(
 ) {
   if (!file) return;
   const errors: unknown[] = [];
-
   const opfsUrls = new Set(
     [file.sourcePath, file.contentPath, file.path].filter(
       (url): url is string => Boolean(url),
     ),
   );
+  const stagedFiles: Array<{ originalUrl: string; stagedUrl: string }> = [];
+
+  const cleanupStagedFiles = async () => {
+    await Promise.allSettled(
+      stagedFiles.map(({ stagedUrl }) => deleteFromOPFS(stagedUrl)),
+    );
+  };
+
+  if (options.strict) {
+    try {
+      let index = 0;
+      for (const originalUrl of opfsUrls) {
+        const content = await resolveOPFSBlob(originalUrl);
+        if (!content) continue;
+        const stagedUrl = `opfs://knowledge-base/.trash/${uuidv7()}/${index}`;
+        await writeBlobToOPFS(stagedUrl, content);
+        stagedFiles.push({ originalUrl, stagedUrl });
+        index += 1;
+      }
+    } catch (error) {
+      await cleanupStagedFiles();
+      logDevWarn("Failed to stage OPFS knowledge files:", error);
+      throw new Error("Failed to stage knowledge file resources.");
+    }
+  }
+
+  if (file.ragId) {
+    try {
+      const chunkCount = file.ragChunkCount || 1_000;
+      const ids = buildKnowledgeVectorIds(file.ragId, chunkCount);
+      const deleted = await deleteFromRAG(ids, collectionId);
+      if (!deleted) {
+        throw new Error("Failed to delete RAG vectors.");
+      }
+    } catch (error) {
+      logDevWarn("Failed to delete RAG vectors:", error);
+      errors.push(error);
+    }
+  }
+
+  // A strict deletion keeps the local source recoverable until remote vector
+  // cleanup has succeeded. The user can safely retry without a ghost file.
+  if (options.strict && errors.length > 0) {
+    await cleanupStagedFiles();
+    throw new Error("Failed to clean up knowledge file resources.");
+  }
+
   for (const url of opfsUrls) {
     try {
       await deleteFromOPFS(url);
@@ -296,20 +343,23 @@ async function cleanupKnowledgeFileResources(
     }
   }
 
-  if (file.ragId) {
-    try {
-      const chunkCount = file.ragChunkCount || 1_000;
-      const ids = buildKnowledgeVectorIds(file.ragId, chunkCount);
-      await deleteFromRAG(ids, collectionId);
-    } catch (error) {
-      logDevWarn("Failed to delete RAG vectors:", error);
-      errors.push(error);
-    }
-  }
-
   if (options.strict && errors.length > 0) {
+    let rollbackFailed = false;
+    for (const { originalUrl, stagedUrl } of stagedFiles) {
+      try {
+        const content = await resolveOPFSBlob(stagedUrl);
+        if (!content) throw new Error("Staged OPFS file is unavailable.");
+        await writeBlobToOPFS(originalUrl, content);
+      } catch (error) {
+        rollbackFailed = true;
+        logDevWarn("Failed to restore staged OPFS knowledge file:", error);
+      }
+    }
+    if (!rollbackFailed) await cleanupStagedFiles();
     throw new Error("Failed to clean up knowledge file resources.");
   }
+
+  await cleanupStagedFiles();
 }
 
 async function cleanupKnowledgeFiles(

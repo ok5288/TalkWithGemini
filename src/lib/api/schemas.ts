@@ -483,6 +483,7 @@ export const SearchRequestSchema = z
     ]),
     query: z.string().min(1).max(4_000),
     scope: z.string().max(100).optional(),
+    timeRange: z.enum(["any", "day", "week", "month", "year"]).optional(),
     config: z
       .object({
         apiKey: z.unknown().optional(),

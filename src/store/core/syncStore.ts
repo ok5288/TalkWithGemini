@@ -41,6 +41,9 @@ export interface SyncStoreState extends PersistedSyncConfiguration {
   conflicts: SyncConflict[];
   requiresReload: boolean;
   activeController?: AbortController;
+  connectionController?: AbortController;
+  syncOperationGeneration: number;
+  connectionOperationGeneration: number;
   setHydrated: (hydrated: boolean) => void;
   setDeviceName: (name: string) => void;
   configureProvider: (
@@ -99,6 +102,8 @@ export const useSyncStore = create<SyncStoreState>()(
       devices: [],
       conflicts: [],
       requiresReload: false,
+      syncOperationGeneration: 0,
+      connectionOperationGeneration: 0,
       setHydrated: (hydrated) => set({ hydrated }),
       setDeviceName: (deviceName) =>
         set({ deviceName: deviceName.trim().slice(0, 120) || "This device" }),
@@ -121,14 +126,42 @@ export const useSyncStore = create<SyncStoreState>()(
         if (!provider || !credentialSecret) {
           throw new Error("Configure a sync provider first.");
         }
-        set({ status: "syncing", error: undefined });
+        get().connectionController?.abort();
+        const controller = new AbortController();
+        const operationGeneration = get().connectionOperationGeneration + 1;
+        set({
+          status: "syncing",
+          error: undefined,
+          connectionController: controller,
+          connectionOperationGeneration: operationGeneration,
+        });
         try {
           await (
             await createSyncRemoteClient(provider, credentialSecret)
-          ).test();
-          set({ status: "idle" });
+          ).test(controller.signal);
+          const latest = get();
+          if (
+            controller.signal.aborted ||
+            latest.connectionOperationGeneration !== operationGeneration ||
+            latest.connectionController !== controller
+          ) {
+            return;
+          }
+          set({ status: "idle", connectionController: undefined });
         } catch (error) {
-          set({ status: "error", error: errorMessage(error) });
+          const latest = get();
+          if (
+            controller.signal.aborted ||
+            latest.connectionOperationGeneration !== operationGeneration ||
+            latest.connectionController !== controller
+          ) {
+            return;
+          }
+          set({
+            status: "error",
+            error: errorMessage(error),
+            connectionController: undefined,
+          });
           throw error;
         }
       },
@@ -157,12 +190,18 @@ export const useSyncStore = create<SyncStoreState>()(
         });
       },
       disableSync: () => {
-        get().activeController?.abort();
-        set({
+        const { activeController, connectionController } = get();
+        activeController?.abort();
+        connectionController?.abort();
+        set((state) => ({
           enabled: false,
           status: "disabled",
           activeController: undefined,
-        });
+          connectionController: undefined,
+          syncOperationGeneration: state.syncOperationGeneration + 1,
+          connectionOperationGeneration:
+            state.connectionOperationGeneration + 1,
+        }));
       },
       createNewVault: async (recoveryCode) => {
         await get().initializeVault(recoveryCode);
@@ -182,10 +221,12 @@ export const useSyncStore = create<SyncStoreState>()(
         if (state.activeController) return;
 
         const controller = new AbortController();
+        const operationGeneration = state.syncOperationGeneration + 1;
         set({
           status: "syncing",
           error: undefined,
           activeController: controller,
+          syncOperationGeneration: operationGeneration,
         });
         try {
           const result = await runEncryptedSync(
@@ -195,6 +236,23 @@ export const useSyncStore = create<SyncStoreState>()(
             },
             controller.signal,
           );
+          const latest = get();
+          const isCurrentOperation =
+            latest.syncOperationGeneration === operationGeneration &&
+            latest.activeController === controller;
+          if (
+            !isCurrentOperation ||
+            !latest.enabled ||
+            controller.signal.aborted
+          ) {
+            if (isCurrentOperation) {
+              set({
+                status: latest.enabled ? "idle" : "disabled",
+                activeController: undefined,
+              });
+            }
+            return;
+          }
           const completedAt = new Date().toISOString();
           set({
             status: result.conflicts.length ? "conflict" : "up-to-date",
@@ -202,17 +260,27 @@ export const useSyncStore = create<SyncStoreState>()(
             lastSyncBytes: result.uploadedBytes + result.downloadedBytes,
             devices: result.devices,
             conflicts: result.conflicts,
-            requiresReload: state.requiresReload || result.changed,
+            requiresReload: latest.requiresReload || result.changed,
             activeController: undefined,
           });
           if (result.changed && typeof window !== "undefined") {
             window.dispatchEvent(new CustomEvent("neo-chat-sync-applied"));
           }
         } catch (error) {
+          const latest = get();
+          const isCurrentOperation =
+            latest.syncOperationGeneration === operationGeneration &&
+            latest.activeController === controller;
           if (controller.signal.aborted) {
-            set({ status: "idle", activeController: undefined });
+            if (isCurrentOperation) {
+              set({
+                status: latest.enabled ? "idle" : "disabled",
+                activeController: undefined,
+              });
+            }
             return;
           }
+          if (!isCurrentOperation || !latest.enabled) return;
           set({
             status: "error",
             error: errorMessage(error),

@@ -26,6 +26,8 @@ export interface ImageSource {
 export type SearchProviderID =
   "default" | "google" | "tavily" | "firecrawl" | "exa" | "bocha" | "searxng";
 
+export type SearchTimeRange = "any" | "day" | "week" | "month" | "year";
+
 export interface SearchServiceConfig {
   apiKey?: string;
   apiKeySecret?: LocalEncryptedSecretEnvelope;

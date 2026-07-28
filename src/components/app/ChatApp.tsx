@@ -95,6 +95,7 @@ import {
   shouldRunSettingsStartupEffects,
 } from "@/lib/app/startupEffects";
 import { buildSearchUpdate, mergeSources } from "@/lib/chat/searchUpdate";
+import { getSessionDisplayTitle } from "@/lib/chat/sessionTitle";
 import { createCitationSources } from "@/lib/utils/citations";
 import { resolveEffectiveSearchCapability } from "@/lib/settings/searchRag";
 import {
@@ -161,6 +162,7 @@ const ChatApp = () => {
       addMessageVersion,
       createEditedUserMessageBranch,
       switchMessageVersion,
+      selectMessageVersion,
       deleteMessage,
       deleteMessageAndSubsequent,
       setSuggestedQuestions,
@@ -2389,8 +2391,22 @@ const ChatApp = () => {
   };
 
   const handleVersionChange = (msgId: string, direction: "prev" | "next") => {
-    if (currentSessionId && !useChatStore.getState().isActiveSessionLoading) {
+    if (
+      currentSessionId &&
+      !isGenerating &&
+      !useChatStore.getState().isActiveSessionLoading
+    ) {
       switchMessageVersion(currentSessionId, msgId, direction);
+    }
+  };
+
+  const handleVersionSelect = (msgId: string, targetId: string) => {
+    if (
+      currentSessionId &&
+      !isGenerating &&
+      !useChatStore.getState().isActiveSessionLoading
+    ) {
+      selectMessageVersion(currentSessionId, msgId, targetId);
     }
   };
 
@@ -2443,7 +2459,11 @@ const ChatApp = () => {
   };
 
   const handleEditMessage = (msgId: string, newContent: string) => {
-    if (currentSessionId && !useChatStore.getState().isActiveSessionLoading) {
+    if (
+      currentSessionId &&
+      !isGenerating &&
+      !useChatStore.getState().isActiveSessionLoading
+    ) {
       updateMessageContent(currentSessionId, msgId, newContent);
       void syncActiveSessionWithNotice(
         currentSessionId,
@@ -2856,7 +2876,13 @@ const ChatApp = () => {
 
   const handleDeleteMessage = async (msgId: string) => {
     const sessionId = currentSessionId;
-    if (!sessionId || useChatStore.getState().isActiveSessionLoading) return;
+    if (
+      !sessionId ||
+      isGenerating ||
+      useChatStore.getState().isActiveSessionLoading
+    ) {
+      return;
+    }
 
     try {
       await deleteMessage(sessionId, msgId);
@@ -2897,7 +2923,15 @@ const ChatApp = () => {
 
     try {
       abortBackgroundPostProcessing();
-      await duplicateSession(sessionId);
+      const sourceSession = useChatStore
+        .getState()
+        .sessions.find((session) => session.id === sessionId);
+      const duplicateTitle = sourceSession
+        ? t("duplicateTitle", {
+            title: getSessionDisplayTitle(sourceSession.title, t("newChat")),
+          })
+        : undefined;
+      await duplicateSession(sessionId, duplicateTitle);
     } catch (error) {
       logChatAppError("Failed to duplicate session", error);
       showActionError(t("errDuplicateChat"));
@@ -2906,7 +2940,13 @@ const ChatApp = () => {
 
   const handleRetractMessage = async (msg: Message) => {
     const sessionId = currentSessionId;
-    if (!sessionId || useChatStore.getState().isActiveSessionLoading) return;
+    if (
+      !sessionId ||
+      isGenerating ||
+      useChatStore.getState().isActiveSessionLoading
+    ) {
+      return;
+    }
 
     try {
       await deleteMessageAndSubsequent(sessionId, msg.id);
@@ -2951,13 +2991,18 @@ const ChatApp = () => {
 
     if (msgs.length === 0) return;
 
-    const { generateChatTitle } = await loadChatService();
-    const newTitle = await generateChatTitle(msgs);
-    const currentSession = useChatStore
-      .getState()
-      .sessions.find((session) => session.id === sessionId);
-    if (shouldApplyRequestedTitle(currentSession, snapshot)) {
-      updateSessionTitle(sessionId, newTitle);
+    try {
+      const { generateChatTitle } = await loadChatService();
+      const newTitle = await generateChatTitle(msgs);
+      const currentSession = useChatStore
+        .getState()
+        .sessions.find((session) => session.id === sessionId);
+      if (shouldApplyRequestedTitle(currentSession, snapshot)) {
+        updateSessionTitle(sessionId, newTitle);
+      }
+    } catch (error) {
+      logChatAppError("Failed to generate a smart rename", error);
+      showActionError(t("errRenameChat"));
     }
   };
 
@@ -2994,6 +3039,7 @@ const ChatApp = () => {
         isGenerating={isGenerating}
         isActiveSessionLoading={isActiveSessionLoading}
         availableModels={availableModels}
+        isModelBootstrapReady={serverModelBootstrapReady}
         selectedModel={selectedModel}
         isSearchEnabled={chatConfig.useSearch}
         viewMode={viewMode}
@@ -3027,6 +3073,7 @@ const ChatApp = () => {
         handleRegenerate={handleRegenerate}
         handleContinueGeneration={handleContinueGeneration}
         handleVersionChange={handleVersionChange}
+        handleVersionSelect={handleVersionSelect}
         handleSendMessage={handleSendMessage}
         prepareComposerSkillParameters={() =>
           prepareComposerSkillParameters(currentSession, selectedModel)

@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   AlertTriangle,
   Check,
@@ -20,6 +26,10 @@ import type {
 } from "@/lib/sync/types";
 import { useSyncStore } from "@/store/core/syncStore";
 import SyncRecoveryQr from "@/components/sync/SyncRecoveryQr";
+import {
+  inspectLocalStorageHealth,
+  type LocalStorageHealthSnapshot,
+} from "@/lib/data/storageHealth";
 
 type ProviderKind = "webdav" | "s3";
 
@@ -75,6 +85,36 @@ const SyncSettings: React.FC = () => {
   const [copied, setCopied] = useState(false);
   const [localBusy, setLocalBusy] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
+  const [operationError, setOperationError] = useState<string>();
+  const [storageHealth, setStorageHealth] =
+    useState<LocalStorageHealthSnapshot>();
+  const [storageHealthLoading, setStorageHealthLoading] = useState(false);
+  const storageHealthRequestRef = useRef(0);
+
+  const refreshStorageHealth = useCallback(async () => {
+    const requestId = storageHealthRequestRef.current + 1;
+    storageHealthRequestRef.current = requestId;
+    setStorageHealthLoading(true);
+    try {
+      const snapshot = await inspectLocalStorageHealth();
+      if (storageHealthRequestRef.current !== requestId) return;
+      setStorageHealth(snapshot);
+    } catch {
+      if (storageHealthRequestRef.current !== requestId) return;
+      setStorageHealth({ quota: null, opfs: null });
+    } finally {
+      if (storageHealthRequestRef.current === requestId) {
+        setStorageHealthLoading(false);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshStorageHealth();
+    return () => {
+      storageHealthRequestRef.current += 1;
+    };
+  }, [refreshStorageHealth]);
 
   useEffect(() => {
     const updateOnlineState = () => setIsOnline(navigator.onLine);
@@ -116,15 +156,30 @@ const SyncSettings: React.FC = () => {
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
   }, [store.lastSyncBytes]);
+  const formatStorageBytes = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    if (bytes < 1024 * 1024 * 1024) {
+      return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+    }
+    return `${(bytes / 1024 / 1024 / 1024).toFixed(1)} GB`;
+  };
 
   const run = async (operation: () => Promise<void>) => {
     if (!navigator.onLine) {
       setIsOnline(false);
       return;
     }
+    setOperationError(undefined);
     setLocalBusy(true);
     try {
       await operation();
+    } catch (error) {
+      setOperationError(
+        error instanceof Error && error.message
+          ? error.message
+          : t("operationFailed"),
+      );
     } finally {
       setLocalBusy(false);
     }
@@ -187,6 +242,20 @@ const SyncSettings: React.FC = () => {
       setRecoveryInput("");
     });
 
+  const copyRecoveryCode = async () => {
+    setOperationError(undefined);
+    try {
+      await navigator.clipboard.writeText(pendingRecoveryCode);
+      setCopied(true);
+    } catch (error) {
+      setOperationError(
+        error instanceof Error && error.message
+          ? error.message
+          : t("operationFailed"),
+      );
+    }
+  };
+
   return (
     <div className="space-y-6">
       <header className="flex items-start gap-3">
@@ -244,7 +313,7 @@ const SyncSettings: React.FC = () => {
             {statusLabel}
           </span>
         </div>
-        {store.error ? (
+        {store.error || operationError ? (
           <div
             role="alert"
             className="mt-4 flex gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-400/30 dark:bg-red-400/10 dark:text-red-200"
@@ -254,7 +323,9 @@ const SyncSettings: React.FC = () => {
               className="mt-0.5 shrink-0"
               aria-hidden="true"
             />
-            <span className="min-w-0 break-words">{store.error}</span>
+            <span className="min-w-0 break-words">
+              {operationError || store.error}
+            </span>
           </div>
         ) : null}
         <div className="mt-4 flex flex-wrap gap-2">
@@ -289,6 +360,93 @@ const SyncSettings: React.FC = () => {
               {t("reload")}
             </button>
           ) : null}
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-border bg-card p-4 md:p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 className="font-semibold text-foreground">
+              {t("storageHealthTitle")}
+            </h3>
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
+              {t("storageHealthDescription")}
+            </p>
+          </div>
+          <button
+            type="button"
+            className={secondaryButton}
+            disabled={storageHealthLoading}
+            onClick={() => void refreshStorageHealth()}
+          >
+            <RefreshCw
+              size={16}
+              className={storageHealthLoading ? "animate-spin" : undefined}
+              aria-hidden="true"
+            />
+            {storageHealthLoading ? t("healthChecking") : t("refreshHealth")}
+          </button>
+        </div>
+
+        <dl className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-lg border border-border bg-muted/40 p-3">
+            <dt className="text-xs font-medium text-muted-foreground">
+              {t("storageUsage")}
+            </dt>
+            <dd className="mt-1 text-sm font-semibold text-foreground">
+              {storageHealth?.quota
+                ? t("storageUsageValue", {
+                    used: formatStorageBytes(storageHealth.quota.usage),
+                    quota: formatStorageBytes(storageHealth.quota.quota),
+                  })
+                : t("healthUnavailable")}
+            </dd>
+          </div>
+          {(
+            [
+              ["referencedFiles", storageHealth?.opfs?.referencedCount],
+              ["storedFiles", storageHealth?.opfs?.storedCount],
+              ["orphanFiles", storageHealth?.opfs?.orphanCount],
+              ["missingFiles", storageHealth?.opfs?.missingCount],
+            ] as const
+          ).map(([label, value]) => (
+            <div
+              key={label}
+              className="rounded-lg border border-border bg-muted/40 p-3"
+            >
+              <dt className="text-xs font-medium text-muted-foreground">
+                {t(label)}
+              </dt>
+              <dd className="mt-1 text-sm font-semibold text-foreground">
+                {value ?? t("healthUnavailable")}
+              </dd>
+            </div>
+          ))}
+        </dl>
+
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          <div className="rounded-lg border border-border p-3">
+            <p className="text-sm font-medium text-foreground">
+              {t("backupFreshness")}
+            </p>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              {t("backupFreshnessUnavailable")}
+            </p>
+            <a
+              className={`${secondaryButton} mt-3`}
+              href="?panel=settings&settingsTab=system"
+            >
+              {t("openBackupSettings")}
+            </a>
+          </div>
+          <div className="rounded-lg border border-border p-3">
+            <p className="text-sm font-medium text-foreground">
+              {t("deviceSecurity")}
+            </p>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              {t("deviceSecurityPlanned")}
+            </p>
+          </div>
         </div>
       </section>
 
@@ -503,11 +661,7 @@ const SyncSettings: React.FC = () => {
             <button
               type="button"
               className={secondaryButton}
-              onClick={() =>
-                void navigator.clipboard
-                  .writeText(pendingRecoveryCode)
-                  .then(() => setCopied(true))
-              }
+              onClick={() => void copyRecoveryCode()}
             >
               {copied ? (
                 <Check size={16} aria-hidden="true" />

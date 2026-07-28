@@ -4,6 +4,7 @@ import {
   ModelMetadata,
   SearchProviderID,
   SearchServiceConfig,
+  SearchTimeRange,
   Plugin,
   PluginConfig,
   LobeAgent,
@@ -18,7 +19,10 @@ import {
 } from "@/types";
 import { BUILT_IN_PLUGINS, UNSPLASH_PLUGIN } from "@/config/plugins";
 import { DEFAULT_SYSTEM_SETTINGS } from "@/config/defaults";
-import { PublicServerConfig } from "@/lib/defaultConfig/shared";
+import {
+  PublicServerConfig,
+  SERVER_DEFAULT_PROVIDER_ID,
+} from "@/lib/defaultConfig/shared";
 import {
   STORAGE_KEYS,
   STORAGE_VERSION,
@@ -49,6 +53,10 @@ import {
   normalizeSearchSettings,
 } from "@/lib/settings/searchRag";
 import { getDefaultModelSelectValue } from "@/lib/utils/defaultModels";
+import {
+  getProviderModelMetadataKey,
+  resolveProviderModelMetadata,
+} from "@/lib/utils/model";
 import { readJsonResponseOrThrow } from "@/lib/api/client";
 import {
   isPluginAuthRequired,
@@ -128,13 +136,18 @@ interface SettingsState {
   modelMetadata: Record<string, ModelMetadata>;
   modelMetadataTimestamp: number;
   customModelMetadata: Record<string, ModelMetadata>;
-  setCustomModelMetadata: (id: string, meta: ModelMetadata) => void;
+  setCustomModelMetadata: (
+    providerId: string,
+    id: string,
+    meta: ModelMetadata,
+  ) => void;
   fetchModelMetadata: (forceRefresh?: boolean) => Promise<void>;
 
   // Search Settings
   search: {
     provider: SearchProviderID;
     resultsLimit: number;
+    timeRange: SearchTimeRange;
     configs: Record<string, SearchServiceConfig>;
   };
   setSearchProvider: (provider: SearchProviderID) => void;
@@ -143,6 +156,7 @@ interface SettingsState {
     config: Partial<SearchServiceConfig>,
   ) => void;
   setSearchResultsLimit: (limit: number) => void;
+  setSearchTimeRange: (timeRange: SearchTimeRange) => void;
 
   // RAG Settings
   rag: RAGConfig;
@@ -410,8 +424,15 @@ export const useSettingsStore = create<SettingsState>()(
           );
           const nextCustomModelMetadata = { ...state.customModelMetadata };
           for (const [id, metadata] of Object.entries(serverModelMetadata)) {
-            if (!nextCustomModelMetadata[id]) {
-              nextCustomModelMetadata[id] = metadata;
+            const qualifiedKey = getProviderModelMetadataKey(
+              SERVER_DEFAULT_PROVIDER_ID,
+              id,
+            );
+            if (
+              !nextCustomModelMetadata[qualifiedKey] &&
+              !nextCustomModelMetadata[id]
+            ) {
+              nextCustomModelMetadata[qualifiedKey] = metadata;
             }
           }
 
@@ -579,7 +600,7 @@ export const useSettingsStore = create<SettingsState>()(
       modelMetadata: {},
       modelMetadataTimestamp: 0,
       customModelMetadata: {},
-      setCustomModelMetadata: (id, meta) =>
+      setCustomModelMetadata: (providerId, id, meta) =>
         set((state) => {
           const metadata = normalizeModelMetadata(meta, id);
           if (!metadata) return state;
@@ -587,7 +608,7 @@ export const useSettingsStore = create<SettingsState>()(
           return {
             customModelMetadata: {
               ...state.customModelMetadata,
-              [metadata.id]: metadata,
+              [getProviderModelMetadataKey(providerId, metadata.id)]: metadata,
             },
           };
         }),
@@ -626,6 +647,7 @@ export const useSettingsStore = create<SettingsState>()(
       search: {
         provider: "firecrawl",
         resultsLimit: 5,
+        timeRange: "any",
         configs: {
           tavily: { apiKey: "" },
           firecrawl: { apiKey: "" },
@@ -664,6 +686,13 @@ export const useSettingsStore = create<SettingsState>()(
           search: normalizeSearchSettings({
             ...state.search,
             resultsLimit: limit,
+          }),
+        })),
+      setSearchTimeRange: (timeRange) =>
+        set((state) => ({
+          search: normalizeSearchSettings({
+            ...state.search,
+            timeRange,
           }),
         })),
 
@@ -1351,6 +1380,7 @@ export const useSettingsStore = create<SettingsState>()(
           modelMetadataTimestamp: state.modelMetadataTimestamp || 0,
           customModelMetadata: normalizeModelMetadataMap(
             state.customModelMetadata,
+            { preserveKeys: true },
           ),
           search,
           rag,
@@ -1466,11 +1496,17 @@ export const formatModelName = (
   id: string,
   metadata?: Record<string, ModelMetadata>,
   customMetadata?: Record<string, ModelMetadata>,
+  providerId?: string,
 ): string => {
   if (!id) return "";
 
   // Priority: custom metadata > fetched metadata > fallback formatting
-  const name = customMetadata?.[id]?.name || metadata?.[id]?.name;
+  const name = resolveProviderModelMetadata({
+    providerId,
+    modelName: id,
+    modelMetadata: metadata || {},
+    customModelMetadata: customMetadata || {},
+  })?.name;
   if (name) return name;
 
   // Fallback: format the ID

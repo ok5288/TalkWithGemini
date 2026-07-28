@@ -17,7 +17,7 @@ import {
   getKnowledgeAttachmentSelectionKey,
   isKnowledgeFileAttachment,
 } from "../utils/knowledgeAttachments";
-import { parseModelString } from "../utils/model";
+import { parseModelString, resolveProviderModelMetadata } from "../utils/model";
 import { resolveOPFSUrl } from "@/utils/opfs";
 import { appendContextToChatInput } from "../utils/chatInput";
 
@@ -97,8 +97,13 @@ export async function processMessageForSending(
   }
 
   // Check model capability
-  const { modelName: modelId } = parseModelString(selectedModel);
-  const meta = customModelMetadata[modelId] || modelMetadata[modelId];
+  const { providerId, modelName } = parseModelString(selectedModel);
+  const meta = resolveProviderModelMetadata({
+    providerId,
+    modelName,
+    modelMetadata,
+    customModelMetadata,
+  });
   const supportAttachment = meta ? (meta.attachment ?? false) : true;
 
   // Process RAG attachments

@@ -222,9 +222,12 @@ describe("service worker cache boundary", () => {
 
     expect(shell).toContain("actionsDisabled={isActiveSessionLoading}");
     expect(shell).toContain("mutationsDisabled={");
+    expect(shell).toContain("toolActionsDisabled={");
+    expect(shell).toContain("!isOnline");
     expect(message).toContain("mutationActionsDisabled");
+    expect(message).toContain("confirmationActionsDisabled");
     expect(message).toContain(
-      "mutationActionsDisabled\n                        ? undefined\n                        : onToolConfirmationDecision",
+      "confirmationActionsDisabled\n                        ? undefined\n                        : onToolConfirmationDecision",
     );
     expect(knowledge).toContain("readOnly={!isOnline}");
     expect(knowledge).toContain('t("offlineReadOnly")');

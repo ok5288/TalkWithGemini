@@ -238,6 +238,31 @@ test("loads the local chat shell", async ({ page }) => {
   await expect(page.locator('textarea[name="message"]')).toBeVisible();
 });
 
+test("keeps an offline draft editable until connectivity returns", async ({
+  page,
+  context,
+}) => {
+  await page.goto("/");
+  const composer = page.locator('textarea[name="message"]');
+  await expect(composer).toBeVisible();
+  await page.waitForLoadState("networkidle");
+
+  await context.setOffline(true);
+  await expect(page.getByText(/Offline draft/)).toBeVisible();
+  await composer.fill("locally retained draft");
+  await expect(composer).toHaveValue("locally retained draft");
+  await expect(
+    page.getByRole("button", { name: "Send message" }),
+  ).toBeDisabled();
+
+  await context.setOffline(false);
+  await expect(page.getByText(/Offline draft/)).toHaveCount(0);
+  await expect(composer).toHaveValue("locally retained draft");
+  await expect(
+    page.getByRole("button", { name: "Send message" }),
+  ).toBeEnabled();
+});
+
 test("uses expanded desktop and collapsed pad sidebar defaults", async ({
   page,
 }) => {
@@ -379,6 +404,7 @@ test("gates Agent mode by tool support and isolates it per chat", async ({
   });
   await legacySession.click();
   await expect(legacySession).toHaveAttribute("aria-current", "page");
+  await expect(page.locator('[aria-current="page"]')).toHaveCount(1);
   await expect(
     page.getByRole("button", { name: "Enable Agent Mode" }),
   ).toHaveAttribute("aria-pressed", "false");
@@ -389,6 +415,7 @@ test("gates Agent mode by tool support and isolates it per chat", async ({
   });
   await enabledSession.click();
   await expect(enabledSession).toHaveAttribute("aria-current", "page");
+  await expect(page.locator('[aria-current="page"]')).toHaveCount(1);
   await expect(
     page.getByRole("button", { name: "Disable Agent Mode" }),
   ).toHaveAttribute("aria-pressed", "true");
@@ -961,9 +988,14 @@ test("applies stable gutters to the primary app scroll regions", async ({
     "/?panel=settings&settingsTab=system",
   ]) {
     await page.goto(path);
-    const scrollers = page.locator(
-      'main [class~="overflow-y-auto"], main [class~="overflow-auto"]',
-    );
+    const scrollers =
+      path === "/?panel=search"
+        ? page.locator(
+            '[role="dialog"] [class~="overflow-y-auto"], [role="dialog"] [class~="overflow-auto"]',
+          )
+        : page.locator(
+            'main [class~="overflow-y-auto"], main [class~="overflow-auto"]',
+          );
     await expect(scrollers.first()).toBeVisible();
     expect(
       await scrollers.evaluateAll((elements) =>
@@ -1009,7 +1041,9 @@ test("keeps centered content fixed while vertical overflow changes", async ({
   await expect(page.locator("#global-search-title")).toBeVisible();
   await page.waitForTimeout(400);
 
-  const searchScroller = page.locator('main [class~="scrollbar-gutter-both"]');
+  const searchScroller = page.locator(
+    '[role="dialog"] [class~="scrollbar-gutter-both"]',
+  );
   await expect(searchScroller).toBeVisible();
 
   const measurements = await searchScroller.evaluate(async (scroller) => {
@@ -1070,7 +1104,11 @@ test("avoids page-level horizontal overflow on mobile panels", async ({
     "/?panel=settings&settingsTab=system",
   ]) {
     await page.goto(path);
-    await expect(page.getByRole("main")).toBeVisible();
+    if (path === "/?panel=search") {
+      await expect(page.getByRole("dialog")).toBeVisible();
+    } else {
+      await expect(page.getByRole("main")).toBeVisible();
+    }
     await expectNoPageHorizontalOverflow(page);
   }
 
@@ -1360,13 +1398,109 @@ test("opens and closes the global search center with the keyboard", async ({
 }) => {
   await page.goto("/");
 
+  const searchLauncher = page.getByRole("button", { name: "Open search" });
+  await searchLauncher.focus();
+  await expect(searchLauncher).toBeFocused();
   await openSearchWithKeyboard(page);
-  await expect(page.locator("#global-search-title")).toBeVisible();
+  const searchDialog = page.getByRole("dialog", { name: "Search" });
+  const searchInput = page.locator(
+    'input[aria-controls="global-search-results"]',
+  );
+  await expect(searchDialog).toBeVisible();
+  await expect(searchDialog).toHaveAttribute("aria-modal", "true");
+  await expect(searchInput).toBeFocused();
+  await expect(page.locator("[data-chat-app-shell]")).toHaveAttribute(
+    "inert",
+    "",
+  );
+  await expect(page.locator('textarea[name="message"]')).toHaveCount(1);
   await expect(page).toHaveURL(/(?:\?|&)panel=search(?:&|$)/);
 
   await page.keyboard.press("Escape");
   await expect(page.locator('textarea[name="message"]')).toBeVisible();
   await expect(page).not.toHaveURL(/(?:\?|&)panel=search(?:&|$)/);
+  await expect(searchLauncher).toBeFocused();
+});
+
+test("navigates settings search results from the keyboard", async ({
+  page,
+}) => {
+  await page.goto("/?panel=settings&settingsTab=system");
+
+  const settingsSearch = page.getByRole("combobox", {
+    name: "Search settings",
+  });
+  await settingsSearch.fill("webdav");
+  await expect(
+    page.getByRole("option", { name: /Encrypted Sync/ }),
+  ).toHaveAttribute("aria-selected", "true");
+  await settingsSearch.press("Enter");
+
+  await expect(page).toHaveURL(/settingsTab=sync/);
+  await expect(page.getByRole("tabpanel")).toHaveAttribute(
+    "aria-labelledby",
+    "settings-tab-sync",
+  );
+});
+
+test("renders the new workstation controls in all supported locales", async ({
+  page,
+  context,
+}) => {
+  for (const [locale, searchLabel] of [
+    ["en", "Search settings"],
+    ["zh", "搜索设置"],
+    ["ja", "設定を検索"],
+  ] as const) {
+    await context.addCookies([
+      {
+        name: "NEXT_LOCALE",
+        value: locale,
+        url: "http://127.0.0.1:3100",
+      },
+    ]);
+    await page.goto("/?panel=settings&settingsTab=system");
+    await expect(page.locator("html")).toHaveAttribute("lang", locale);
+    await expect(
+      page.getByRole("combobox", { name: searchLabel }),
+    ).toBeVisible();
+  }
+});
+
+test("guides a first-run user without models to Provider settings", async ({
+  page,
+}) => {
+  await page.route("**/api/config", async (route) => {
+    const response = await route.fetch();
+    const config = (await response.json()) as {
+      modelProvider: {
+        available: boolean;
+        models: string[];
+        modelMetadata: Record<string, unknown>;
+        defaultModels: Record<string, unknown>;
+      };
+    };
+    config.modelProvider = {
+      ...config.modelProvider,
+      available: false,
+      models: [],
+      modelMetadata: {},
+      defaultModels: {},
+    };
+    await route.fulfill({ response, json: config });
+  });
+  await page.goto("/");
+
+  const providerSettings = page.getByRole("button", {
+    name: "Provider settings",
+  });
+  await expect(providerSettings).toBeVisible();
+  await expect(page.locator('textarea[name="message"]')).toBeDisabled();
+
+  await providerSettings.click();
+  await expect(page).toHaveURL(
+    /(?:\?|&)panel=settings(?:&|$).*settingsTab=providers/,
+  );
 });
 
 test("opens global search from the sidebar and exposes compact controls", async ({
