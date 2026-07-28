@@ -220,6 +220,11 @@ export const useCoreSettingsStore = create<CoreSettingsState>()(
 
       applyServerConfig: (config) =>
         set((state) => {
+          const savedDefaultProvider = state.providers.find(
+            (provider) =>
+              provider.id === SERVER_DEFAULT_PROVIDER_ID ||
+              provider.isServerDefault,
+          );
           const userProviders = state.providers.filter(
             (provider) => !provider.isServerDefault,
           );
@@ -241,6 +246,7 @@ export const useCoreSettingsStore = create<CoreSettingsState>()(
             type: config.modelProvider.type,
             baseUrl: "default",
             apiKey: "",
+            apiKeySecret: savedDefaultProvider?.apiKeySecret,
             enabled: true,
             models: providerModels,
             modelsList: providerModels,
@@ -303,9 +309,7 @@ export const useCoreSettingsStore = create<CoreSettingsState>()(
       partialize: (state) => ({
         theme: state.theme,
         language: state.language,
-        providers: state.providers
-          .filter((provider) => !provider.isServerDefault)
-          .map(stripProviderPlainSecret),
+        providers: state.providers.map(stripProviderPlainSecret),
         defaultModels: state.defaultModels,
       }),
       onRehydrateStorage: () => {

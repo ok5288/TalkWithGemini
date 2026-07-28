@@ -113,6 +113,8 @@ const ProviderSettings = () => {
   );
   const [editingModelId, setEditingModelId] = useState<string | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [baseUrlDraft, setBaseUrlDraft] = useState("");
+  const [baseUrlError, setBaseUrlError] = useState<string | null>(null);
   const [deleteConfirmProviderId, setDeleteConfirmProviderId] = useState<
     string | null
   >(null);
@@ -187,11 +189,35 @@ const ProviderSettings = () => {
   useEffect(() => {
     selectedProviderIdRef.current = selectedProviderId;
     setFetchError(null);
+    const selectedProvider = providers.find(
+      (provider) => provider.id === selectedProviderId,
+    );
+    setBaseUrlDraft(selectedProvider?.baseUrl || "");
+    setBaseUrlError(null);
     fetchAbortRef.current?.abort();
     fetchAbortRef.current = null;
     setFetchingProviderId(null);
     clearDeleteConfirmation();
-  }, [selectedProviderId]);
+  }, [providers, selectedProviderId]);
+
+  const handleBaseUrlBlur = () => {
+    if (!currentProvider) return;
+
+    const value = baseUrlDraft.trim();
+    if (!value) {
+      setBaseUrlError(null);
+      updateProvider(currentProvider.id, { baseUrl: "" });
+      return;
+    }
+
+    try {
+      getEffectiveBaseUrl(value, currentProvider.type);
+      setBaseUrlError(null);
+      updateProvider(currentProvider.id, { baseUrl: value });
+    } catch {
+      setBaseUrlError(t("invalidBaseUrl"));
+    }
+  };
 
   useEffect(() => {
     return () => {
@@ -529,14 +555,20 @@ const ProviderSettings = () => {
                       name="providerBaseUrl"
                       type="url"
                       inputMode="url"
-                      value={currentProvider.baseUrl}
+                      value={baseUrlDraft}
                       maxLength={PROVIDER_CONFIG_LIMITS.maxBaseUrlChars}
                       autoComplete="off"
                       spellCheck={false}
-                      onChange={(e) =>
-                        updateProvider(currentProvider.id, {
-                          baseUrl: e.target.value,
-                        })
+                      onChange={(e) => {
+                        setBaseUrlDraft(e.target.value);
+                        setBaseUrlError(null);
+                      }}
+                      onBlur={handleBaseUrlBlur}
+                      aria-invalid={Boolean(baseUrlError)}
+                      aria-describedby={
+                        baseUrlError
+                          ? `${providerBaseUrlInputId}-error`
+                          : undefined
                       }
                       placeholder={getProviderBaseUrlPlaceholder(
                         currentProvider.type,
@@ -544,7 +576,15 @@ const ProviderSettings = () => {
                       )}
                       className="w-full px-3 py-2 bg-gray-50 dark:bg-muted border border-gray-200 dark:border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:focus:border-blue-400 transition-[border-color,box-shadow] font-mono text-gray-600 dark:text-foreground/85"
                     />
-                    {currentProvider.baseUrl ? (
+                    {baseUrlError ? (
+                      <p
+                        id={`${providerBaseUrlInputId}-error`}
+                        className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400"
+                      >
+                        <AlertCircle size={12} aria-hidden="true" />
+                        {baseUrlError}
+                      </p>
+                    ) : currentProvider.baseUrl ? (
                       <div className="text-[11px] text-gray-400 font-mono pl-1 flex items-start gap-1">
                         <span className="break-all text-gray-500 dark:text-muted-foreground">
                           {t("preview")}{" "}
@@ -557,60 +597,57 @@ const ProviderSettings = () => {
                     ) : null}
                   </div>
                 )}
-                {!isServerDefaultProvider && (
-                  <div className="col-span-1 md:col-span-2 space-y-2">
-                    <label
-                      htmlFor={providerApiKeyInputId}
-                      className="text-sm font-medium text-gray-700 dark:text-foreground/85 flex items-center justify-between gap-2"
-                    >
-                      {t("apiKey")}
-                      {providerApiKeyHelpUrl ? (
-                        <a
-                          href={providerApiKeyHelpUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs text-blue-500 hover:underline flex items-center gap-1"
-                        >
-                          {t("getKey")}{" "}
-                          <ExternalLink size={10} aria-hidden="true" />
-                        </a>
-                      ) : null}
-                    </label>
-                    <div className="relative">
-                      <SecretInput
-                        id={providerApiKeyInputId}
-                        name="providerApiKey"
-                        maxLength={PROVIDER_CONFIG_LIMITS.maxApiKeyChars}
-                        placeholder={t("apiKeyPlaceholder")}
-                        hasSecret={Boolean(
-                          currentProvider.apiKey ||
-                          currentProvider.apiKeySecret,
-                        )}
-                        onSave={async (value) =>
-                          updateProvider(currentProvider.id, {
-                            apiKey: "",
-                            apiKeySecret: await encryptLocalSecret(
-                              value,
-                              LOCAL_SECRET_CONTEXTS.providerApiKey(
-                                currentProvider.id,
-                              ),
+                <div className="col-span-1 md:col-span-2 space-y-2">
+                  <label
+                    htmlFor={providerApiKeyInputId}
+                    className="text-sm font-medium text-gray-700 dark:text-foreground/85 flex items-center justify-between gap-2"
+                  >
+                    {t("apiKey")}
+                    {providerApiKeyHelpUrl ? (
+                      <a
+                        href={providerApiKeyHelpUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-blue-500 hover:underline flex items-center gap-1"
+                      >
+                        {t("getKey")}{" "}
+                        <ExternalLink size={10} aria-hidden="true" />
+                      </a>
+                    ) : null}
+                  </label>
+                  <div className="relative">
+                    <SecretInput
+                      id={providerApiKeyInputId}
+                      name="providerApiKey"
+                      maxLength={PROVIDER_CONFIG_LIMITS.maxApiKeyChars}
+                      placeholder={t("apiKeyPlaceholder")}
+                      hasSecret={Boolean(
+                        currentProvider.apiKey || currentProvider.apiKeySecret,
+                      )}
+                      onSave={async (value) =>
+                        updateProvider(currentProvider.id, {
+                          apiKey: "",
+                          apiKeySecret: await encryptLocalSecret(
+                            value,
+                            LOCAL_SECRET_CONTEXTS.providerApiKey(
+                              currentProvider.id,
                             ),
-                          })
-                        }
-                        onClear={() =>
-                          updateProvider(currentProvider.id, {
-                            apiKey: "",
-                            apiKeySecret: undefined,
-                          })
-                        }
-                        inputClassName="min-w-0 flex-1 px-3 py-2 bg-gray-50 dark:bg-muted border border-gray-200 dark:border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:focus:border-blue-400 transition-[border-color,box-shadow] font-mono text-gray-800 dark:text-foreground"
-                      />
-                    </div>
-                    <p className="text-xs text-gray-400">
-                      {t("keyStoredLocally")}
-                    </p>
+                          ),
+                        })
+                      }
+                      onClear={() =>
+                        updateProvider(currentProvider.id, {
+                          apiKey: "",
+                          apiKeySecret: undefined,
+                        })
+                      }
+                      inputClassName="min-w-0 flex-1 px-3 py-2 bg-gray-50 dark:bg-muted border border-gray-200 dark:border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:focus:border-blue-400 transition-[border-color,box-shadow] font-mono text-gray-800 dark:text-foreground"
+                    />
                   </div>
-                )}
+                  <p className="text-xs text-gray-400">
+                    {t("keyStoredLocally")}
+                  </p>
+                </div>
                 {isServerDefaultProvider && (
                   <div className="col-span-1 md:col-span-2 rounded-xl border border-blue-100 bg-blue-50/70 px-4 py-3 text-xs text-blue-700 dark:border-blue-900/40 dark:bg-blue-900/10 dark:text-blue-200">
                     {t("serverDefaultProviderDesc")}
