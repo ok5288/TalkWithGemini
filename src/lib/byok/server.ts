@@ -200,8 +200,12 @@ export async function resolveProviderRuntimeConfig(
 ): Promise<ProviderRuntimeConfig> {
   if (provider.source === "server-default") {
     const defaultProvider = getDefaultProviderRuntimeConfig();
-    if (!defaultProvider) return provider;
-    return defaultProvider;
+    const apiKey = await decryptOptionalSecret(
+      provider.apiKeySecret,
+      getProviderSecretContext(provider),
+    );
+    if (!defaultProvider) return apiKey ? { ...provider, apiKey } : provider;
+    return apiKey ? { ...defaultProvider, apiKey } : defaultProvider;
   }
 
   const apiKey = await decryptOptionalSecret(

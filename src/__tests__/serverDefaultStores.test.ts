@@ -196,6 +196,86 @@ describe("server default store injection", () => {
     });
   });
 
+  it("preserves the default provider local key when server config is reapplied", async () => {
+    const { useCoreSettingsStore } =
+      await import("../store/core/coreSettingsStore");
+    const { encryptLocalSecret, LOCAL_SECRET_CONTEXTS } =
+      await import("../lib/security/localSecrets");
+    const apiKeySecret = await encryptLocalSecret(
+      "browser-key",
+      LOCAL_SECRET_CONTEXTS.providerApiKey(SERVER_DEFAULT_PROVIDER_ID),
+    );
+
+    useCoreSettingsStore.setState((state) => ({
+      ...state,
+      providers: [
+        {
+          id: SERVER_DEFAULT_PROVIDER_ID,
+          name: "Hosted Default",
+          type: "Google",
+          baseUrl: "default",
+          apiKey: "",
+          apiKeySecret,
+          enabled: true,
+          models: ["gemini-default"],
+          modelsList: ["gemini-default"],
+          isServerDefault: true,
+        },
+      ],
+    }));
+
+    useCoreSettingsStore.getState().applyServerConfig(serverConfig);
+
+    expect(
+      useCoreSettingsStore
+        .getState()
+        .providers.find(
+          (provider) => provider.id === SERVER_DEFAULT_PROVIDER_ID,
+        )?.apiKeySecret,
+    ).toEqual(apiKeySecret);
+  });
+
+  it("persists the default provider local key like a regular provider", async () => {
+    const { useCoreSettingsStore } =
+      await import("../store/core/coreSettingsStore");
+    const { encryptLocalSecret, LOCAL_SECRET_CONTEXTS } =
+      await import("../lib/security/localSecrets");
+    const apiKeySecret = await encryptLocalSecret(
+      "browser-key",
+      LOCAL_SECRET_CONTEXTS.providerApiKey(SERVER_DEFAULT_PROVIDER_ID),
+    );
+
+    useCoreSettingsStore.setState((state) => ({
+      ...state,
+      providers: [
+        {
+          id: SERVER_DEFAULT_PROVIDER_ID,
+          name: "Hosted Default",
+          type: "Google",
+          baseUrl: "default",
+          apiKey: "",
+          apiKeySecret,
+          enabled: true,
+          models: ["gemini-default"],
+          modelsList: ["gemini-default"],
+          isServerDefault: true,
+        },
+      ],
+    }));
+
+    const partialize = (useCoreSettingsStore as any).persist.getOptions()
+      .partialize;
+    const persisted = partialize(useCoreSettingsStore.getState());
+
+    expect(persisted.providers).toHaveLength(1);
+    expect(persisted.providers[0]).toMatchObject({
+      id: SERVER_DEFAULT_PROVIDER_ID,
+      apiKey: "",
+      apiKeySecret,
+      isServerDefault: true,
+    });
+  });
+
   it("initializes missing server model metadata without overwriting user edits", async () => {
     const { useSettingsStore } = await import("../store/core/settingsStore");
 
