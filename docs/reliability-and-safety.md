@@ -83,8 +83,10 @@ policy, response limits, and the tool-call round ceiling.
 
 MCP-backed functions add a side-effect boundary: the MCP server owns the tool
 implementation and may perform external actions. The application transport is
-`streamable-http` over HTTP or HTTPS; local Docker deployments can translate an
-explicit stdio allowlist through the separate bridge. User-configured MCP,
+`streamable-http` or legacy `sse` over HTTP or HTTPS; local Docker deployments
+can translate an explicit stdio allowlist through the separate bridge.
+Fallback from Streamable HTTP to SSE is limited to connection setup after a 404
+or 405, so a tool call is never retried across transports. User-configured MCP,
 provider, search, RAG, and plugin targets may resolve to localhost or private
 networks in either deployment mode; fixed registries and built-in services
 remain HTTPS-only. HTTP may expose credentials or permit response tampering,

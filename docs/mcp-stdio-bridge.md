@@ -1,7 +1,7 @@
 # Local MCP stdio bridge
 
-Neo Chat continues to speak MCP over Streamable HTTP. A local Docker deployment
-can optionally run the `mcp-bridge` profile, which starts allowlisted stdio MCP
+The local bridge exposes MCP over Streamable HTTP. A local Docker deployment can
+optionally run the `mcp-bridge` profile, which starts allowlisted stdio MCP
 servers inside a separate container and exposes them as authenticated
 Streamable HTTP endpoints.
 

@@ -2,7 +2,7 @@ import type { LocalEncryptedSecretEnvelope } from "../security/localSecrets";
 
 export type PluginFunctionRisk = "read" | "write" | "destructive" | "external";
 export type PluginSource = "builtin" | "openapi" | "mcp";
-export type McpTransport = "streamable-http";
+export type McpTransport = "streamable-http" | "sse";
 
 export interface PluginFunction {
   name: string;

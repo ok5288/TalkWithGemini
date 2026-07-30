@@ -369,6 +369,195 @@ const CustomPluginModal = ({
   );
 };
 
+const McpInstallAuthModal = ({
+  plugin,
+  onClose,
+  onInstall,
+}: {
+  plugin: Plugin;
+  onClose: () => void;
+  onInstall: (authValue: string) => Promise<string | null>;
+}) => {
+  const t = useTranslations("Plugin");
+  const [authValue, setAuthValue] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const isMountedRef = useRef(true);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+  const modalId = useId();
+  const titleId = `${modalId}-title`;
+  const descriptionId = `${modalId}-description`;
+  const inputId = `${modalId}-auth-input`;
+  const errorId = `${modalId}-error`;
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    previousFocusRef.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    closeButtonRef.current?.focus({ preventScroll: true });
+
+    return () => {
+      isMountedRef.current = false;
+      if (previousFocusRef.current?.isConnected) {
+        previousFocusRef.current.focus({ preventScroll: true });
+      }
+      previousFocusRef.current = null;
+    };
+  }, []);
+
+  const handleClose = () => {
+    if (!isLoading) onClose();
+  };
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      handleClose();
+      return;
+    }
+
+    trapModalFocus(event, dialogRef.current);
+  };
+
+  const handleInstall = async () => {
+    const normalizedAuthValue = authValue.trim();
+    if (!normalizedAuthValue || isLoading) return;
+
+    setIsLoading(true);
+    setError(null);
+    try {
+      const installError = await onInstall(normalizedAuthValue);
+      if (!isMountedRef.current) return;
+      if (installError) {
+        setError(installError);
+        return;
+      }
+      onClose();
+    } finally {
+      if (isMountedRef.current) {
+        setIsLoading(false);
+      }
+    }
+  };
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-9999 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-in fade-in duration-200"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
+          handleClose();
+        }
+      }}
+    >
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={descriptionId}
+        tabIndex={-1}
+        onKeyDown={handleKeyDown}
+        className="flex w-full max-w-md flex-col gap-4 rounded-2xl border border-gray-200 bg-white p-6 shadow-2xl dark:border-border dark:bg-card"
+      >
+        <div className="flex items-center justify-between gap-3">
+          <h2
+            id={titleId}
+            className="flex min-w-0 items-center gap-2 text-lg font-bold text-gray-800 dark:text-foreground"
+          >
+            <KeyRound
+              size={20}
+              className="shrink-0 text-blue-500"
+              aria-hidden="true"
+            />
+            <span className="truncate">{t("mcpInstallAuthTitle")}</span>
+          </h2>
+          <button
+            ref={closeButtonRef}
+            type="button"
+            aria-label={t("closeMcpAuthInstaller")}
+            onClick={handleClose}
+            disabled={isLoading}
+            className="rounded-full p-1 text-gray-500 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-muted"
+          >
+            <X size={20} aria-hidden="true" />
+          </button>
+        </div>
+
+        <p
+          id={descriptionId}
+          className="text-sm leading-relaxed text-gray-500 dark:text-muted-foreground"
+        >
+          {t("mcpInstallAuthDescription", { title: plugin.title })}
+        </p>
+
+        <div className="space-y-2">
+          <label
+            htmlFor={inputId}
+            className="text-sm font-medium text-gray-700 dark:text-foreground/85"
+          >
+            {t("mcpInstallAuthLabel")}
+          </label>
+          <input
+            id={inputId}
+            name={`mcp-install-auth-${plugin.id}`}
+            type="password"
+            value={authValue}
+            onChange={(event) => setAuthValue(event.target.value)}
+            maxLength={PLUGIN_CONFIG_LIMITS.maxAuthValueChars}
+            autoComplete="off"
+            spellCheck={false}
+            aria-describedby={`${descriptionId}${error ? ` ${errorId}` : ""}`}
+            placeholder={t("authPlaceholder")}
+            className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 font-mono text-sm text-gray-800 transition-[background-color,border-color,box-shadow,color] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-border dark:bg-muted dark:text-foreground"
+          />
+        </div>
+
+        {error && (
+          <div
+            id={errorId}
+            role="alert"
+            className="flex items-center gap-2 rounded-lg bg-red-50 p-3 text-xs text-red-600 dark:bg-red-900/20 dark:text-red-400"
+          >
+            <AlertTriangle size={14} className="shrink-0" aria-hidden="true" />
+            {error}
+          </div>
+        )}
+
+        <div className="flex justify-end gap-2 pt-2">
+          <button
+            type="button"
+            onClick={handleClose}
+            disabled={isLoading}
+            className="rounded-lg px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:cursor-not-allowed disabled:opacity-60 dark:text-muted-foreground dark:hover:bg-muted"
+          >
+            {t("cancel")}
+          </button>
+          <button
+            type="button"
+            aria-label={t("installPluginAria", { title: plugin.title })}
+            aria-busy={isLoading || undefined}
+            onClick={handleInstall}
+            disabled={isLoading || !authValue.trim()}
+            className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isLoading ? (
+              <Loader2 size={16} className="animate-spin" aria-hidden="true" />
+            ) : (
+              <Download size={16} aria-hidden="true" />
+            )}
+            {t("install")}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+};
+
 const CustomMcpServerModal = ({
   onClose,
   onInstall,
@@ -1505,6 +1694,8 @@ const PluginMarket: React.FC<PluginMarketProps> = ({ onClose }) => {
   const [showCustomPluginModal, setShowCustomPluginModal] = useState(false);
   const [showCustomMcpServerModal, setShowCustomMcpServerModal] =
     useState(false);
+  const [mcpPluginAwaitingAuth, setMcpPluginAwaitingAuth] =
+    useState<Plugin | null>(null);
   const [mcpPageCursors, setMcpPageCursors] = useState<string[]>([""]);
   const [mcpNextCursor, setMcpNextCursor] = useState("");
   const isMountedRef = useRef(true);
@@ -1711,33 +1902,76 @@ const PluginMarket: React.FC<PluginMarketProps> = ({ onClose }) => {
     }
   }, [searchTerm, selectedCategories, activeSource]);
 
-  const handleInstall = async (plugin: Plugin) => {
+  const installMarketplacePlugin = async (
+    plugin: Plugin,
+    authValue?: string,
+  ): Promise<string | null> => {
     if (!isOnline || !isBrowserOnline()) {
-      setMarketError(t("offlineOperationsUnavailable"));
-      return;
+      const message = t("offlineOperationsUnavailable");
+      setMarketError(message);
+      return message;
     }
-    if (installingIdsRef.current.has(plugin.id)) return;
+    if (installingIdsRef.current.has(plugin.id)) return null;
 
     installingIdsRef.current.add(plugin.id);
     setInstallingIds(Array.from(installingIdsRef.current));
     setMarketError(null);
     try {
-      const fullPlugin = await installPlugin(plugin);
+      const fullPlugin = await installPlugin(plugin, authValue);
+      const normalizedAuthValue = authValue?.trim();
+      const localValueSecret = normalizedAuthValue
+        ? await encryptLocalSecret(
+            normalizedAuthValue,
+            LOCAL_SECRET_CONTEXTS.pluginAuth(fullPlugin.id),
+          )
+        : undefined;
+
       if (isMountedRef.current) {
         addInstalledPlugin(fullPlugin);
+        if (localValueSecret) {
+          updatePluginConfig(fullPlugin.id, {
+            auth: {
+              type:
+                fullPlugin.auth?.type === "apiKey"
+                  ? "apiKey"
+                  : fullPlugin.auth?.type === "oauth2"
+                    ? "oauth2"
+                    : "bearer",
+              value: "",
+              localValueSecret,
+              key:
+                fullPlugin.auth?.name ||
+                (fullPlugin.auth?.type === "apiKey"
+                  ? "X-API-Key"
+                  : "Authorization"),
+              addTo: fullPlugin.auth?.in || "header",
+            },
+          });
+        }
       }
+      return null;
     } catch (error) {
+      const message =
+        error instanceof Error ? error.message : t("installFailed");
       if (isMountedRef.current) {
-        setMarketError(
-          error instanceof Error ? error.message : t("installFailed"),
-        );
+        setMarketError(message);
       }
+      return message;
     } finally {
       if (isMountedRef.current) {
         installingIdsRef.current.delete(plugin.id);
         setInstallingIds(Array.from(installingIdsRef.current));
       }
     }
+  };
+
+  const handleInstall = (plugin: Plugin) => {
+    if (plugin.source === "mcp" && isPluginAuthRequired(plugin)) {
+      setMcpPluginAwaitingAuth(plugin);
+      return;
+    }
+
+    void installMarketplacePlugin(plugin);
   };
 
   const handleCustomMcpInstalled = async (
@@ -1930,6 +2164,16 @@ const PluginMarket: React.FC<PluginMarketProps> = ({ onClose }) => {
           onInstall={handleCustomMcpInstalled}
           bridgeDiscoveryEnabled={serverConfig?.deployment?.mode === "local"}
           isOnline={isOnline}
+        />
+      )}
+
+      {mcpPluginAwaitingAuth && (
+        <McpInstallAuthModal
+          plugin={mcpPluginAwaitingAuth}
+          onClose={() => setMcpPluginAwaitingAuth(null)}
+          onInstall={(authValue) =>
+            installMarketplacePlugin(mcpPluginAwaitingAuth, authValue)
+          }
         />
       )}
 

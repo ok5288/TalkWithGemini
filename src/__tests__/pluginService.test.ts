@@ -503,6 +503,70 @@ describe("plugin market service cache", () => {
     );
   });
 
+  it("encrypts marketplace MCP auth before install-time discovery", async () => {
+    encryptSecretMock.mockResolvedValue({
+      v: 1,
+      kid: "test-key",
+      alg: "RSA-OAEP-256+A256GCM",
+      iv: "iv",
+      wrappedKey: "wrappedKey",
+      ciphertext: "ciphertext",
+      context: "plugin:mcp:private:1.0.0:auth",
+    });
+    const fetchMock = vi.fn(
+      async (_input: RequestInfo | URL, init?: RequestInit) => {
+        const payload = JSON.parse(String(init?.body || "{}"));
+        return jsonResponse({ plugin: payload.plugin });
+      },
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const plugin: Plugin = {
+      id: "mcp:private:1.0.0",
+      title: "private",
+      description: "",
+      logoUrl: "",
+      manifestUrl: "",
+      source: "mcp",
+      functions: [],
+      auth: {
+        type: "apiKey",
+        name: "X-API-Key",
+        in: "header",
+        required: true,
+      },
+      mcp: {
+        transport: "streamable-http",
+        serverUrl: "https://mcp.example.com/mcp",
+        serverName: "private",
+        serverVersion: "1.0.0",
+        toolNameMap: {},
+      },
+    };
+
+    const { installPlugin } = await import("../services/api/pluginService");
+    await installPlugin(plugin, "market-secret");
+
+    expect(encryptSecretMock).toHaveBeenCalledWith(
+      "market-secret",
+      "plugin:mcp:private:1.0.0:auth",
+    );
+    const [, requestInit] = getFetchCalls(fetchMock)[0];
+    const serializedBody = String(requestInit?.body || "");
+    const payload = JSON.parse(serializedBody);
+    expect(serializedBody).not.toContain("market-secret");
+    expect(payload).toMatchObject({
+      plugin: { id: plugin.id },
+      authConfig: {
+        type: "apiKey",
+        key: "X-API-Key",
+        addTo: "header",
+        valueSecret: {
+          context: "plugin:mcp:private:1.0.0:auth",
+        },
+      },
+    });
+  });
+
   it("installs a custom MCP server without auth through the shared install API", async () => {
     const fetchMock = vi.fn(
       async (_input: RequestInfo | URL, init?: RequestInit) => {

@@ -200,10 +200,11 @@ the chat. See
 boundaries, context budgeting, and recovery behavior.
 
 Remote MCP servers use the same server-registered plugin path and outbound URL
-policy. Neo Chat supports `streamable-http` MCP over HTTP or HTTPS, including
-localhost and private-network targets. Local Docker deployments may opt into
-the isolated [stdio bridge](mcp-stdio-bridge.md); hosted and Worker deployments
-must not run it. The official Registry remains HTTPS-only. Hosted or
+policy. Neo Chat supports `streamable-http` and legacy `sse` MCP over HTTP or
+HTTPS, including localhost and private-network targets. Streamable HTTP is
+preferred when both are available. Local Docker deployments may opt into the
+isolated [stdio bridge](mcp-stdio-bridge.md); hosted and Worker deployments must
+not run it. The official Registry remains HTTPS-only. Hosted or
 multi-instance deployments should configure
 `PLUGIN_REGISTRY_STORE=upstash` so installed MCP tools resolve consistently
 across instances.

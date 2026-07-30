@@ -18,7 +18,12 @@ describe("PluginMarket MCP composition", () => {
     expect(pluginMarket).toContain('t("pageOf", { currentPage, totalPages })');
     expect(pluginMarket).toContain("showCustomMcpServerModal");
     expect(pluginMarket).toContain("CustomMcpServerModal");
+    expect(pluginMarket).toContain("McpInstallAuthModal");
     expect(pluginMarket).toContain("installCustomMcpServer");
+    expect(pluginMarket).toContain(
+      'plugin.source === "mcp" && isPluginAuthRequired(plugin)',
+    );
+    expect(pluginMarket).toContain("installPlugin(plugin, authValue)");
     expect(pluginMarket).toContain("discoverMcpBridgeServers");
     expect(pluginMarket).toContain(
       'serverConfig?.deployment?.mode === "local"',

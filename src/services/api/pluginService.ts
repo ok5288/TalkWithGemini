@@ -567,14 +567,43 @@ export const clearPluginsCache = (): void => {
   logDevInfo("Plugins cache cleared");
 };
 
-export const installPlugin = async (plugin: Plugin): Promise<Plugin> => {
+export const installPlugin = async (
+  plugin: Plugin,
+  authValue?: string,
+): Promise<Plugin> => {
+  const normalizedAuthValue = authValue?.trim();
+  const valueSecret = normalizedAuthValue
+    ? await encryptSecret(
+        normalizedAuthValue,
+        BYOK_CONTEXTS.pluginAuth(plugin.id),
+      )
+    : undefined;
+  const authConfig = valueSecret
+    ? {
+        type:
+          plugin.auth?.type === "apiKey"
+            ? ("apiKey" as const)
+            : plugin.auth?.type === "oauth2"
+              ? ("oauth2" as const)
+              : ("bearer" as const),
+        key:
+          plugin.auth?.name ||
+          (plugin.auth?.type === "apiKey" ? "X-API-Key" : "Authorization"),
+        addTo: plugin.auth?.in || ("header" as const),
+        valueSecret,
+      }
+    : undefined;
+
   try {
     const response = await signedApiFetch("/api/plugins/install", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ plugin }),
+      body: JSON.stringify({
+        plugin,
+        ...(authConfig ? { authConfig } : {}),
+      }),
     });
 
     if (!response.ok) {

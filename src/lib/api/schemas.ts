@@ -372,7 +372,7 @@ const PluginSchema = z
     source: z.enum(["builtin", "openapi", "mcp"]).optional(),
     mcp: z
       .object({
-        transport: z.literal("streamable-http"),
+        transport: z.enum(["streamable-http", "sse"]),
         source: z.enum(["registry", "custom", "bridge"]).optional(),
         serverUrl: z.string().min(1).max(2_048),
         serverName: z.string().min(1).max(300),
