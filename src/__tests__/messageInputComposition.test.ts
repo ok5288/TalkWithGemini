@@ -3,6 +3,41 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 describe("MessageInput composition", () => {
+  it("omits the model capability preview while retaining capability gates", () => {
+    const messageInput = readFileSync(
+      resolve(process.cwd(), "src/components/chat/MessageInput.tsx"),
+      "utf8",
+    );
+    const localeCatalogs = ["en", "zh", "ja"]
+      .map((locale) =>
+        readFileSync(
+          resolve(
+            process.cwd(),
+            `src/i18n/locales/${locale}/MessageInput.json`,
+          ),
+          "utf8",
+        ),
+      )
+      .join("\n");
+    const removedKeys = [
+      "selectModelWithCapabilitiesAria",
+      "modelCapabilityPreflight",
+      "capabilityAttachments",
+      "capabilityImages",
+      "capabilityTools",
+      "capabilityReasoning",
+      "capabilitySupported",
+      "capabilityUnavailable",
+    ];
+
+    expect(messageInput).toContain('t("selectModelAria"');
+    expect(messageInput).toContain("modelCapabilities");
+    removedKeys.forEach((key) => {
+      expect(messageInput).not.toContain(key);
+      expect(localeCatalogs).not.toContain(`"${key}"`);
+    });
+  });
+
   it("keeps attachment tray presentation outside the composer container", () => {
     const messageInput = readFileSync(
       resolve(process.cwd(), "src/components/chat/MessageInput.tsx"),

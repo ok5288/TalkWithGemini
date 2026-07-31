@@ -1227,21 +1227,6 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
       availableModels.find((m) => m.name === selectedModel)?.displayName ||
       selectedModel ||
       t("noModelSelected");
-    const capabilityStatuses = [
-      {
-        label: t("capabilityAttachments"),
-        supported: modelCapabilities.attachment,
-      },
-      { label: t("capabilityImages"), supported: modelCapabilities.vision },
-      { label: t("capabilityTools"), supported: modelCapabilities.toolCall },
-      { label: t("capabilityReasoning"), supported: isReasoningSupported },
-    ];
-    const capabilitySummaryText = capabilityStatuses
-      .map(
-        ({ label, supported }) =>
-          `${label}: ${supported ? t("capabilitySupported") : t("capabilityUnavailable")}`,
-      )
-      .join(", ");
     const hasKnowledgeAttachments = attachments.some(isKnowledgeAttachment);
     const isInputBusy =
       disabled || isTranscribing || isParsingAttachments || isPreparingSend;
@@ -1419,7 +1404,7 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
           id={messageInputId}
           name="message"
           ref={textareaRef}
-          className={`w-full px-4 pt-3 bg-transparent focus:outline-0 text-gray-800 dark:text-foreground placeholder-gray-500 dark:placeholder:text-muted-foreground resize-none max-h-32 md:max-h-48 text-(length:--neo-font-size-base) leading-5 ${textareaMinHeightClass} overflow-y-auto overscroll-contain custom-scrollbar`}
+          className={`w-full px-2 pt-3 bg-transparent focus:outline-0 text-gray-800 dark:text-foreground placeholder-gray-500 dark:placeholder:text-muted-foreground resize-none max-h-32 md:max-h-48 text-(length:--neo-font-size-base) leading-5 ${textareaMinHeightClass} overflow-y-auto overscroll-contain custom-scrollbar`}
           placeholder={
             isRecording
               ? voice.sttProvider === "browser"
@@ -1983,33 +1968,12 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
                   setShowModelSelect(open && availableModels.length > 0);
                 }}
               >
-                <Tooltip
-                  content={
-                    <span className="flex min-w-48 flex-col gap-1 text-left">
-                      <span className="font-medium">{currentModelName}</span>
-                      <span className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px]">
-                        {capabilityStatuses.map(({ label, supported }) => (
-                          <span
-                            key={label}
-                            className={
-                              supported ? "text-emerald-200" : "text-white/60"
-                            }
-                          >
-                            {supported ? "✓" : "—"} {label}
-                          </span>
-                        ))}
-                      </span>
-                    </span>
-                  }
-                  position="top"
-                  portal
-                >
+                <Tooltip content={currentModelName} position="top" portal>
                   <DropdownMenuTrigger asChild>
                     <button
                       type="button"
-                      aria-label={t("selectModelWithCapabilitiesAria", {
+                      aria-label={t("selectModelAria", {
                         model: currentModelName,
-                        capabilities: capabilitySummaryText,
                       })}
                       className={`group ${iconButtonBaseClass} gap-1.5 px-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 md:w-auto md:max-w-52 dark:text-muted-foreground dark:hover:bg-accent/50 dark:hover:text-foreground ${iconButtonFocusClass}`}
                       disabled={isInputBusy}
@@ -2037,24 +2001,6 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
                   align="end"
                   className="max-h-64 w-56 overflow-y-auto custom-scrollbar"
                 >
-                  <DropdownMenuLabel>
-                    {t("modelCapabilityPreflight")}
-                  </DropdownMenuLabel>
-                  <div className="grid grid-cols-2 gap-1 px-2 pb-2">
-                    {capabilityStatuses.map(({ label, supported }) => (
-                      <span
-                        key={label}
-                        className={`rounded px-1.5 py-1 text-[10px] ${
-                          supported
-                            ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-                            : "bg-muted text-muted-foreground"
-                        }`}
-                      >
-                        {supported ? "✓" : "—"} {label}
-                      </span>
-                    ))}
-                  </div>
-                  <DropdownMenuSeparator />
                   <DropdownMenuRadioGroup
                     value={selectedModel}
                     onValueChange={(model) => {

@@ -50,6 +50,8 @@ interface MessageOutputRendererProps {
 const isMemorySearchTool = (name: string | undefined) =>
   name === "memory_search";
 
+const isWebSearchTool = (name: string | undefined) => name === "web_search";
+
 const ImageGenerationStatusBlock: React.FC<{ label: string }> = ({ label }) => (
   <div
     className="my-3 w-72 max-w-full overflow-hidden rounded-lg border border-border bg-muted/30"
@@ -252,7 +254,9 @@ const MessageOutputRenderer: React.FC<MessageOutputRendererProps> = ({
               isMemorySearchTool(toolCall.name),
             );
             const otherToolCalls = block.toolCalls.filter(
-              (toolCall) => !isMemorySearchTool(toolCall.name),
+              (toolCall) =>
+                !isMemorySearchTool(toolCall.name) &&
+                !isWebSearchTool(toolCall.name),
             );
 
             return (
