@@ -30,7 +30,11 @@ src/store/
 
 ### `coreSettingsStore`
 
-Stores frequently needed core settings such as theme, language, provider records, provider API keys, and default model selections. These values are kept in `localStorage` for fast synchronous access.
+Stores frequently needed core settings such as theme, language, keyboard
+shortcut bindings, provider records, provider API keys, and default model
+selections. These values are kept in `localStorage` for fast synchronous access.
+The non-secret shortcut bindings are part of the core-settings backup and
+end-to-end encrypted sync document.
 
 ### `settingsStore`
 

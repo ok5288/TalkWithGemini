@@ -17,6 +17,12 @@ const entries: SettingsSearchEntry[] = [
     description: "配置 WebDAV 或 S3",
     keywords: "恢复码 设备 冲突",
   },
+  {
+    id: "shortcuts",
+    label: "快捷键",
+    description: "自定义聊天与导航操作",
+    keywords: "键盘 热键 输入框 侧栏",
+  },
 ];
 
 describe("settings search", () => {
@@ -30,6 +36,7 @@ describe("settings search", () => {
     expect(filterSettingsSearchEntries(entries, "恢复码")).toEqual([
       entries[1],
     ]);
+    expect(filterSettingsSearchEntries(entries, "热键")).toEqual([entries[2]]);
   });
 
   it("normalizes full-width text and returns no results for blank input", () => {

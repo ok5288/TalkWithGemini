@@ -13,6 +13,7 @@ import {
   ShieldCheck,
   Brain,
   Cloud,
+  Keyboard,
   Info,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -26,7 +27,9 @@ import DefaultModelSettings from "./DefaultModelSettings";
 import DeploymentHealth from "./DeploymentHealth";
 import MemorySettings from "./MemorySettings";
 import AboutSettings from "./AboutSettings";
+import ShortcutsSettings from "./ShortcutsSettings";
 import type { SettingsTabId } from "@/lib/chat/panelUrlState";
+import { useShortcutPresentation } from "@/components/shortcuts/ShortcutHint";
 
 const SyncSettings = dynamic(() => import("./SyncSettings"), {
   ssr: false,
@@ -46,6 +49,7 @@ const SETTINGS_TABS: Array<{
   { id: "sync", labelKey: "tabSync", Icon: Cloud },
   { id: "health", labelKey: "tabHealth", Icon: ShieldCheck },
   { id: "system", labelKey: "tabSystem", Icon: Settings },
+  { id: "shortcuts", labelKey: "tabShortcuts", Icon: Keyboard },
   { id: "about", labelKey: "tabAbout", Icon: Info },
 ];
 
@@ -93,6 +97,8 @@ const renderTabContent = (activeTab: SettingsTabId, focusMemoryId?: string) => {
       return <DeploymentHealth />;
     case "system":
       return <SystemSettings />;
+    case "shortcuts":
+      return <ShortcutsSettings />;
     case "about":
       return <AboutSettings />;
   }
@@ -112,6 +118,9 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
   focusMemoryId,
 }) => {
   const t = useTranslations("SettingsPage");
+  const shortcutSettingsShortcut = useShortcutPresentation(
+    "openShortcutSettings",
+  );
   const [localActiveTab, setLocalActiveTab] =
     useState<SettingsTabId>("providers");
   const [searchQuery, setSearchQuery] = useState("");
@@ -336,6 +345,11 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                   role="tab"
                   aria-selected={isSelected}
                   aria-controls={`settings-panel-${id}`}
+                  aria-keyshortcuts={
+                    id === "shortcuts"
+                      ? shortcutSettingsShortcut.ariaKeyShortcuts
+                      : undefined
+                  }
                   tabIndex={isSelected ? 0 : -1}
                   onClick={() => setResolvedActiveTab(id)}
                   onKeyDown={(event) => handleTabKeyDown(event, id)}

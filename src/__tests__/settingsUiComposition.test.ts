@@ -71,6 +71,25 @@ describe("settings UI primitives", () => {
     expect(settingsPage).toContain("tabMemory");
   });
 
+  it("places keyboard shortcuts between system settings and about", () => {
+    const settingsPage = readFileSync(
+      resolve(process.cwd(), "src/components/settings/SettingsPage.tsx"),
+      "utf8",
+    );
+
+    const systemIndex = settingsPage.indexOf('id: "system"');
+    const shortcutIndex = settingsPage.indexOf('id: "shortcuts"');
+    const aboutIndex = settingsPage.indexOf('id: "about"');
+
+    expect(settingsPage).toContain("ShortcutsSettings");
+    expect(settingsPage).toContain("Keyboard");
+    expect(systemIndex).toBeLessThan(shortcutIndex);
+    expect(shortcutIndex).toBeLessThan(aboutIndex);
+    expect(en.SettingsPage.tabShortcuts).toBeTruthy();
+    expect(zh.SettingsPage.tabShortcuts).toBeTruthy();
+    expect(ja.SettingsPage.tabShortcuts).toBeTruthy();
+  });
+
   it("organizes system settings into scalable grouped sections", () => {
     const systemSettings = readFileSync(
       resolve(process.cwd(), "src/components/settings/SystemSettings.tsx"),

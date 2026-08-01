@@ -20,6 +20,7 @@ export const SETTINGS_TAB_VALUES = [
   "sync",
   "health",
   "system",
+  "shortcuts",
   "about",
 ] as const;
 

@@ -13,6 +13,10 @@ import VirtualizedMessageTimeline, {
 } from "@/components/chat/VirtualizedMessageTimeline";
 import Tooltip from "@/components/ui/Tooltip";
 import { Logo } from "@/components/ui/Icons";
+import {
+  ShortcutTooltipContent,
+  useShortcutPresentation,
+} from "@/components/shortcuts/ShortcutHint";
 import type { ModelInfo } from "@/services/api/chatService";
 import type { ChatPanel, SettingsTabId } from "@/lib/chat/panelUrlState";
 import type {
@@ -31,7 +35,12 @@ import { getSessionDisplayTitle } from "@/lib/chat/sessionTitle";
 import { getReplyExcerpt } from "@/lib/chat/streamResilience";
 import type { GlobalSearchNavigationTarget } from "@/lib/global-search";
 import { useChatStore } from "@/store/core/chatStore";
+import { useCoreSettingsStore } from "@/store/core/coreSettingsStore";
 import { getSyncDeviceId } from "@/lib/sync/deviceIdentity";
+import {
+  dispatchShortcutEvent,
+  type ShortcutActionHandlers,
+} from "@/lib/shortcutDispatcher";
 import {
   KNOWLEDGE_SOURCE_NAVIGATE_EVENT,
   type KnowledgeSourceNavigationDetail,
@@ -200,8 +209,14 @@ const ChatAppShell = ({
   onRevokeToolSessionApproval,
 }: ChatAppShellProps) => {
   const t = useTranslations("ChatApp");
+  const newChatShortcut = useShortcutPresentation("newChat");
+  const toggleSidebarShortcut = useShortcutPresentation("toggleSidebar");
+  const shortcutBindings = useCoreSettingsStore(
+    (state) => state.shortcutBindings,
+  );
   const [focusedMessageId, setFocusedMessageId] = React.useState<string>();
   const searchReturnFocusRef = React.useRef<HTMLElement | null>(null);
+  const shouldFocusComposerRef = React.useRef(false);
   const [replyTarget, setReplyTarget] = React.useState<MessageReplyReference>();
   const timelineRef = React.useRef<VirtualizedMessageTimelineRef>(null);
   const [messagesScrollElement, setMessagesScrollElement] =
@@ -300,6 +315,62 @@ const ChatAppShell = ({
     navigateToPanel("search");
   }, [navigateToPanel]);
 
+  const focusComposer = React.useCallback(() => {
+    if (viewMode !== "chat") {
+      shouldFocusComposerRef.current = true;
+      navigateToPanel("chat");
+      return true;
+    }
+
+    window.requestAnimationFrame(() => messageInputRef.current?.focus());
+    return true;
+  }, [messageInputRef, navigateToPanel, viewMode]);
+
+  React.useEffect(() => {
+    if (viewMode !== "chat" || !shouldFocusComposerRef.current) return;
+    shouldFocusComposerRef.current = false;
+    const frameId = window.requestAnimationFrame(() =>
+      messageInputRef.current?.focus(),
+    );
+    return () => window.cancelAnimationFrame(frameId);
+  }, [messageInputRef, viewMode]);
+
+  const shortcutActionHandlers = React.useMemo<ShortcutActionHandlers>(
+    () => ({
+      globalSearch: () => {
+        openGlobalSearch();
+        return true;
+      },
+      newChat: () => {
+        handleNewChat();
+        return true;
+      },
+      focusComposer,
+      toggleSidebar: () => {
+        setIsSidebarOpen((open) => !open);
+        return true;
+      },
+      openShortcutSettings: () => {
+        navigateToPanel("settings", "shortcuts");
+        return true;
+      },
+      stopGeneration: () => {
+        if (!isGenerating) return false;
+        handleStopGeneration();
+        return true;
+      },
+    }),
+    [
+      focusComposer,
+      handleNewChat,
+      handleStopGeneration,
+      isGenerating,
+      navigateToPanel,
+      openGlobalSearch,
+      setIsSidebarOpen,
+    ],
+  );
+
   React.useEffect(() => {
     const updateOnlineStatus = () => setIsOnline(navigator.onLine);
     updateOnlineStatus();
@@ -351,20 +422,12 @@ const ChatAppShell = ({
   }, [navigateToPanel]);
 
   React.useEffect(() => {
-    const handleGlobalSearchShortcut = (event: KeyboardEvent) => {
-      if (
-        !(event.metaKey || event.ctrlKey) ||
-        event.key.toLowerCase() !== "k"
-      ) {
-        return;
-      }
-      event.preventDefault();
-      openGlobalSearch();
+    const handleShortcut = (event: KeyboardEvent) => {
+      dispatchShortcutEvent(event, shortcutBindings, shortcutActionHandlers);
     };
-    window.addEventListener("keydown", handleGlobalSearchShortcut);
-    return () =>
-      window.removeEventListener("keydown", handleGlobalSearchShortcut);
-  }, [openGlobalSearch]);
+    window.addEventListener("keydown", handleShortcut);
+    return () => window.removeEventListener("keydown", handleShortcut);
+  }, [shortcutActionHandlers, shortcutBindings]);
 
   React.useEffect(() => {
     if (viewMode !== "chat" || !focusedMessageId) return;
@@ -592,7 +655,14 @@ const ChatAppShell = ({
             <header className="relative z-10 flex h-14 items-center justify-between px-4 md:px-6">
               <div className="flex min-w-10 items-center">
                 <Tooltip
-                  content={isSidebarOpen ? t("closeSidebar") : t("openSidebar")}
+                  content={
+                    <ShortcutTooltipContent
+                      label={
+                        isSidebarOpen ? t("closeSidebar") : t("openSidebar")
+                      }
+                      shortcut={toggleSidebarShortcut.display}
+                    />
+                  }
                   position="right"
                   className="lg:hidden"
                 >
@@ -603,6 +673,7 @@ const ChatAppShell = ({
                         ? t("closeSidebarAria")
                         : t("openSidebarAria")
                     }
+                    aria-keyshortcuts={toggleSidebarShortcut.ariaKeyShortcuts}
                     onClick={() => setIsSidebarOpen((open) => !open)}
                     className="p-2 -ml-2 rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   >
@@ -628,10 +699,19 @@ const ChatAppShell = ({
 
               <div className="flex min-w-10 items-center justify-end gap-1">
                 {!isSidebarOpen && (
-                  <Tooltip content={t("newChat")} position="left">
+                  <Tooltip
+                    content={
+                      <ShortcutTooltipContent
+                        label={t("newChat")}
+                        shortcut={newChatShortcut.display}
+                      />
+                    }
+                    position="left"
+                  >
                     <button
                       type="button"
                       aria-label={t("newChatAria")}
+                      aria-keyshortcuts={newChatShortcut.ariaKeyShortcuts}
                       onClick={handleNewChat}
                       className="p-2 -mr-2 rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                     >

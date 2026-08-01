@@ -111,6 +111,10 @@ import {
   useComposerMenuState,
 } from "@/features/chat";
 import type { ComposerSkillParameterValues } from "@/components/skill/SkillParameterDialog";
+import {
+  ShortcutTooltipContent,
+  useShortcutPresentation,
+} from "@/components/shortcuts/ShortcutHint";
 
 type MessageInputVariant = "default" | "hero";
 
@@ -210,6 +214,8 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
 
     const t = useTranslations("MessageInput");
     const tConfig = useTranslations("Config");
+    const focusComposerShortcut = useShortcutPresentation("focusComposer");
+    const stopGenerationShortcut = useShortcutPresentation("stopGeneration");
     const {
       chatConfig,
       setChatConfig,
@@ -1414,6 +1420,7 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
           }
           autoComplete="off"
           aria-describedby={errorMsg ? errorMessageId : undefined}
+          aria-keyshortcuts={focusComposerShortcut.ariaKeyShortcuts}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -2078,10 +2085,21 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
             <div className="flex shrink-0 items-center gap-1">
               {isInputBusy ? (
                 onStop && !isParsingAttachments ? (
-                  <Tooltip content={t("stopGeneration")} position="top">
+                  <Tooltip
+                    content={
+                      <ShortcutTooltipContent
+                        label={t("stopGeneration")}
+                        shortcut={stopGenerationShortcut.display}
+                      />
+                    }
+                    position="top"
+                  >
                     <button
                       type="button"
                       aria-label={t("stopGenerationAria")}
+                      aria-keyshortcuts={
+                        stopGenerationShortcut.ariaKeyShortcuts
+                      }
                       aria-busy="true"
                       className={`${iconButtonBaseClass} relative overflow-hidden bg-gray-100 text-gray-500 transition-colors hover:bg-red-50 hover:text-red-500 dark:bg-accent dark:text-muted-foreground dark:hover:bg-red-900/20 dark:hover:text-red-400 group ${iconButtonFocusClass}`}
                       onClick={onStop}

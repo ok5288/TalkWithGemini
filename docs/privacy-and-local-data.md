@@ -10,7 +10,7 @@ Neo Chat uses several browser storage layers:
 
 | Storage                         | Data                                                                                                                                                                        |
 | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `localStorage`                  | Core settings, provider records, selected models, and provider API key envelopes.                                                                                           |
+| `localStorage`                  | Core settings, keyboard shortcut preferences, provider records, selected models, and provider API key envelopes.                                                            |
 | IndexedDB through `localforage` | Chat metadata, messages, app settings, installed plugins, installed/custom skills, skill catalog and definition caches, assistants, knowledge metadata, and local memories. |
 | OPFS                            | Uploaded chat/workspace files, knowledge originals and extracted text, and image display-cache copies for user-sent or model-generated images.                              |
 
@@ -30,6 +30,11 @@ manifest records file size, MIME type, and SHA-256; missing files are listed
 explicitly. Runtime `blob:` URLs, remote caches, external RAG vectors, plaintext
 credentials, browser-local encrypted credential envelopes, and local master
 keys are not included.
+
+Keyboard shortcut bindings are ordinary core preference data, not secrets. They
+are included in versioned app backups and in the encrypted `core-settings`
+document when cross-device sync is enabled. They apply only while the Neo Chat
+page has focus; Neo Chat does not register operating-system global hotkeys.
 
 Restore validates ZIP paths, duplicate entries, extraction limits, sizes, and
 SHA-256 before replacing data. Files are written to new OPFS paths first, and a
