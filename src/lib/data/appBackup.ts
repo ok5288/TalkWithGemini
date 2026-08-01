@@ -410,7 +410,7 @@ export async function createBrowserAppBackup(
   return {
     blob,
     manifest,
-    fileName: `neo-chat-backup-${captured.payload.exportedAt.slice(0, 10)}.zip`,
+    fileName: `ed-ichat-backup-${captured.payload.exportedAt.slice(0, 10)}.zip`,
   };
 }
 
