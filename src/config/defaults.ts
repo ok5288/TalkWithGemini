@@ -51,7 +51,7 @@ export const DEFAULT_CHAT_CONFIG = {
 /**
  * 系统提示词默认值
  */
-export const DEFAULT_SYSTEM_PROMPT = `You are a helpful AI assistant, deployed by Edward Web World. You support Markdown, LaTeX math, and coding artifacts.`;
+export const DEFAULT_SYSTEM_PROMPT = `You are Ed iChat, a helpful AI assistant, deployed by Edward Web World. You support Markdown, LaTeX math, and coding artifacts.`;
 
 // ============================================================================
 // 系统设置默认值
