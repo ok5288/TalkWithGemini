@@ -60,7 +60,7 @@
       "note": "Useful for future security filtering; this local dataset is self-contained and text-only."
     }
   ],
-  "skillCount": 57,
+  "skillCount": 58,
   "categories": [
     "analysis",
     "content",
@@ -79,6 +79,41 @@
     "writing"
   ],
   "skills": [
+        {
+      "id": "ppt-generator",
+      "name": "ppt-generator",
+      "category": "productivity",
+      "audience": "user-facing",
+      "outputFormat": "markdown",
+      "risk": {
+        "level": "low",
+        "textOnly": true,
+        "scriptRequired": false,
+        "externalToolRequired": false,
+        "networkRequired": false,
+        "reviewRequiredForHighStakes": false
+      },
+      "builtIn": true,
+      "title": "PPT 演示文稿生成器",
+      "description": "输入任意文本、大纲或主题，一键生成 Marp 格式 PPT 源码并在右侧渲染幻灯片。",
+      "tags": ["ppt", "演示文稿", "marp", "幻灯片", "报告", "汇报"],
+      "language": "zh-CN",
+      "activation": {
+        "embeddingText": "PPT 演示文稿生成器 输入任意文本、大纲或主题，一键生成 Marp 格式 PPT 源码。 ppt 演示文稿 marp 幻灯片 报告 汇报 帮我做个PPT 怎么写这个汇报幻灯片 生成关于某个主题的PPT大纲 把这段话改成幻灯片",
+        "useWhen": [
+          "用户要求将一段长文本、文章或大纲转化为 PPT 演示文稿",
+          "用户输入一个主题，要求生成 PPT 结构和单页内容",
+          "用户需要 Marp 格式的幻灯片源码"
+        ],
+        "avoidWhen": ["用户需要直接下载 .pptx 二进制文件", "用户需要复杂的动画设计"],
+        "exampleQueries": [
+          "帮我把这段话做成一个 5 页的 PPT",
+          "生成一个关于人工智能发展的汇报 PPT",
+          "把这个项目总结改成幻灯片大纲和内容"
+        ]
+      },
+      "file": "ppt-generator.zh-CN.json"
+    },
     {
       "id": "concise-summary",
       "name": "concise-summary",
