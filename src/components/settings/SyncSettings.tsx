@@ -69,12 +69,12 @@ const SyncSettings: React.FC = () => {
     store.provider?.kind || "webdav",
   );
   const [endpoint, setEndpoint] = useState("");
-  const [rootPath, setRootPath] = useState("neo-chat-sync");
+  const [rootPath, setRootPath] = useState("ed-ichat-sync");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [region, setRegion] = useState("us-east-1");
   const [bucket, setBucket] = useState("");
-  const [prefix, setPrefix] = useState("neo-chat-sync");
+  const [prefix, setPrefix] = useState("ed-ichat-sync");
   const [forcePathStyle, setForcePathStyle] = useState(true);
   const [accessKeyId, setAccessKeyId] = useState("");
   const [secretAccessKey, setSecretAccessKey] = useState("");
