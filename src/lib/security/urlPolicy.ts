@@ -321,7 +321,7 @@ export function getSafeUrlPolicy(context: OutboundContext): SafeUrlPolicy {
       return {
         context,
         allowedProtocols: ["https:"],
-        allowedHosts: ["registry.npmmirror.com"],
+        allowedHosts: ["registry.npmmirror.com", "agents.ok5266.com"],
         profile,
       };
     case "metadata":
