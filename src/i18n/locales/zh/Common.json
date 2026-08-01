@@ -14,5 +14,8 @@
   "clearSecret": "清除已保存密钥",
   "secretSaved": "密钥已加密保存在本地，无法直接查看原文。",
   "secretNotSaved": "尚未保存本地密钥。",
-  "replaceSecretPlaceholder": "输入新密钥以覆盖已保存密钥…"
+  "replaceSecretPlaceholder": "输入新密钥以覆盖已保存密钥…",
+  "pwaOfflineReadOnly": "离线只读 · 仍可查看历史、本地搜索、知识库和导出备份",
+  "pwaUpdateReady": "新的离线应用版本已就绪",
+  "pwaReload": "重新加载"
 }
