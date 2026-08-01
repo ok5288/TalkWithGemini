@@ -88,7 +88,7 @@ export const AI_SERVICE_URLS = {
 export const DATA_SERVICE_URLS = {
   llamaParse: "https://api.cloud.llamaindex.ai/api/v2/parse",
   lobeAgents:
-    "https://registry.npmmirror.com/@lobehub/agents-index/v1/files/public",
+    "https://agents.ok5266.com",
   apisGuru: "https://api.apis.guru/v2/list.json",
 } as const;
 
