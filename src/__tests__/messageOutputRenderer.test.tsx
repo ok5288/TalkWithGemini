@@ -108,6 +108,69 @@ describe("MessageOutputRenderer web search presentation", () => {
     expect(screen.getByText("Release notes")).toBeTruthy();
   });
 
+  it("does not present a stale search error when results are available", async () => {
+    renderMessage({
+      id: "message-search-partial",
+      role: "model",
+      content: "",
+      timestamp: 3,
+      outputBlocks: [
+        {
+          id: "search-partial",
+          type: "search",
+          sources: [
+            {
+              title: "Available result",
+              url: "https://example.com/result",
+              content: "Useful search content",
+            },
+          ],
+          images: [],
+          isSearching: false,
+          error: "Search request failed",
+        },
+      ],
+    });
+
+    const toggle = screen.getByRole("button", { name: "Sources" });
+    expect(screen.queryByText("Search request failed")).toBeNull();
+
+    await userEvent.click(toggle);
+    expect(screen.getByText("Available result")).toBeTruthy();
+    expect(screen.queryByText("Search request failed")).toBeNull();
+  });
+
+  it("allows an error-only search panel to expand and collapse", async () => {
+    renderMessage({
+      id: "message-search-error",
+      role: "model",
+      content: "",
+      timestamp: 4,
+      outputBlocks: [
+        {
+          id: "search-error",
+          type: "search",
+          sources: [],
+          images: [],
+          isSearching: false,
+          error: "Search request failed",
+        },
+      ],
+    });
+
+    const toggle = screen.getByRole("button", { name: "Search failed" });
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByText("Search request failed")).toBeNull();
+
+    await userEvent.click(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByText("Search request failed")).toBeTruthy();
+
+    await userEvent.click(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByText("Search request failed")).toBeNull();
+  });
+
   it("counts and renders only non-search tools in a mixed group", async () => {
     renderMessage({
       id: "message-3",

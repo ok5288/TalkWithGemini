@@ -7,7 +7,6 @@ import { MessageSquarePlus, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 
 import Sidebar from "@/components/layout/Sidebar";
 import MessageInput, { MessageInputRef } from "@/components/chat/MessageInput";
-import SessionUsageSummary from "@/components/chat/SessionUsageSummary";
 import type { ComposerSkillParameterValues } from "@/components/skill/SkillParameterDialog";
 import VirtualizedMessageTimeline, {
   type VirtualizedMessageTimelineRef,
@@ -32,11 +31,6 @@ import { getSessionDisplayTitle } from "@/lib/chat/sessionTitle";
 import { getReplyExcerpt } from "@/lib/chat/streamResilience";
 import type { GlobalSearchNavigationTarget } from "@/lib/global-search";
 import { useChatStore } from "@/store/core/chatStore";
-import { useSettingsStore } from "@/store/core/settingsStore";
-import {
-  parseModelString,
-  resolveProviderModelMetadata,
-} from "@/lib/utils/model";
 import { getSyncDeviceId } from "@/lib/sync/deviceIdentity";
 import {
   KNOWLEDGE_SOURCE_NAVIGATE_EVENT,
@@ -229,20 +223,6 @@ const ChatAppShell = ({
   const [focusedMemoryId, setFocusedMemoryId] = React.useState<string>();
   const [isOnline, setIsOnline] = React.useState(true);
   const [streamClock, setStreamClock] = React.useState(() => Date.now());
-  const modelMetadata = useSettingsStore((state) => state.modelMetadata);
-  const customModelMetadata = useSettingsStore(
-    (state) => state.customModelMetadata,
-  );
-  const contextWindow = React.useMemo(() => {
-    if (!selectedModel) return undefined;
-    const { providerId, modelName } = parseModelString(selectedModel);
-    return resolveProviderModelMetadata({
-      providerId,
-      modelName,
-      modelMetadata,
-      customModelMetadata,
-    })?.limit?.context;
-  }, [customModelMetadata, modelMetadata, selectedModel]);
   const localDeviceId = React.useMemo(() => getSyncDeviceId(), []);
   const hasForeignActiveGeneration = React.useMemo(
     () =>
@@ -647,10 +627,6 @@ const ChatAppShell = ({
               )}
 
               <div className="flex min-w-10 items-center justify-end gap-1">
-                <SessionUsageSummary
-                  messages={messages}
-                  contextWindow={contextWindow}
-                />
                 {!isSidebarOpen && (
                   <Tooltip content={t("newChat")} position="left">
                     <button
