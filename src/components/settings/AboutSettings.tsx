@@ -8,7 +8,7 @@ import { version } from "../../../package.json";
 
 const PROJECT_NAME = PRODUCT_NAME;
 const PROJECT_VERSION = version;
-const OFFICIAL_SITE_URL = "https://neo.u14.app";
+const OFFICIAL_SITE_URL = "https://www.ok5266.com";
 const OFFICIAL_REPO_URL = "https://github.com/u14app/neo-chat";
 const LICENSE_URL = "https://github.com/u14app/neo-chat/blob/main/LICENSE";
 const COPYRIGHT_TEXT = PRODUCT_COPYRIGHT;
