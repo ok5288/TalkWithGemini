@@ -27,11 +27,11 @@ import {
 } from "../utils/history";
 import {
   convertAttachmentsToAnthropic,
+  convertAttachmentsToGemini,
   convertAttachmentsToOpenAI,
   convertAttachmentsToOpenAIResponses,
 } from "../utils/attachments";
 import { convertSchemaToGemini } from "../utils/schema";
-import { logDevWarn } from "../utils/devLogger";
 import {
   isOpenAIProviderType,
   isAnthropicProviderType,
@@ -39,6 +39,14 @@ import {
   OPENAI_COMPATIBLE_PROVIDER_TYPE,
 } from "../providers/providerTypes";
 import { safeServerLogError } from "../utils/safeServerLog";
+import { ValidationError } from "../errors";
+import {
+  ANTHROPIC_FILES_BETA,
+  hasUploadedImageFiles,
+  uploadAnthropicImageFiles,
+  uploadGoogleImageFiles,
+  uploadOpenAIImageFiles,
+} from "../providers/imageFiles";
 
 export interface ChatHandlerOptions {
   provider: ProviderConfig;
@@ -192,32 +200,48 @@ export async function handleChatStream(options: ChatHandlerOptions) {
       if (provider.type === "OpenAI") {
         await ProviderFactory.assertProviderOutboundAllowed(provider, signal);
         const client = ProviderFactory.createOpenAIClient(provider);
-        const input = prepareOpenAIResponsesInput(history);
-
-        const content: any[] = [{ type: "input_text", text: newMessage }];
-        if (attachments?.length) {
-          content.push(...convertAttachmentsToOpenAIResponses(attachments));
-        }
-        input.push({ role: "user", content });
-
-        await streamOpenAIResponses({
+        const prepared = await uploadOpenAIImageFiles(
           client,
-          model: modelName,
-          input,
-          instructions: appendImageCountInstruction(
-            systemInstruction,
-            enableImageGeneration ? config?.imageCount : undefined,
-          ),
-          temperature: config?.temperature,
-          tools: convertToolsToOpenAIResponses(tools),
-          useReasoning: config?.useReasoning,
-          reasoningMode: config?.reasoningMode,
-          enableImageGeneration,
-          enableWebSearch: enableOpenAIWebSearch,
+          history,
+          attachments || [],
           signal,
-          onChunk: send,
-        });
+        );
+        try {
+          const input = prepareOpenAIResponsesInput(prepared.history);
+          const content: any[] = [{ type: "input_text", text: newMessage }];
+          if (prepared.attachments.length) {
+            content.push(
+              ...convertAttachmentsToOpenAIResponses(prepared.attachments),
+            );
+          }
+          input.push({ role: "user", content });
+
+          await streamOpenAIResponses({
+            client,
+            model: modelName,
+            input,
+            instructions: appendImageCountInstruction(
+              systemInstruction,
+              enableImageGeneration ? config?.imageCount : undefined,
+            ),
+            temperature: config?.temperature,
+            tools: convertToolsToOpenAIResponses(tools),
+            useReasoning: config?.useReasoning,
+            reasoningMode: config?.reasoningMode,
+            enableImageGeneration,
+            enableWebSearch: enableOpenAIWebSearch,
+            signal,
+            onChunk: send,
+          });
+        } finally {
+          await prepared.cleanup();
+        }
       } else if (provider.type === OPENAI_COMPATIBLE_PROVIDER_TYPE) {
+        if (hasUploadedImageFiles(history, attachments || [])) {
+          throw new ValidationError(
+            "This OpenAI-compatible provider does not support file-based image inputs. Use a remote HTTPS image URL or a native OpenAI, Google, or Anthropic provider.",
+          );
+        }
         await ProviderFactory.assertProviderOutboundAllowed(provider, signal);
         const messages = prepareOpenAIHistory(history);
 
@@ -249,105 +273,84 @@ export async function handleChatStream(options: ChatHandlerOptions) {
       } else if (isAnthropicProviderType(provider.type)) {
         await ProviderFactory.assertProviderOutboundAllowed(provider, signal);
         const client = ProviderFactory.createAnthropicClient(provider);
-        const messages = prepareAnthropicMessages(history);
-        const content: any[] = [];
-        if (newMessage) content.push({ type: "text", text: newMessage });
-        if (attachments?.length) {
-          content.push(...convertAttachmentsToAnthropic(attachments));
-        }
-        messages.push({
-          role: "user",
-          content: content.length > 0 ? content : " ",
-        });
-
-        await streamAnthropicMessages({
+        const prepared = await uploadAnthropicImageFiles(
           client,
-          model: modelName,
-          messages,
-          system: systemInstruction,
-          temperature: config?.temperature,
-          tools: convertToolsToAnthropic(tools),
-          useReasoning: config?.useReasoning,
-          reasoningMode: config?.reasoningMode,
+          history,
+          attachments || [],
           signal,
-          onChunk: send,
-        });
+        );
+        try {
+          const messages = prepareAnthropicMessages(prepared.history);
+          const content: any[] = [];
+          if (newMessage) content.push({ type: "text", text: newMessage });
+          if (prepared.attachments.length) {
+            content.push(
+              ...convertAttachmentsToAnthropic(prepared.attachments),
+            );
+          }
+          messages.push({
+            role: "user",
+            content: content.length > 0 ? content : " ",
+          });
+
+          await streamAnthropicMessages({
+            client,
+            model: modelName,
+            messages,
+            system: systemInstruction,
+            temperature: config?.temperature,
+            tools: convertToolsToAnthropic(tools),
+            useReasoning: config?.useReasoning,
+            reasoningMode: config?.reasoningMode,
+            betas: [ANTHROPIC_FILES_BETA],
+            signal,
+            onChunk: send,
+          });
+        } finally {
+          await prepared.cleanup();
+        }
       } else if (isGoogleProviderType(provider.type)) {
         // Google
         await ProviderFactory.assertProviderOutboundAllowed(provider, signal);
         const client = ProviderFactory.createGoogleClient(provider);
-        const contents = prepareGeminiHistory(history);
-
-        // 添加新消息
-        const parts: any[] = [{ text: newMessage }];
-        if (attachments?.length) {
-          // 转换附件为 Gemini 格式
-          const geminiAttachments = attachments
-            .map((att: any) => {
-              // 如果已经是正确的 Gemini 格式
-              if (att.fileData) {
-                return att;
-              }
-              if (att.inlineData) {
-                return att;
-              }
-
-              // 转换原始附件对象
-              if (att.url && !att.data) {
-                // 远程文件
-                return {
-                  fileData: {
-                    mimeType: att.mimeType,
-                    fileUri: att.url,
-                  },
-                };
-              }
-
-              if (att.data) {
-                // Base64 数据
-                return {
-                  inlineData: {
-                    mimeType: att.mimeType,
-                    data: att.data,
-                  },
-                };
-              }
-
-              // 如果既没有 url 也没有 data，跳过这个附件
-              logDevWarn("Skipping invalid attachment:", {
-                fileName: att.fileName,
-                mimeType: att.mimeType,
-              });
-              return null;
-            })
-            .filter(Boolean); // 过滤掉 null 值
-
-          parts.push(...geminiAttachments);
-        }
-        contents.push({ role: "user", parts });
-
-        // 转换工具格式
-        const geminiTools = tools?.map((tool: any) => ({
-          name: tool.function.name,
-          description: tool.function.description,
-          parameters: convertSchemaToGemini(tool.function.parameters),
-        }));
-
-        await streamGeminiResponse({
+        const prepared = await uploadGoogleImageFiles(
           client,
-          model: modelName,
-          contents,
-          systemInstruction,
-          temperature: config?.temperature,
-          tools: geminiTools,
-          enableGoogleSearch,
-          enableImageGeneration,
-          imageCount: config?.imageCount,
-          useReasoning: config?.useReasoning,
-          reasoningMode: config?.reasoningMode,
+          history,
+          attachments || [],
           signal,
-          onChunk: send,
-        });
+        );
+        try {
+          const contents = prepareGeminiHistory(prepared.history);
+          const parts: any[] = [{ text: newMessage }];
+          if (prepared.attachments.length) {
+            parts.push(...convertAttachmentsToGemini(prepared.attachments));
+          }
+          contents.push({ role: "user", parts });
+
+          const geminiTools = tools?.map((tool: any) => ({
+            name: tool.function.name,
+            description: tool.function.description,
+            parameters: convertSchemaToGemini(tool.function.parameters),
+          }));
+
+          await streamGeminiResponse({
+            client,
+            model: modelName,
+            contents,
+            systemInstruction,
+            temperature: config?.temperature,
+            tools: geminiTools,
+            enableGoogleSearch,
+            enableImageGeneration,
+            imageCount: config?.imageCount,
+            useReasoning: config?.useReasoning,
+            reasoningMode: config?.reasoningMode,
+            signal,
+            onChunk: send,
+          });
+        } finally {
+          await prepared.cleanup();
+        }
       } else {
         throw new Error(`Unsupported provider type: ${provider.type}`);
       }

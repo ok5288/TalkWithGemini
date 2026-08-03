@@ -62,6 +62,7 @@ function createNextConfig(phase: string): NextConfig {
     allowedDevOrigins: ["127.0.0.1"],
     experimental: {
       optimizePackageImports: ["lucide-react"],
+      proxyClientMaxBodySize: "36mb",
     },
     async headers() {
       return [

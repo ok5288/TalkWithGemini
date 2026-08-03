@@ -61,6 +61,7 @@ import {
 } from "@/services/api/voiceService";
 import {
   ATTACHMENT_LIMITS,
+  IMAGE_ATTACHMENT_LIMITS,
   formatBytes,
   getAttachmentPayloadChars,
   getAttachmentsPayloadChars,
@@ -73,6 +74,7 @@ import {
   extractChatAttachmentFilesFromClipboard,
   extractChatAttachmentFilesFromDrop,
   getChatAttachmentFileSelectionMessage,
+  isChatImageFileCandidate,
   selectChatAttachmentFiles,
 } from "@/lib/utils/chatAttachmentFiles";
 import {
@@ -84,10 +86,11 @@ import { hasPluginAuthValue } from "@/lib/security/localSecretResolvers";
 import { isPluginAuthRequired } from "@/lib/plugin/config";
 import { isKnowledgeAttachment } from "@/lib/utils/knowledgeAttachments";
 import { createChatDocumentAttachment } from "@/lib/utils/documentAttachments";
-import { ensureImageDisplayCache } from "@/lib/utils/imageDisplayCache";
 import {
-  compressImageFile,
   getImageCompressionConfig,
+  ImageAttachmentPreparationError,
+  prepareImageFileForAttachment,
+  type ImagePreparationStage,
 } from "@/lib/utils/imageCompression";
 import { polishTextContent } from "@/services/artifactService";
 import { normalizeSkillIdRefs } from "@/lib/skills";
@@ -117,6 +120,8 @@ import {
 } from "@/components/shortcuts/ShortcutHint";
 
 type MessageInputVariant = "default" | "hero";
+type AttachmentProcessingStage =
+  ImagePreparationStage | "preparing" | "parsing";
 
 interface MessageInputProps {
   onSend: (
@@ -210,6 +215,8 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
     const [isDragUploadActive, setIsDragUploadActive] = useState(false);
     const [isPolishingInput, setIsPolishingInput] = useState(false);
     const [isParsingAttachments, setIsParsingAttachments] = useState(false);
+    const [attachmentProcessingStage, setAttachmentProcessingStage] =
+      useState<AttachmentProcessingStage>("preparing");
     const [isPreparingSend, setIsPreparingSend] = useState(false);
 
     const t = useTranslations("MessageInput");
@@ -296,6 +303,7 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
     const isMountedRef = useRef(true);
     const recordingSessionRef = useRef(0);
     const fileSelectionRunRef = useRef(0);
+    const fileSelectionAbortRef = useRef<AbortController | null>(null);
     const polishRunRef = useRef(0);
     const dragDepthRef = useRef(0);
 
@@ -323,6 +331,8 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
         isMountedRef.current = false;
         recordingSessionRef.current += 1;
         fileSelectionRunRef.current += 1;
+        fileSelectionAbortRef.current?.abort();
+        fileSelectionAbortRef.current = null;
         polishRunRef.current += 1;
         clearRecordingTimer();
 
@@ -1034,19 +1044,10 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
       }
     };
 
-    const fileToBase64 = (file: File): Promise<string> => {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = (error) => reject(error);
-      });
-    };
-
     const canAttachFileNatively = (file: File): boolean => {
       if (!isNativeMediaFile(file)) return false;
       if (modelCapabilities.attachment) return true;
-      if (file.type.startsWith("image/")) return modelCapabilities.vision;
+      if (isChatImageFileCandidate(file)) return modelCapabilities.vision;
       if (file.type.startsWith("audio/")) return modelCapabilities.audio;
       if (file.type.startsWith("video/")) return modelCapabilities.video;
       return false;
@@ -1069,25 +1070,80 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
 
       const runId = fileSelectionRunRef.current + 1;
       fileSelectionRunRef.current = runId;
+      fileSelectionAbortRef.current?.abort();
+      const abortController = new AbortController();
+      fileSelectionAbortRef.current = abortController;
       const selection = selectChatAttachmentFiles(attachments.length, files, {
         maxFileBytes: maxAttachmentFileBytes,
+        maxImageFileBytes: IMAGE_ATTACHMENT_LIMITS.maxSourceBytes,
       });
-      const selectionMessage = getChatAttachmentFileSelectionMessage(
-        selection,
-        {
-          maxFileBytes: maxAttachmentFileBytes,
-        },
-      );
-      if (selectionMessage) setErrorMsg(selectionMessage);
+      let deferredError = getChatAttachmentFileSelectionMessage(selection, {
+        maxFileBytes: maxAttachmentFileBytes,
+        maxImageFileBytes: IMAGE_ATTACHMENT_LIMITS.maxSourceBytes,
+      });
+      if (
+        selection.rejectedByCount.length === 0 &&
+        selection.rejectedBySize.length > 0 &&
+        selection.rejectedBySize.every(isChatImageFileCandidate)
+      ) {
+        deferredError = t("imageTooLarge", {
+          size: formatBytes(IMAGE_ATTACHMENT_LIMITS.maxSourceBytes),
+        });
+      }
+      if (selection.accepted.length === 0) {
+        if (deferredError) setErrorMsg(deferredError);
+        if (closeAttachMenu) setShowAttachMenu(false);
+        if (fileSelectionAbortRef.current === abortController) {
+          fileSelectionAbortRef.current = null;
+        }
+        return;
+      }
       const newAttachments: Attachment[] = [];
 
+      setErrorMsg(null);
+      setAttachmentProcessingStage("preparing");
       setIsParsingAttachments(true);
       try {
         for (const file of selection.accepted) {
           const useNativeAttachment =
             !documentsOnly && canAttachFileNatively(file);
           try {
+            abortController.signal.throwIfAborted();
             if (useNativeAttachment) {
+              if (isChatImageFileCandidate(file)) {
+                const preparedFile = await prepareImageFileForAttachment(
+                  file,
+                  getImageCompressionConfig(system),
+                  {
+                    signal: abortController.signal,
+                    maxOutputBytes: maxAttachmentFileBytes,
+                    onStage: (stage) => {
+                      if (
+                        isMountedRef.current &&
+                        fileSelectionRunRef.current === runId
+                      ) {
+                        setAttachmentProcessingStage(stage);
+                      }
+                    },
+                  },
+                );
+                const url = await saveToOPFS(preparedFile, "chat/images");
+                if (
+                  !isMountedRef.current ||
+                  fileSelectionRunRef.current !== runId
+                ) {
+                  return;
+                }
+                newAttachments.push({
+                  id: uuidv7(),
+                  mimeType: preparedFile.type,
+                  url,
+                  fileName: preparedFile.name,
+                });
+                continue;
+              }
+
+              setAttachmentProcessingStage("preparing");
               if (
                 file.type.startsWith("audio/") ||
                 file.type.startsWith("video/")
@@ -1110,39 +1166,9 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
                 });
                 continue;
               }
-
-              const preparedFile = file.type.startsWith("image/")
-                ? await compressImageFile(
-                    file,
-                    getImageCompressionConfig(system),
-                  )
-                : file;
-              const base64 = await fileToBase64(preparedFile);
-              if (
-                !isMountedRef.current ||
-                fileSelectionRunRef.current !== runId
-              ) {
-                return;
-              }
-              const base64Data = base64.split(",")[1];
-
-              const attachment: Attachment = {
-                id: uuidv7(),
-                mimeType: preparedFile.type || "application/octet-stream",
-                data: base64Data,
-                fileName: preparedFile.name,
-              };
-
-              newAttachments.push(
-                attachment.mimeType.startsWith("image/")
-                  ? await ensureImageDisplayCache(attachment, {
-                      prefix: "chat/images",
-                    })
-                  : attachment,
-              );
-              continue;
             }
 
+            setAttachmentProcessingStage("parsing");
             const result = await createChatDocumentAttachment(file, {
               id: uuidv7(),
               rag,
@@ -1162,30 +1188,47 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
             ) {
               return;
             }
+            if (err instanceof Error && err.name === "AbortError") return;
             logInputError(
               useNativeAttachment
                 ? "Error reading file"
                 : "Error parsing document attachment",
               err,
             );
-            setErrorMsg(
-              t(
+            if (err instanceof ImageAttachmentPreparationError) {
+              deferredError = t(
+                err.code === "compressed-too-large"
+                  ? "imageStillTooLarge"
+                  : "imageTooLarge",
+                { size: formatBytes(err.limitBytes) },
+              );
+            } else if (isChatImageFileCandidate(file)) {
+              deferredError = t("failedToProcessImage", {
+                fileName: file.name,
+              });
+            } else {
+              deferredError = t(
                 useNativeAttachment
                   ? "failedToReadFile"
                   : "failedToParseDocument",
                 { fileName: file.name },
-              ),
-            );
+              );
+            }
           }
         }
 
         if (isMountedRef.current && fileSelectionRunRef.current === runId) {
           appendAttachments(newAttachments);
           if (closeAttachMenu) setShowAttachMenu(false);
+          if (deferredError) setErrorMsg(deferredError);
         }
       } finally {
         if (isMountedRef.current && fileSelectionRunRef.current === runId) {
           setIsParsingAttachments(false);
+          setAttachmentProcessingStage("preparing");
+          if (fileSelectionAbortRef.current === abortController) {
+            fileSelectionAbortRef.current = null;
+          }
         }
       }
     };
@@ -1236,6 +1279,14 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
     const hasKnowledgeAttachments = attachments.some(isKnowledgeAttachment);
     const isInputBusy =
       disabled || isTranscribing || isParsingAttachments || isPreparingSend;
+    const attachmentProcessingLabel =
+      attachmentProcessingStage === "converting"
+        ? t("convertingImage")
+        : attachmentProcessingStage === "compressing"
+          ? t("compressingImage")
+          : attachmentProcessingStage === "parsing"
+            ? t("parsingDocument")
+            : t("preparingAttachment");
     const attachmentActionsDisabled = isInputBusy || offline;
     const textareaMinHeightClass = isHeroVariant
       ? "min-h-[5em]"
@@ -1322,11 +1373,11 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
         )}
 
         {/* Error Message Toast */}
-        {errorMsg && (
+        {errorMsg && !isParsingAttachments && (
           <div
             id={errorMessageId}
-            role="status"
-            aria-live="polite"
+            role="alert"
+            aria-live="assertive"
             className="absolute -top-10 left-0 right-0 flex justify-center z-50 animate-in fade-in slide-in-from-bottom-2"
           >
             <div className="bg-red-600 text-white text-xs px-3 py-1.5 rounded-full shadow-lg font-medium flex items-center gap-2 dark:bg-red-500">
@@ -1343,7 +1394,7 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
           </div>
         )}
 
-        {!errorMsg && isParsingAttachments && (
+        {isParsingAttachments && (
           <div
             role="status"
             aria-live="polite"
@@ -1351,7 +1402,7 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
           >
             <div className="flex items-center gap-2 rounded-full bg-gray-900 px-3 py-1.5 text-xs font-medium text-white shadow-lg dark:bg-muted dark:text-foreground">
               <Loader2 size={12} className="animate-spin" aria-hidden="true" />
-              <span>{t("parsingDocument")}</span>
+              <span>{attachmentProcessingLabel}</span>
             </div>
           </div>
         )}
@@ -1419,7 +1470,9 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
               : t("askAnything")
           }
           autoComplete="off"
-          aria-describedby={errorMsg ? errorMessageId : undefined}
+          aria-describedby={
+            errorMsg && !isParsingAttachments ? errorMessageId : undefined
+          }
           aria-keyshortcuts={focusComposerShortcut.ariaKeyShortcuts}
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -1461,7 +1514,7 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
                 onChange={handleFileSelect}
                 className="hidden"
                 multiple
-                accept="image/*"
+                accept="image/*,.heic,.heif"
               />
               {/* Fallback Input for dumb models */}
               <input

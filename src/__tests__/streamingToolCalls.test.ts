@@ -891,6 +891,30 @@ describe("streamed tool-call normalization", () => {
     expect(request.thinking).toEqual({ type: "adaptive" });
   });
 
+  it("uses the Anthropic beta Messages client for file references", async () => {
+    const stableCreate = vi.fn();
+    const betaCreate = vi.fn(async () => asyncChunks([]));
+    const client = {
+      messages: { create: stableCreate },
+      beta: { messages: { create: betaCreate } },
+    };
+
+    await streamAnthropicMessages({
+      client: client as any,
+      model: "claude-test",
+      messages: [{ role: "user", content: "Describe the file" }],
+      betas: ["files-api-2025-04-14"],
+      onChunk: () => undefined,
+    });
+
+    expect(stableCreate).not.toHaveBeenCalled();
+    expect(betaCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        betas: ["files-api-2025-04-14"],
+      }),
+    );
+  });
+
   it("maps Anthropic explicit reasoning modes to thinking budgets", async () => {
     const client = {
       messages: {

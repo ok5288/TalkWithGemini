@@ -2,11 +2,13 @@
 
 import type { Options as BrowserImageCompressionOptions } from "browser-image-compression";
 import type { Attachment, SystemSettings } from "@/types";
+import { IMAGE_ATTACHMENT_LIMITS } from "@/config/limits";
 import { normalizeSystemSettings } from "@/lib/settings/appConfig";
-import { base64ToBytes, bytesToArrayBuffer, bytesToBase64 } from "./binary";
+import { base64ToBytes, bytesToArrayBuffer } from "./binary";
 import { logDevWarn } from "./devLogger";
 import { ensureImageDisplayCache } from "./imageDisplayCache";
-import { isOPFSUrl, resolveOPFSBlob } from "@/utils/opfs";
+import { getChatImageMimeType, isHeicImageFile } from "./chatAttachmentFiles";
+import { isOPFSUrl, resolveOPFSBlob, saveToOPFS } from "@/utils/opfs";
 
 const SUPPORTED_IMAGE_MIME_TYPES = new Set([
   "image/bmp",
@@ -33,10 +35,21 @@ export type ImageCompressor = (
   options: BrowserImageCompressionOptions,
 ) => Promise<File>;
 
+export type ImagePreparationStage = "converting" | "compressing";
+
+export type HeicConverter = (options: {
+  blob: Blob;
+  type: "image/jpeg";
+  quality: number;
+}) => Promise<Blob>;
+
 export interface ImageCompressionRuntimeOptions {
   signal?: AbortSignal;
   readDimensions?: (file: File) => Promise<ImageDimensions>;
   compress?: ImageCompressor;
+  convertHeic?: HeicConverter;
+  maxOutputBytes?: number;
+  onStage?: (stage: ImagePreparationStage) => void;
 }
 
 type ResolveOPFSBlob = (url: string) => Promise<Blob | null>;
@@ -49,6 +62,23 @@ export interface PrepareImageAttachmentsOptions extends ImageCompressionRuntimeO
   saveFile?: SaveFile;
   deleteFile?: DeleteFile;
   now?: () => number;
+}
+
+export type ImageAttachmentPreparationErrorCode =
+  "source-too-large" | "compressed-too-large" | "prepared-too-large";
+
+export class ImageAttachmentPreparationError extends Error {
+  constructor(
+    readonly code: ImageAttachmentPreparationErrorCode,
+    readonly limitBytes: number,
+  ) {
+    super(
+      code === "source-too-large"
+        ? "The source image is too large."
+        : "The prepared image is too large.",
+    );
+    this.name = "ImageAttachmentPreparationError";
+  }
 }
 
 function createAbortError(signal?: AbortSignal): Error {
@@ -90,6 +120,50 @@ function createFile(
     name: fileName,
     lastModified: options.lastModified ?? Date.now(),
   }) as File;
+}
+
+function jpegFileName(fileName: string): string {
+  if (/\.(?:heic|heif)$/i.test(fileName)) {
+    return fileName.replace(/\.(?:heic|heif)$/i, ".jpg");
+  }
+  const extensionIndex = fileName.lastIndexOf(".");
+  return `${extensionIndex > 0 ? fileName.slice(0, extensionIndex) : fileName}.jpg`;
+}
+
+function normalizeImageFileMimeType(file: File): File {
+  if (isHeicImageFile(file)) return file;
+  const mimeType = getChatImageMimeType(file);
+  if (!mimeType || mimeType === file.type.toLowerCase()) return file;
+  return createFile([file], file.name, {
+    type: mimeType,
+    lastModified: file.lastModified,
+  });
+}
+
+export async function convertHeicToJpegFile(
+  file: File,
+  runtime: Pick<
+    ImageCompressionRuntimeOptions,
+    "convertHeic" | "onStage" | "signal"
+  > = {},
+): Promise<File> {
+  if (!isHeicImageFile(file)) return file;
+
+  throwIfAborted(runtime.signal);
+  runtime.onStage?.("converting");
+  const convertHeic =
+    runtime.convertHeic || (await import("heic-to/csp")).heicTo;
+  const jpeg = await convertHeic({
+    blob: file,
+    type: "image/jpeg",
+    quality: 0.9,
+  });
+  throwIfAborted(runtime.signal);
+
+  return createFile([jpeg], jpegFileName(file.name), {
+    type: "image/jpeg",
+    lastModified: file.lastModified,
+  });
 }
 
 async function readDimensionsWithImageElement(
@@ -249,6 +323,62 @@ export async function compressImageFile(
   }
 }
 
+export async function prepareImageFileForAttachment(
+  file: File,
+  config: ImageCompressionConfig,
+  runtime: ImageCompressionRuntimeOptions = {},
+): Promise<File> {
+  throwIfAborted(runtime.signal);
+  if (file.size > IMAGE_ATTACHMENT_LIMITS.maxSourceBytes) {
+    throw new ImageAttachmentPreparationError(
+      "source-too-large",
+      IMAGE_ATTACHMENT_LIMITS.maxSourceBytes,
+    );
+  }
+
+  const forceCompression =
+    file.size > IMAGE_ATTACHMENT_LIMITS.compressionThresholdBytes;
+  const wasHeic = isHeicImageFile(file);
+  const converted = await convertHeicToJpegFile(
+    normalizeImageFileMimeType(file),
+    runtime,
+  );
+  const shouldEnableCompression = config.enabled || forceCompression || wasHeic;
+  const effectiveConfig: ImageCompressionConfig = {
+    ...config,
+    enabled: shouldEnableCompression,
+    maxSizeMB: forceCompression
+      ? Math.min(
+          config.maxSizeMB,
+          IMAGE_ATTACHMENT_LIMITS.maxCompressedBytes / BYTES_PER_MEGABYTE,
+        )
+      : config.maxSizeMB,
+  };
+
+  if (effectiveConfig.enabled) runtime.onStage?.("compressing");
+  const prepared = await compressImageFile(converted, effectiveConfig, runtime);
+  throwIfAborted(runtime.signal);
+
+  const configuredOutputLimit = Math.min(
+    runtime.maxOutputBytes ?? IMAGE_ATTACHMENT_LIMITS.maxRequestFileBytes,
+    IMAGE_ATTACHMENT_LIMITS.maxRequestFileBytes,
+  );
+  const outputLimit = forceCompression
+    ? Math.min(
+        configuredOutputLimit,
+        IMAGE_ATTACHMENT_LIMITS.maxCompressedBytes,
+      )
+    : configuredOutputLimit;
+  if (prepared.size > outputLimit) {
+    throw new ImageAttachmentPreparationError(
+      forceCompression ? "compressed-too-large" : "prepared-too-large",
+      outputLimit,
+    );
+  }
+
+  return prepared;
+}
+
 async function createAttachmentFile(
   attachment: Attachment,
   options: PrepareImageAttachmentsOptions,
@@ -293,15 +423,25 @@ export async function compressImageAttachment(
     const compressed = await compressImageFile(file, config, options);
     if (compressed === file) return attachment;
 
-    const data = bytesToBase64(new Uint8Array(await compressed.arrayBuffer()));
-    throwIfAborted(options.signal);
+    if (options.prefix) {
+      const updated = {
+        ...attachment,
+        mimeType: compressed.type,
+        fileName: compressed.name,
+        url: await (options.saveFile || saveToOPFS)(compressed, options.prefix),
+      };
+      delete updated.data;
+      delete updated.displayCache;
+      return updated;
+    }
 
-    const updated = {
+    const updated: Attachment & { file?: File } = {
       ...attachment,
-      mimeType: file.type,
-      fileName: file.name,
-      data,
+      mimeType: compressed.type,
+      fileName: compressed.name,
+      file: compressed,
     };
+    delete updated.data;
     delete updated.url;
     delete updated.displayCache;
     return updated;
@@ -324,7 +464,7 @@ async function prepareImageAttachments(
   const compressedAttachments = await compressImageAttachments(
     attachments,
     config,
-    options,
+    { ...options, prefix: options.prefix || defaultPrefix },
   );
   const prepared: Attachment[] = [];
 
@@ -337,7 +477,17 @@ async function prepareImageAttachments(
       now: options.now,
       signal: options.signal,
     });
-    prepared.push(cached);
+    if (cached.data && cached.displayCache?.opfsUrl) {
+      const fileBacked = {
+        ...cached,
+        url: cached.displayCache.opfsUrl,
+      };
+      delete fileBacked.data;
+      delete fileBacked.displayCache;
+      prepared.push(fileBacked);
+    } else {
+      prepared.push(cached);
+    }
   }
 
   return prepared;

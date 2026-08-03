@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  convertAttachmentsToAnthropic,
+  convertAttachmentsToGemini,
+  convertAttachmentsToOpenAI,
+  convertAttachmentsToOpenAIResponses,
   processAttachmentsForModel,
   stripAttachmentsDisplayCacheForModel,
 } from "../lib/utils/attachments";
@@ -7,6 +11,57 @@ import {
 describe("attachment processing", () => {
   const encodeText = (value: string) =>
     btoa(unescape(encodeURIComponent(value)));
+
+  it("uses provider file references and never rebuilds inline image payloads", () => {
+    const inlineImage = {
+      id: "inline",
+      mimeType: "image/png",
+      fileName: "inline.png",
+      data: "aW1hZ2U=",
+    };
+    expect(convertAttachmentsToGemini([inlineImage])).toEqual([]);
+    expect(convertAttachmentsToOpenAI([inlineImage])).toEqual([]);
+    expect(convertAttachmentsToOpenAIResponses([inlineImage])).toEqual([]);
+    expect(convertAttachmentsToAnthropic([inlineImage])).toEqual([]);
+
+    expect(
+      convertAttachmentsToOpenAIResponses([
+        { ...inlineImage, data: undefined, providerFileId: "file_openai" },
+      ] as any),
+    ).toEqual([
+      {
+        type: "input_image",
+        file_id: "file_openai",
+        detail: "auto",
+      },
+    ]);
+    expect(
+      convertAttachmentsToAnthropic([
+        { ...inlineImage, data: undefined, providerFileId: "file_anthropic" },
+      ] as any),
+    ).toEqual([
+      {
+        type: "image",
+        source: { type: "file", file_id: "file_anthropic" },
+      },
+    ]);
+    expect(
+      convertAttachmentsToGemini([
+        {
+          ...inlineImage,
+          data: undefined,
+          providerFileUri: "https://files.example/image",
+        },
+      ] as any),
+    ).toEqual([
+      {
+        fileData: {
+          mimeType: "image/png",
+          fileUri: "https://files.example/image",
+        },
+      },
+    ]);
+  });
 
   it("converts OPFS text attachments into prompt context without keeping the local URL", async () => {
     const revokeObjectURL = vi

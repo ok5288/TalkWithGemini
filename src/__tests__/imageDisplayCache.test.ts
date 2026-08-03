@@ -145,7 +145,7 @@ describe("image display cache", () => {
     ).resolves.toBe("blob:from-data");
   });
 
-  it("strips display cache before model requests and converts legacy OPFS-only images to base64", async () => {
+  it("strips display cache but keeps OPFS images file-backed for model requests", async () => {
     const cached = imageAttachment({
       displayCache: {
         opfsUrl: "opfs://images/generated/cache.png",
@@ -170,8 +170,13 @@ describe("image display cache", () => {
     const converted = await stripAttachmentDisplayCacheForModel(legacy, {
       resolveOPFSBlob: async () => new Blob(["legacy"], { type: "image/png" }),
     });
-    expect(converted).toMatchObject({ data: "bGVnYWN5" });
-    expect(converted).not.toHaveProperty("url");
+    expect(converted).toEqual({
+      id: "img_1",
+      mimeType: "image/png",
+      fileName: "image.png",
+      url: "opfs://images/generated/legacy.png",
+    });
+    expect(converted).not.toHaveProperty("data");
   });
 
   it("removes display-only tool result images from model history", async () => {

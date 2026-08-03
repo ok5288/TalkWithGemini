@@ -34,6 +34,7 @@ export interface AnthropicMessagesStreamOptions {
   tools?: Tool[];
   useReasoning?: boolean;
   reasoningMode?: ReasoningMode;
+  betas?: string[];
   signal?: AbortSignal;
   onChunk: (message: SSEMessage) => void;
 }
@@ -123,6 +124,7 @@ export async function streamAnthropicMessages(
     tools,
     useReasoning,
     reasoningMode: rawReasoningMode,
+    betas,
     signal,
     onChunk,
   } = options;
@@ -143,10 +145,13 @@ export async function streamAnthropicMessages(
     requestParams.temperature = temperature;
   }
   if (tools && tools.length > 0) requestParams.tools = tools;
+  if (betas && betas.length > 0) requestParams.betas = betas;
 
+  const messagesClient =
+    betas && betas.length > 0 ? (client as any).beta.messages : client.messages;
   const stream = (await (signal
-    ? client.messages.create(requestParams, { signal })
-    : client.messages.create(requestParams))) as any;
+    ? messagesClient.create(requestParams, { signal })
+    : messagesClient.create(requestParams))) as any;
   const pendingToolUses = new Map<number, PendingAnthropicToolUse>();
   let inputTokens = 0;
   let emittedToolCalls = 0;

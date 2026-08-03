@@ -112,7 +112,7 @@ describe("generated image attachment normalization", () => {
     expect(attachments).toHaveLength(ATTACHMENT_LIMITS.maxCount);
   });
 
-  it("adds OPFS display cache metadata to generated image attachments", async () => {
+  it("promotes generated inline images to OPFS-backed attachments", async () => {
     const saveFile = vi.fn(async () => "opfs://images/generated/image.png");
     const [attachment] = normalizeGeneratedImageAttachments([
       {
@@ -138,13 +138,10 @@ describe("generated image attachment normalization", () => {
 
     expect(cached[0]).toMatchObject({
       id: "img_1",
-      data: "aW1hZ2U=",
-      displayCache: {
-        opfsUrl: "opfs://images/generated/image.png",
-        sourceKind: "data",
-        createdAt: 456,
-      },
+      url: "opfs://images/generated/image.png",
     });
+    expect(cached[0]).not.toHaveProperty("data");
+    expect(cached[0]).not.toHaveProperty("displayCache");
     expect(saveFile).toHaveBeenCalledTimes(1);
   });
 

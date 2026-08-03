@@ -55,6 +55,49 @@ describe("api schemas", () => {
     ).toThrow(/encrypted BYOK secret/i);
   });
 
+  it("rejects Base64 image attachments in current and historical chat input", () => {
+    const image = {
+      id: "inline",
+      mimeType: "image/png",
+      fileName: "inline.png",
+      data: "aW1hZ2U=",
+    };
+    const baseRequest = {
+      provider: { type: "Gemini", apiKeySecret: encryptedSecret },
+      modelName: "gemini-test",
+      history: [],
+      newMessage: "describe",
+    };
+
+    expect(() =>
+      ChatRequestSchema.parse({ ...baseRequest, attachments: [image] }),
+    ).toThrow(/uploaded as files/i);
+    expect(() =>
+      ChatRequestSchema.parse({
+        ...baseRequest,
+        history: [
+          {
+            role: "user",
+            content: "earlier",
+            attachments: [image],
+          },
+        ],
+      }),
+    ).toThrow(/uploaded as files/i);
+    expect(() =>
+      ChatRequestSchema.parse({
+        ...baseRequest,
+        attachments: [
+          {
+            id: "missing",
+            mimeType: "image/png",
+            fileName: "missing.png",
+          },
+        ],
+      }),
+    ).toThrow(/source is required/i);
+  });
+
   it("rejects unknown high-risk request fields", () => {
     expect(() =>
       ChatRequestSchema.parse({
@@ -363,7 +406,7 @@ describe("api schemas", () => {
     ).toThrow();
   });
 
-  it("accepts optional image generation count and private HTTPS edit attachments", () => {
+  it("accepts file-upload image descriptors and private HTTPS edit attachments", () => {
     const baseRequest = {
       provider: { type: "OpenAI", apiKeySecret: encryptedSecret },
       modelName: "gpt-image-2",
@@ -379,11 +422,25 @@ describe("api schemas", () => {
             id: "att_1",
             mimeType: "image/png",
             fileName: "source.png",
-            data: "abc",
+            uploadId: "image-0",
           },
         ],
       }),
     ).toMatchObject({ imageCount: 4 });
+
+    expect(() =>
+      ImageGenerateRequestSchema.parse({
+        ...baseRequest,
+        attachments: [
+          {
+            id: "legacy-inline",
+            mimeType: "image/png",
+            fileName: "inline.png",
+            data: "abc",
+          },
+        ],
+      }),
+    ).toThrow(/uploaded as files/i);
 
     expect(() =>
       ImageGenerateRequestSchema.parse({

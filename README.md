@@ -41,8 +41,8 @@ It is designed for people who want the power of modern AI workspaces without giv
 - Added collection-level chunking controls, Markdown heading-aware previews,
   explicit reindexing, hybrid lexical/vector retrieval, graceful lexical
   fallback, stable source previews, file filtering, and serial batch operations.
-- Added configurable client-side image compression for conversation, workspace,
-  generated, and plugin images, with cancellation and original-file fallback.
+- Added HEIC/HEIF conversion, staged client-side image compression, and
+  file-backed multimodal uploads for native OpenAI, Google, and Anthropic chat.
 - Added legacy SSE compatibility for remote MCP, connection-stage-only fallback,
   encrypted install-time credentials, and an authenticated Docker stdio bridge
   whose commands remain fixed by deployment configuration.
@@ -86,9 +86,9 @@ See [CHANGELOG.md](CHANGELOG.md) for the complete release notes.
 - Multi-provider chat with Google, Anthropic, OpenAI, and OpenAI-compatible
   endpoints, including provider-scoped custom model capabilities.
 - Native image generation and image editing for models whose metadata exposes image output/input, with ordered mixed text/image message blocks and OPFS-backed Blob URL display caching.
-- Configurable client-side compression for supported uploaded and generated
-  images before storage or model use, with long-image safeguards and safe
-  original-file fallback.
+- File-backed multimodal image input without Base64 for native OpenAI, Google,
+  and Anthropic chat; HEIC/HEIF conversion and staged client-side compression
+  enforce the 20 MiB source, 10 MiB force-compression, and 5 MiB result limits.
 - Local-first sessions, branches, pinned chats, per-chat composer drafts, reply
   navigation, token/context usage summaries, workspaces, workspace files, and
   assistant instructions.

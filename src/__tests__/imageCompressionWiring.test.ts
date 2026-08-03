@@ -7,7 +7,7 @@ function readProjectFile(path: string): string {
 }
 
 describe("image compression wiring", () => {
-  it("compresses selected, dropped, and pasted images before Base64 and cache writes", () => {
+  it("prepares selected, dropped, and pasted images as OPFS-backed files", () => {
     const source = readProjectFile("src/components/chat/MessageInput.tsx");
     const pipeline = source.slice(
       source.indexOf("const processSelectedFiles"),
@@ -15,14 +15,14 @@ describe("image compression wiring", () => {
     );
 
     expect(pipeline.indexOf("selectChatAttachmentFiles")).toBeLessThan(
-      pipeline.indexOf("compressImageFile"),
+      pipeline.indexOf("prepareImageFileForAttachment"),
     );
-    expect(pipeline.indexOf("compressImageFile")).toBeLessThan(
-      pipeline.indexOf("fileToBase64(preparedFile)"),
+    expect(pipeline.indexOf("prepareImageFileForAttachment")).toBeLessThan(
+      pipeline.indexOf('saveToOPFS(preparedFile, "chat/images")'),
     );
-    expect(pipeline.indexOf("fileToBase64(preparedFile)")).toBeLessThan(
-      pipeline.indexOf("ensureImageDisplayCache"),
-    );
+    expect(pipeline).toContain("onStage: (stage)");
+    expect(pipeline).not.toContain("readAsDataURL");
+    expect(pipeline).not.toContain("fileToBase64");
 
     const dropHandler = source.slice(
       source.indexOf("const handleComposerDrop"),

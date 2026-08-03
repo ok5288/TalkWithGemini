@@ -21,6 +21,7 @@ import {
 import { logDevError, logDevInfo } from "../utils/devLogger";
 
 export type ApiHandler = (request: NextRequest, body: any) => Promise<Response>;
+export type RequestBodyReader = (request: Request) => Promise<unknown>;
 
 const jsonDecoder = new TextDecoder();
 
@@ -154,10 +155,13 @@ export function withApiHandler(handler: ApiHandler) {
 /**
  * 包装流式 API 处理器，错误以 SSE 格式返回
  */
-export function withStreamApiHandler(handler: ApiHandler) {
+export function withStreamApiHandler(
+  handler: ApiHandler,
+  readBody: RequestBodyReader = readJsonRequestBody,
+) {
   return async (request: NextRequest): Promise<Response> => {
     try {
-      const body = await readJsonRequestBody(request);
+      const body = await readBody(request);
       return await handler(request, body);
     } catch (error) {
       if (isRequestAbort(error, request)) return createClientClosedResponse();

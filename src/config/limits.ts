@@ -10,6 +10,13 @@ export const ATTACHMENT_LIMITS = {
   maxMimeTypeChars: 200,
 } as const;
 
+export const IMAGE_ATTACHMENT_LIMITS = {
+  compressionThresholdBytes: 10 * 1024 * 1024,
+  maxSourceBytes: 20 * 1024 * 1024,
+  maxCompressedBytes: 5 * 1024 * 1024,
+  maxRequestFileBytes: 10 * 1024 * 1024,
+} as const;
+
 const MAX_ATTACHMENT_FILE_BYTES_ENV = "MAX_ATTACHMENT_FILE_BYTES";
 const ATTACHMENT_BASE64_DECODE_RATIO = 3 / 4;
 

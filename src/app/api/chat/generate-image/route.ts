@@ -4,11 +4,12 @@ import {
   assertProviderOutboundAllowed,
   createGoogleClient,
 } from "@/utils/apiHelpers";
-import {
-  createApiErrorResponse,
-  readJsonRequestBody,
-} from "@/lib/api/middleware";
+import { createApiErrorResponse } from "@/lib/api/middleware";
 import { ImageGenerateRequestSchema } from "@/lib/api/schemas";
+import {
+  hydrateChatImageUploads,
+  readChatRequestBody,
+} from "@/lib/api/chatMultipart";
 import { safeFetchJson } from "@/lib/security/safeFetch";
 import {
   getProviderApiKey,
@@ -22,32 +23,28 @@ import {
   isGoogleProviderType,
   isOpenAIProviderType,
 } from "@/lib/providers/providerTypes";
-import type { Attachment } from "@/types";
+import { convertAttachmentsToGemini } from "@/lib/utils/attachments";
+import {
+  type ProviderImageAttachment,
+  uploadGoogleImageFiles,
+} from "@/lib/providers/imageFiles";
 
-function base64ToBlob(data: string, mimeType: string): Blob {
-  const binary = atob(data);
-  const bytes = new Uint8Array(binary.length);
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
-  }
-  return new Blob([bytes], { type: mimeType });
-}
-
-function appendOpenAIEditImages(formData: FormData, attachments: Attachment[]) {
+function appendOpenAIEditImages(
+  formData: FormData,
+  attachments: ProviderImageAttachment[],
+) {
   const images = attachments.filter((attachment) =>
     attachment.mimeType.toLowerCase().startsWith("image/"),
   );
   if (images.length === 0) return false;
 
   for (const [index, attachment] of images.entries()) {
-    if (!attachment.data) {
-      throw new Error(
-        "Image editing requires uploaded image attachments with inline data.",
-      );
+    if (!attachment.file) {
+      throw new Error("Image editing requires uploaded image files.");
     }
     formData.append(
       "image",
-      base64ToBlob(attachment.data, attachment.mimeType),
+      attachment.file,
       attachment.fileName || `edit-source-${index + 1}.png`,
     );
   }
@@ -55,34 +52,12 @@ function appendOpenAIEditImages(formData: FormData, attachments: Attachment[]) {
   return true;
 }
 
-function attachmentsToGeminiParts(attachments: Attachment[] = []): any[] {
-  return attachments
-    .map((attachment) => {
-      if (attachment.url && !attachment.data) {
-        return {
-          fileData: {
-            mimeType: attachment.mimeType,
-            fileUri: attachment.url,
-          },
-        };
-      }
-      if (attachment.data) {
-        return {
-          inlineData: {
-            mimeType: attachment.mimeType,
-            data: attachment.data,
-          },
-        };
-      }
-      return null;
-    })
-    .filter(Boolean) as any[];
-}
-
 export async function POST(request: NextRequest) {
   try {
-    const body = ImageGenerateRequestSchema.parse(
-      await readJsonRequestBody(request),
+    const requestBody = await readChatRequestBody(request);
+    const body = await hydrateChatImageUploads(
+      ImageGenerateRequestSchema.parse(requestBody.payload),
+      requestBody.files,
     );
     const { modelName, prompt, imageCount, attachments } = body;
     const provider = await resolveProviderRuntimeConfig(body.provider);
@@ -115,7 +90,12 @@ export async function POST(request: NextRequest) {
             if (shouldRequestBase64Response) {
               formData.append("response_format", "b64_json");
             }
-            if (!appendOpenAIEditImages(formData, attachments || [])) {
+            if (
+              !appendOpenAIEditImages(
+                formData,
+                (attachments || []) as ProviderImageAttachment[],
+              )
+            ) {
               throw new Error("Image editing requires at least one image.");
             }
             return safeFetchJson<any>(
@@ -188,43 +168,58 @@ export async function POST(request: NextRequest) {
       const ai = createGoogleClient(provider);
 
       if (attachments?.length) {
-        const response: any = await ai.models.generateContent({
-          model: modelName,
-          contents: {
-            parts: [{ text: prompt }, ...attachmentsToGeminiParts(attachments)],
-          },
-          config: {
-            responseModalities: ["TEXT", "IMAGE"],
-            abortSignal: request.signal,
-          },
-        });
-        const parts = response.candidates?.[0]?.content?.parts || [];
-        const images = normalizeGeneratedImageAttachments(
-          parts
-            .filter((part: any) => part.inlineData)
-            .map((part: any) => ({
-              id: uuidv7(),
-              mimeType: part.inlineData.mimeType || "image/png",
-              data: part.inlineData.data,
-              fileName: `gemini-edit-${Date.now()}.png`,
-            })),
+        const prepared = await uploadGoogleImageFiles(
+          ai,
+          [],
+          attachments as ProviderImageAttachment[],
+          request.signal,
         );
-        const text = parts
-          .map((part: any) => (typeof part.text === "string" ? part.text : ""))
-          .join("")
-          .trim();
-
-        if (images.length > 0) {
-          return NextResponse.json({
-            images,
-            message: text || `Generated image for: "${prompt}"`,
+        try {
+          const response: any = await ai.models.generateContent({
+            model: modelName,
+            contents: {
+              parts: [
+                { text: prompt },
+                ...(convertAttachmentsToGemini(prepared.attachments) as any[]),
+              ],
+            },
+            config: {
+              responseModalities: ["TEXT", "IMAGE"],
+              abortSignal: request.signal,
+            },
           });
-        }
+          const parts = response.candidates?.[0]?.content?.parts || [];
+          const images = normalizeGeneratedImageAttachments(
+            parts
+              .filter((part: any) => part.inlineData)
+              .map((part: any) => ({
+                id: uuidv7(),
+                mimeType: part.inlineData.mimeType || "image/png",
+                data: part.inlineData.data,
+                fileName: `gemini-edit-${Date.now()}.png`,
+              })),
+          );
+          const text = parts
+            .map((part: any) =>
+              typeof part.text === "string" ? part.text : "",
+            )
+            .join("")
+            .trim();
 
-        return NextResponse.json({
-          images: [],
-          message: text || "No images generated.",
-        });
+          if (images.length > 0) {
+            return NextResponse.json({
+              images,
+              message: text || `Generated image for: "${prompt}"`,
+            });
+          }
+
+          return NextResponse.json({
+            images: [],
+            message: text || "No images generated.",
+          });
+        } finally {
+          await prepared.cleanup();
+        }
       }
 
       const response: any = await ai.models.generateImages({
