@@ -46,6 +46,9 @@ yarn-error.log*
 .dev.vars
 cloudflare-env.d.ts
 
+# generated browser-only vendor assets
+/public/vendor/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

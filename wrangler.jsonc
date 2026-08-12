@@ -2,6 +2,7 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "neo-chat",
   "main": ".open-next/worker.js",
+  "minify": true,
   "compatibility_date": "2026-07-01",
   "compatibility_flags": ["nodejs_compat"],
   "keep_vars": true,

@@ -238,6 +238,25 @@ test("loads the local chat shell", async ({ page }) => {
   await expect(page.locator('textarea[name="message"]')).toBeVisible();
 });
 
+test("loads the HEIC converter from a same-origin static module", async ({
+  page,
+}) => {
+  await page.goto("/");
+
+  const exports = await page.evaluate(async (moduleUrl) => {
+    const vendorModule = await import(moduleUrl);
+    return {
+      heicTo: typeof vendorModule.heicTo,
+      isHeic: typeof vendorModule.isHeic,
+    };
+  }, "/vendor/heic-to-csp.mjs");
+
+  expect(exports).toEqual({
+    heicTo: "function",
+    isHeic: "function",
+  });
+});
+
 test("keeps an offline draft editable until connectivity returns", async ({
   page,
   context,

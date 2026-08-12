@@ -18,6 +18,7 @@ const SUPPORTED_IMAGE_MIME_TYPES = new Set([
 ]);
 
 const BYTES_PER_MEGABYTE = 1024 * 1024;
+const HEIC_CONVERTER_MODULE_URL = "/vendor/heic-to-csp.mjs";
 
 export interface ImageCompressionConfig {
   enabled: boolean;
@@ -42,6 +43,21 @@ export type HeicConverter = (options: {
   type: "image/jpeg";
   quality: number;
 }) => Promise<Blob>;
+
+type HeicConverterModule = {
+  heicTo: HeicConverter;
+};
+
+async function loadHeicConverter(): Promise<HeicConverter> {
+  const moduleUrl = new URL(HEIC_CONVERTER_MODULE_URL, window.location.origin)
+    .href;
+  const vendorModule = (await import(
+    /* webpackIgnore: true */
+    /* turbopackIgnore: true */
+    moduleUrl
+  )) as HeicConverterModule;
+  return vendorModule.heicTo;
+}
 
 export interface ImageCompressionRuntimeOptions {
   signal?: AbortSignal;
@@ -151,8 +167,7 @@ export async function convertHeicToJpegFile(
 
   throwIfAborted(runtime.signal);
   runtime.onStage?.("converting");
-  const convertHeic =
-    runtime.convertHeic || (await import("heic-to/csp")).heicTo;
+  const convertHeic = runtime.convertHeic || (await loadHeicConverter());
   const jpeg = await convertHeic({
     blob: file,
     type: "image/jpeg",
