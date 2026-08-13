@@ -52,7 +52,7 @@
   "saveProvider": "保存后端",
   "testConnection": "测试连接",
   "vaultTitle": "个人保险库",
-  "vaultDescription": "恢复代码是在其他设备解密保险库的唯一方式。Neo Chat 无法替你找回。",
+  "vaultDescription": "恢复代码是在其他设备解密保险库的唯一方式。Ed iChat 无法替你找回。",
   "vaultId": "保险库 ID",
   "saveRecoveryWarning": "启用同步前请保存此恢复代码。任何持有它的人都能解密你的保险库。",
   "recoveryCode": "恢复代码",
