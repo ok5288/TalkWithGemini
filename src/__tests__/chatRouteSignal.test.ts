@@ -47,7 +47,7 @@ describe("chat route cancellation", () => {
     const { POST } = await import("../app/api/chat/route");
     await (POST as unknown as (request: Request, body: unknown) => Response)(
       request,
-      body,
+      { payload: body, files: new Map() },
     );
 
     expect(mocks.handleChatStream).toHaveBeenCalledWith(

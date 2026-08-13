@@ -50,6 +50,18 @@ describe("chat panel URL state", () => {
     expect(state.needsReplace).toBe(false);
   });
 
+  it("round-trips the keyboard shortcut settings tab", () => {
+    const params = setChatPanelUrlState(new URLSearchParams("keep=1"), {
+      panel: "settings",
+      settingsTab: "shortcuts",
+    });
+    const state = parseChatPanelUrlState(params);
+
+    expect(params.toString()).toContain("panel=settings&settingsTab=shortcuts");
+    expect(state.settingsTab).toBe("shortcuts");
+    expect(state.needsReplace).toBe(false);
+  });
+
   it("round-trips the skills panel without settings params", () => {
     const params = setChatPanelUrlState(new URLSearchParams("keep=1"), {
       panel: "skills",

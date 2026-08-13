@@ -146,4 +146,20 @@ describe("request body helpers", () => {
     expect(payload).toContain('"code":"TYPED_FAILURE"');
     expect(payload).toContain('"statusCode":422');
   });
+
+  it("allows stream routes to supply a multipart-aware body reader", async () => {
+    const readBody = vi.fn(async () => ({ payload: { ok: true } }));
+    const route = withStreamApiHandler(
+      async (_request, body) => Response.json(body),
+      readBody,
+    );
+    const request = new Request("https://example.test/api", {
+      method: "POST",
+    });
+
+    const response = await route(request as never);
+
+    expect(readBody).toHaveBeenCalledWith(request);
+    await expect(response.json()).resolves.toEqual({ payload: { ok: true } });
+  });
 });

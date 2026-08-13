@@ -1,8 +1,13 @@
-import { ATTACHMENT_LIMITS, formatBytes } from "@/config/limits";
+import {
+  ATTACHMENT_LIMITS,
+  IMAGE_ATTACHMENT_LIMITS,
+  formatBytes,
+} from "@/config/limits";
 
 export interface ChatAttachmentFileCandidate {
   name: string;
   size: number;
+  type?: string;
 }
 
 export interface ChatAttachmentFileSelection<
@@ -15,9 +20,21 @@ export interface ChatAttachmentFileSelection<
 
 interface ChatAttachmentFileSelectionOptions {
   maxFileBytes?: number;
+  maxImageFileBytes?: number;
 }
 
 type FileListLike = Iterable<File> | ArrayLike<File>;
+
+const IMAGE_MIME_TYPES_BY_EXTENSION: Record<string, string> = {
+  bmp: "image/bmp",
+  gif: "image/gif",
+  heic: "image/heic",
+  heif: "image/heif",
+  jpeg: "image/jpeg",
+  jpg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+};
 
 interface ClipboardItemLike {
   kind?: string;
@@ -50,6 +67,47 @@ function filesFromItems(
   });
 }
 
+export function isHeicImageFile(
+  candidate: Pick<ChatAttachmentFileCandidate, "name" | "type">,
+): boolean {
+  const mimeType = candidate.type?.trim().toLowerCase();
+  return (
+    mimeType === "image/heic" ||
+    mimeType === "image/heif" ||
+    mimeType === "image/heic-sequence" ||
+    mimeType === "image/heif-sequence" ||
+    /\.(?:heic|heif)$/i.test(candidate.name)
+  );
+}
+
+export function getChatImageMimeType(
+  candidate: Pick<ChatAttachmentFileCandidate, "name" | "type">,
+): string | null {
+  const mimeType = candidate.type?.trim().toLowerCase();
+  if (mimeType?.startsWith("image/")) {
+    return mimeType === "image/jpg" ? "image/jpeg" : mimeType;
+  }
+
+  const extension = candidate.name.split(".").pop()?.toLowerCase();
+  return extension ? IMAGE_MIME_TYPES_BY_EXTENSION[extension] || null : null;
+}
+
+export function isChatImageFileCandidate(
+  candidate: Pick<ChatAttachmentFileCandidate, "name" | "type">,
+): boolean {
+  return getChatImageMimeType(candidate) !== null;
+}
+
+function getCandidateMaxFileBytes(
+  candidate: ChatAttachmentFileCandidate,
+  options: ChatAttachmentFileSelectionOptions,
+): number {
+  if (isChatImageFileCandidate(candidate)) {
+    return options.maxImageFileBytes ?? IMAGE_ATTACHMENT_LIMITS.maxSourceBytes;
+  }
+  return options.maxFileBytes ?? ATTACHMENT_LIMITS.maxFileBytes;
+}
+
 export function extractChatAttachmentFilesFromDrop(
   dataTransfer: DropDataLike,
 ): File[] {
@@ -74,10 +132,8 @@ export function selectChatAttachmentFiles<
   const accepted: T[] = [];
   const rejectedByCount: T[] = [];
   const rejectedBySize: T[] = [];
-  const maxFileBytes = options.maxFileBytes ?? ATTACHMENT_LIMITS.maxFileBytes;
-
   for (const candidate of candidates) {
-    if (candidate.size > maxFileBytes) {
+    if (candidate.size > getCandidateMaxFileBytes(candidate, options)) {
       rejectedBySize.push(candidate);
       continue;
     }
@@ -110,17 +166,33 @@ export function getChatAttachmentFileSelectionMessage(
   }
 
   if (selection.rejectedBySize.length === 1) {
+    const rejected = selection.rejectedBySize[0];
     messages.push(
-      `File "${selection.rejectedBySize[0].name}" exceeds ${formatBytes(
-        maxFileBytes,
+      `File "${rejected.name}" exceeds ${formatBytes(
+        getCandidateMaxFileBytes(rejected, options),
       )}.`,
     );
   } else if (selection.rejectedBySize.length > 1) {
-    messages.push(
-      `Skipped ${selection.rejectedBySize.length} file(s): each file must be ${formatBytes(
-        maxFileBytes,
-      )} or smaller.`,
+    const rejectedLimits = new Set(
+      selection.rejectedBySize.map((candidate) =>
+        getCandidateMaxFileBytes(candidate, options),
+      ),
     );
+    if (rejectedLimits.size === 1) {
+      messages.push(
+        `Skipped ${selection.rejectedBySize.length} file(s): each file must be ${formatBytes(
+          [...rejectedLimits][0] ?? maxFileBytes,
+        )} or smaller.`,
+      );
+    } else {
+      messages.push(
+        `Skipped ${selection.rejectedBySize.length} file(s): images must be ${formatBytes(
+          options.maxImageFileBytes ?? IMAGE_ATTACHMENT_LIMITS.maxSourceBytes,
+        )} or smaller, and other files must be ${formatBytes(
+          maxFileBytes,
+        )} or smaller.`,
+      );
+    }
   }
 
   return messages.join(" ");

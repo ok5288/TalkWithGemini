@@ -10,16 +10,17 @@ Neo Chat uses several browser storage layers:
 
 | Storage                         | Data                                                                                                                                                                        |
 | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `localStorage`                  | Core settings, provider records, selected models, and provider API key envelopes.                                                                                           |
+| `localStorage`                  | Core settings, keyboard shortcut preferences, provider records, selected models, and provider API key envelopes.                                                            |
 | IndexedDB through `localforage` | Chat metadata, messages, app settings, installed plugins, installed/custom skills, skill catalog and definition caches, assistants, knowledge metadata, and local memories. |
-| OPFS                            | Uploaded chat/workspace files, knowledge originals and extracted text, and image display-cache copies for user-sent or model-generated images.                              |
+| OPFS                            | Uploaded chat/workspace files, knowledge originals and extracted text, and file-backed user-sent or model-generated images.                                                 |
 
 Clearing browser data can remove local chats, settings, plugin configuration,
 assistant records, memories, and uploaded files.
 
-Generated images from native image models are saved as message output data in
-IndexedDB with the rest of the chat message. When users export app data, those
-image output blocks are included in the exported conversation payload. PNG/PDF
+Generated images from native image models are stored as OPFS-backed message
+output references in IndexedDB with the rest of the chat message. When users
+export app data, those image output blocks and referenced OPFS files are
+included in the exported conversation payload. PNG/PDF
 message exports render the visible output blocks, while full app export
 preserves every stored session message tree, including trees not referenced by
 the current chat metadata. If any message tree cannot be read, the export fails
@@ -30,6 +31,11 @@ manifest records file size, MIME type, and SHA-256; missing files are listed
 explicitly. Runtime `blob:` URLs, remote caches, external RAG vectors, plaintext
 credentials, browser-local encrypted credential envelopes, and local master
 keys are not included.
+
+Keyboard shortcut bindings are ordinary core preference data, not secrets. They
+are included in versioned app backups and in the encrypted `core-settings`
+document when cross-device sync is enabled. They apply only while the Neo Chat
+page has focus; Neo Chat does not register operating-system global hotkeys.
 
 Restore validates ZIP paths, duplicate entries, extraction limits, sizes, and
 SHA-256 before replacing data. Files are written to new OPFS paths first, and a
@@ -61,12 +67,22 @@ lifetime and contains only each chat's active branch, workspace metadata,
 knowledge text, and the existing memory fields. It is not uploaded, persisted,
 or used for telemetry, and it excludes reasoning, tool payloads, and secrets.
 
-Image attachments keep their original `data` or remote `url` as the canonical
-message data. OPFS image copies are display caches mapped from that original
-source and are resolved to runtime `blob:` URLs with `URL.createObjectURL(...)`
-for rendering. Blob URLs are not persisted, and model requests strip display
-cache metadata before sending base64 data or the original remote URL to a
-provider.
+New local image attachments keep an OPFS file reference as their canonical
+message data. Legacy inline images are moved into multipart file fields when
+used in a model request and can be promoted to OPFS-backed storage during image
+preparation. Renderers resolve OPFS files to runtime `blob:` URLs with
+`URL.createObjectURL(...)`; Blob URLs are never persisted.
+
+For native OpenAI, Google, and Anthropic multimodal requests, the browser sends
+local images to the server as bounded multipart files. The server uploads them
+through the selected provider's file API and sends only the resulting
+request-scoped file ID or URI to the model call. OpenAI and Anthropic temporary
+files are deleted on a best-effort basis after the stream finishes; Google file
+retention follows the provider-managed file lifecycle. Provider file references
+are not persisted in chat history. OpenAI-compatible endpoints have no uniform
+file-reference protocol, so local image files are rejected explicitly instead
+of being converted to Base64; validated remote HTTPS image URLs remain
+available where the provider supports them.
 
 Memory is local-first, but it is not invisible to model providers. When the
 memory search tool is used, matching memory snippets are included in the
@@ -101,10 +117,10 @@ until users re-enter the affected secrets.
 ## Server Proxy Boundaries
 
 Server routes can receive prompts, message context, applied skill instructions,
-generated tool calls, search queries, document parsing jobs, audio payloads,
-plugin requests, and BYOK envelopes. Local memory tool results may also be
-present in model request context. Deployments should treat server logs,
-observability tools, and hosting provider logs as sensitive.
+generated tool calls, search queries, document parsing jobs, multipart image
+files, audio payloads, plugin requests, and BYOK envelopes. Local memory tool
+results may also be present in model request context. Deployments should treat
+server logs, observability tools, and hosting provider logs as sensitive.
 
 Remote MCP calls send model-generated tool arguments, including any context the
 tool arguments contain, to the configured MCP server. MCP tool results return

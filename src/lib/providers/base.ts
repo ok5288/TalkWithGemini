@@ -63,6 +63,7 @@ export function getProviderResponseLimits(
 
   const isImageRequest =
     /\/images(?:\/|$)/i.test(url) ||
+    /\/files(?:[/:?]|$)/i.test(url) ||
     /"response_?modalities"\s*:\s*\[[^\]]*"IMAGE"/i.test(body) ||
     /"type"\s*:\s*"image_generation"/i.test(body) ||
     /"numberOfImages"\s*:/i.test(body);

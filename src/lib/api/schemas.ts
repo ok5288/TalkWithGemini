@@ -13,6 +13,7 @@ import { getRemoteAttachmentUrlError } from "../security/remoteAttachment";
 import { getPluginExecutionArgsError } from "../plugin/execution";
 import { BYOK_ALG } from "../byok/shared";
 import { normalizeProviderType } from "../providers/providerTypes";
+import { CHAT_IMAGE_UPLOAD_ID_PATTERN } from "./chatUploadProtocol";
 
 const Base64UrlStringSchema = z.string().regex(/^[A-Za-z0-9_-]+$/);
 
@@ -102,8 +103,43 @@ export const AttachmentSchema = z.object({
   mimeType: z.string().min(1).max(ATTACHMENT_LIMITS.maxMimeTypeChars),
   data: z.string().max(ATTACHMENT_LIMITS.maxBase64Chars).optional(),
   url: z.string().max(ATTACHMENT_LIMITS.maxUrlChars).optional(),
+  uploadId: z.string().regex(CHAT_IMAGE_UPLOAD_ID_PATTERN).optional(),
   fileName: z.string().min(1).max(ATTACHMENT_LIMITS.maxFileNameChars),
 });
+
+function addImageAttachmentTransportIssues(
+  attachments: Array<z.infer<typeof AttachmentSchema>>,
+  ctx: z.RefinementCtx,
+  path: Array<string | number>,
+): void {
+  attachments.forEach((attachment, index) => {
+    if (!attachment.mimeType.toLowerCase().startsWith("image/")) return;
+
+    if (attachment.data) {
+      ctx.addIssue({
+        code: "custom",
+        path: [...path, index, "data"],
+        message: "Image attachments must be uploaded as files",
+      });
+    }
+
+    if (attachment.uploadId && attachment.url) {
+      ctx.addIssue({
+        code: "custom",
+        path: [...path, index, "uploadId"],
+        message: "Uploaded image descriptors cannot include URLs",
+      });
+    }
+
+    if (!attachment.data && !attachment.url && !attachment.uploadId) {
+      ctx.addIssue({
+        code: "custom",
+        path: [...path, index],
+        message: "Image attachment source is required",
+      });
+    }
+  });
+}
 
 function addAttachmentFileSizeIssues(
   attachments: Array<z.infer<typeof AttachmentSchema>>,
@@ -287,6 +323,15 @@ export const ChatRequestSchema = z
     }
 
     addAttachmentFileSizeIssues(attachments, ctx, ["attachments"]);
+    addImageAttachmentTransportIssues(attachments, ctx, ["attachments"]);
+
+    request.history.forEach((message, messageIndex) => {
+      addImageAttachmentTransportIssues(message.attachments || [], ctx, [
+        "history",
+        messageIndex,
+        "attachments",
+      ]);
+    });
 
     attachments.forEach((attachment, index) => {
       if (!attachment.url) return;
@@ -634,6 +679,7 @@ export const ImageGenerateRequestSchema = z
     }
 
     addAttachmentFileSizeIssues(attachments, ctx, ["attachments"]);
+    addImageAttachmentTransportIssues(attachments, ctx, ["attachments"]);
 
     attachments.forEach((attachment, index) => {
       if (!attachment.url) return;

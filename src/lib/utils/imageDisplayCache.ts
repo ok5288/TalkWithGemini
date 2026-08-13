@@ -210,6 +210,10 @@ export async function stripAttachmentDisplayCacheForModel(
   delete stripped.displayCache;
 
   if (stripped.url && isOPFSUrl(stripped.url)) {
+    if (isImageAttachment(stripped)) {
+      delete stripped.data;
+      return stripped;
+    }
     if (!stripped.data) {
       try {
         const blob = await (options.resolveOPFSBlob || resolveOPFSBlob)(

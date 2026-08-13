@@ -41,8 +41,8 @@ It is designed for people who want the power of modern AI workspaces without giv
 - Added collection-level chunking controls, Markdown heading-aware previews,
   explicit reindexing, hybrid lexical/vector retrieval, graceful lexical
   fallback, stable source previews, file filtering, and serial batch operations.
-- Added configurable client-side image compression for conversation, workspace,
-  generated, and plugin images, with cancellation and original-file fallback.
+- Added HEIC/HEIF conversion, staged client-side image compression, and
+  file-backed multimodal uploads for native OpenAI, Google, and Anthropic chat.
 - Added legacy SSE compatibility for remote MCP, connection-stage-only fallback,
   encrypted install-time credentials, and an authenticated Docker stdio bridge
   whose commands remain fixed by deployment configuration.
@@ -86,9 +86,9 @@ See [CHANGELOG.md](CHANGELOG.md) for the complete release notes.
 - Multi-provider chat with Google, Anthropic, OpenAI, and OpenAI-compatible
   endpoints, including provider-scoped custom model capabilities.
 - Native image generation and image editing for models whose metadata exposes image output/input, with ordered mixed text/image message blocks and OPFS-backed Blob URL display caching.
-- Configurable client-side compression for supported uploaded and generated
-  images before storage or model use, with long-image safeguards and safe
-  original-file fallback.
+- File-backed multimodal image input without Base64 for native OpenAI, Google,
+  and Anthropic chat; HEIC/HEIF conversion and staged client-side compression
+  enforce the 20 MiB source, 10 MiB force-compression, and 5 MiB result limits.
 - Local-first sessions, branches, pinned chats, per-chat composer drafts, reply
   navigation, token/context usage summaries, workspaces, workspace files, and
   assistant instructions.
@@ -112,6 +112,8 @@ See [CHANGELOG.md](CHANGELOG.md) for the complete release notes.
 - Local global search in an accessible modal across active chat branches,
   attachments, workspaces, knowledge, and memories, with source/date/role
   filters and direct result navigation; Settings has its own localized search.
+- Customizable, page-scoped keyboard shortcuts for search, chat creation,
+  composer focus, sidebar visibility, shortcut settings, and stopping generation.
 - Knowledge-base RAG with preserved original files, editable extracted content,
   configurable Markdown-aware chunking, hybrid lexical/vector retrieval,
   Mineru/LlamaParse document parsing, filename/status filters, serial batch
@@ -161,6 +163,25 @@ cp .env.example .env.local
 ```
 
 Most settings can be managed in the browser. Server environment variables are useful when you want a shared default provider, hosted deployment safety, access password protection, shared runtime stores, or managed defaults for search, RAG, document parsing, voice, memory, and HTML visual rendering.
+
+## Keyboard Shortcuts
+
+Keyboard shortcuts work while the Neo Chat page has focus and can be changed or
+cleared under **Settings > Shortcuts**. `Mod` means `Command` on macOS and
+`Ctrl` on other platforms.
+
+| Action                 | Default shortcut |
+| ---------------------- | ---------------- |
+| Global search          | `Mod+K`          |
+| New chat               | `Mod+Alt+N`      |
+| Focus the composer     | `Mod+/`          |
+| Toggle the sidebar     | `Mod+\`          |
+| Open shortcut settings | `Mod+Alt+S`      |
+| Stop generation        | `Mod+Alt+.`      |
+
+Shortcut preferences are stored with core settings. They are included in
+versioned app backups and, when enabled, in the end-to-end encrypted sync
+document for core settings.
 
 ## Deployment
 
@@ -288,9 +309,9 @@ See [Deployment Hardening](docs/deployment-hardening.md) for production configur
 
 Neo Chat is local-first by default:
 
-- Core settings, provider records, selected models, per-chat composer drafts,
-  and locally encrypted provider credential envelopes are stored in browser
-  `localStorage`.
+- Core settings, provider records, selected models, keyboard shortcut bindings,
+  per-chat composer drafts, and locally encrypted provider credential envelopes
+  are stored in browser `localStorage`.
 - Chat metadata, messages, app settings, installed plugins, installed/custom
   skills, skill catalog caches, assistants, knowledge metadata, local memories,
   encrypted sync configuration, and CRDT baselines are stored in IndexedDB

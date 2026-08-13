@@ -15,6 +15,10 @@ import { useCoreSettingsStore } from "@/store/core/coreSettingsStore";
 import { useSetLocale } from "@/i18n/useSetLocale";
 import { appDb } from "@/store/storage/storageConfig";
 import Tooltip from "../ui/Tooltip";
+import {
+  ShortcutTooltipContent,
+  useShortcutPresentation,
+} from "@/components/shortcuts/ShortcutHint";
 import WorkspaceSettingsModal from "./WorkspaceSettingsModal";
 import SidebarSearch from "./SidebarSearch";
 import {
@@ -180,6 +184,8 @@ const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const t = useTranslations("Sidebar");
   const chatT = useTranslations("ChatApp");
+  const newChatShortcut = useShortcutPresentation("newChat");
+  const toggleSidebarShortcut = useShortcutPresentation("toggleSidebar");
   const { workspaces, createSession, moveSessionToWorkspace } = useChatStore();
   const { theme, setTheme, language } = useCoreSettingsStore();
   const setLocale = useSetLocale();
@@ -826,10 +832,19 @@ const Sidebar: React.FC<SidebarProps> = ({
                   {PRODUCT_NAME}
                 </span>
               </button>
-              <Tooltip content={chatT("closeSidebar")} position="left">
+              <Tooltip
+                content={
+                  <ShortcutTooltipContent
+                    label={chatT("closeSidebar")}
+                    shortcut={toggleSidebarShortcut.display}
+                  />
+                }
+                position="left"
+              >
                 <button
                   type="button"
                   aria-label={chatT("closeSidebarAria")}
+                  aria-keyshortcuts={toggleSidebarShortcut.ariaKeyShortcuts}
                   onClick={toggleSidebar}
                   className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-gray-500 transition-[background-color,color,box-shadow] hover:bg-gray-200/70 hover:text-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:text-muted-foreground dark:hover:bg-muted/80 dark:hover:text-foreground"
                 >
@@ -838,10 +853,19 @@ const Sidebar: React.FC<SidebarProps> = ({
               </Tooltip>
             </>
           ) : (
-            <Tooltip content={chatT("openSidebar")} position="right">
+            <Tooltip
+              content={
+                <ShortcutTooltipContent
+                  label={chatT("openSidebar")}
+                  shortcut={toggleSidebarShortcut.display}
+                />
+              }
+              position="right"
+            >
               <button
                 type="button"
                 aria-label={chatT("openSidebarAria")}
+                aria-keyshortcuts={toggleSidebarShortcut.ariaKeyShortcuts}
                 className="group relative flex h-10 w-10 items-center justify-center rounded-lg text-gray-700 transition-[background-color,color,box-shadow] hover:bg-gray-100/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:text-foreground dark:hover:bg-muted/60"
                 onClick={toggleSidebar}
               >
@@ -1129,10 +1153,19 @@ const Sidebar: React.FC<SidebarProps> = ({
                   <span className="text-sm font-medium text-gray-600 dark:text-muted-foreground whitespace-nowrap">
                     {t("chatList")}
                   </span>
-                  <Tooltip content={t("newChat")} position="left">
+                  <Tooltip
+                    content={
+                      <ShortcutTooltipContent
+                        label={t("newChat")}
+                        shortcut={newChatShortcut.display}
+                      />
+                    }
+                    position="left"
+                  >
                     <button
                       type="button"
                       aria-label={t("createChatAria")}
+                      aria-keyshortcuts={newChatShortcut.ariaKeyShortcuts}
                       onClick={onNewChat}
                       className="p-1.5 text-gray-500 dark:text-muted-foreground hover:bg-gray-200 dark:hover:bg-accent/80 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
                     >
@@ -1233,13 +1266,19 @@ const Sidebar: React.FC<SidebarProps> = ({
               </Tooltip>
 
               <Tooltip
-                content={t("newChat")}
+                content={
+                  <ShortcutTooltipContent
+                    label={t("newChat")}
+                    shortcut={newChatShortcut.display}
+                  />
+                }
                 position="right"
                 className="justify-center"
               >
                 <button
                   type="button"
                   aria-label={t("createChatAria")}
+                  aria-keyshortcuts={newChatShortcut.ariaKeyShortcuts}
                   onClick={onNewChat}
                   className="p-2 text-gray-500 hover:bg-gray-100/80 dark:hover:bg-muted/60 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
                 >

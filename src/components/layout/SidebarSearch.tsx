@@ -3,6 +3,10 @@ import React from "react";
 import { Search } from "lucide-react";
 import { useTranslations } from "next-intl";
 import Tooltip from "../ui/Tooltip";
+import {
+  ShortcutTooltipContent,
+  useShortcutPresentation,
+} from "@/components/shortcuts/ShortcutHint";
 
 interface SidebarSearchProps {
   isOpen: boolean;
@@ -16,17 +20,24 @@ const SidebarSearch: React.FC<SidebarSearchProps> = ({
   isGlobalSearchOpen,
 }) => {
   const t = useTranslations("Sidebar");
+  const searchShortcut = useShortcutPresentation("globalSearch");
 
   return (
     <div className="px-3 pb-2 shrink-0">
       <Tooltip
-        content={t("globalSearch")}
+        content={
+          <ShortcutTooltipContent
+            label={t("globalSearch")}
+            shortcut={searchShortcut.display}
+          />
+        }
         position="right"
         className={isOpen ? "w-full" : "w-full justify-center"}
       >
         <button
           type="button"
           aria-label={t("openGlobalSearch")}
+          aria-keyshortcuts={searchShortcut.ariaKeyShortcuts}
           aria-current={isGlobalSearchOpen ? "page" : undefined}
           onClick={onOpenGlobalSearch}
           className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-[color,background-color] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/60 ${

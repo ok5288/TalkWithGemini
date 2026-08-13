@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ATTACHMENT_LIMITS } from "../config/limits";
+import { ATTACHMENT_LIMITS, IMAGE_ATTACHMENT_LIMITS } from "../config/limits";
 import {
   extractChatAttachmentFilesFromClipboard,
   extractChatAttachmentFilesFromDrop,
@@ -35,6 +35,78 @@ describe("chat attachment file selection", () => {
     ]);
     expect(selection.rejectedBySize.map((file) => file.name)).toEqual([
       "blocked.txt",
+    ]);
+  });
+
+  it("allows images through the 20 MiB preprocessing boundary", () => {
+    const selection = selectChatAttachmentFiles(0, [
+      {
+        name: "compress-me.jpg",
+        size: IMAGE_ATTACHMENT_LIMITS.compressionThresholdBytes + 1,
+        type: "image/jpeg",
+      },
+      {
+        name: "largest-allowed.HEIC",
+        size: IMAGE_ATTACHMENT_LIMITS.maxSourceBytes,
+        type: "",
+      },
+      {
+        name: "too-large.heif",
+        size: IMAGE_ATTACHMENT_LIMITS.maxSourceBytes + 1,
+        type: "image/heif",
+      },
+    ]);
+
+    expect(selection.accepted.map((file) => file.name)).toEqual([
+      "compress-me.jpg",
+      "largest-allowed.HEIC",
+    ]);
+    expect(selection.rejectedBySize.map((file) => file.name)).toEqual([
+      "too-large.heif",
+    ]);
+  });
+
+  it("recognizes common mobile image extensions when MIME is empty", () => {
+    const selection = selectChatAttachmentFiles(0, [
+      {
+        name: "camera.JPG",
+        size: ATTACHMENT_LIMITS.maxFileBytes + 1,
+        type: "",
+      },
+      {
+        name: "screenshot.png",
+        size: ATTACHMENT_LIMITS.maxFileBytes + 1,
+        type: "",
+      },
+    ]);
+
+    expect(selection.accepted.map((file) => file.name)).toEqual([
+      "camera.JPG",
+      "screenshot.png",
+    ]);
+  });
+
+  it("keeps the runtime limit for non-image files", () => {
+    const selection = selectChatAttachmentFiles(
+      0,
+      [
+        {
+          name: "photo.png",
+          size: ATTACHMENT_LIMITS.maxFileBytes + 1,
+          type: "image/png",
+        },
+        {
+          name: "archive.pdf",
+          size: ATTACHMENT_LIMITS.maxFileBytes + 1,
+          type: "application/pdf",
+        },
+      ],
+      { maxFileBytes: ATTACHMENT_LIMITS.maxFileBytes },
+    );
+
+    expect(selection.accepted.map((file) => file.name)).toEqual(["photo.png"]);
+    expect(selection.rejectedBySize.map((file) => file.name)).toEqual([
+      "archive.pdf",
     ]);
   });
 

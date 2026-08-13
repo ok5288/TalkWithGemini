@@ -23,27 +23,45 @@ import {
   parseKnowledgeFileAttachmentData,
 } from "./knowledgeAttachments";
 
+type ProviderImageAttachment = Attachment & {
+  providerFileId?: string;
+  providerFileUri?: string;
+};
+
 /**
  * 将附件转换为 Gemini 格式
  */
 export function convertAttachmentsToGemini(attachments: Attachment[]) {
-  return attachments.map((att) => {
-    if (att.url) {
+  return attachments
+    .map((attachment) => {
+      const att = attachment as ProviderImageAttachment;
+      if (att.providerFileUri) {
+        return {
+          fileData: {
+            mimeType: att.mimeType,
+            fileUri: att.providerFileUri,
+          },
+        };
+      }
+      if (att.url) {
+        return {
+          fileData: {
+            mimeType: att.mimeType,
+            fileUri: att.url,
+          },
+        };
+      }
+
+      if (att.mimeType.toLowerCase().startsWith("image/")) return null;
+
       return {
-        fileData: {
+        inlineData: {
           mimeType: att.mimeType,
-          fileUri: att.url,
+          data: att.data || "",
         },
       };
-    }
-
-    return {
-      inlineData: {
-        mimeType: att.mimeType,
-        data: att.data || "",
-      },
-    };
-  });
+    })
+    .filter(Boolean);
 }
 
 /**
@@ -51,13 +69,13 @@ export function convertAttachmentsToGemini(attachments: Attachment[]) {
  */
 export function convertAttachmentsToOpenAI(attachments: Attachment[]) {
   return attachments
-    .map((att) => {
-      const url = att.url || `data:${att.mimeType};base64,${att.data}`;
-
+    .map((attachment) => {
+      const att = attachment as ProviderImageAttachment;
       if (att.mimeType.startsWith("image/")) {
+        if (!att.url) return null;
         return {
           type: "image_url" as const,
-          image_url: { url },
+          image_url: { url: att.url },
         };
       }
 
@@ -72,13 +90,20 @@ export function convertAttachmentsToOpenAI(attachments: Attachment[]) {
  */
 export function convertAttachmentsToOpenAIResponses(attachments: Attachment[]) {
   return attachments
-    .map((att) => {
-      const url = att.url || `data:${att.mimeType};base64,${att.data}`;
-
+    .map((attachment) => {
+      const att = attachment as ProviderImageAttachment;
       if (att.mimeType.startsWith("image/")) {
+        if (att.providerFileId) {
+          return {
+            type: "input_image" as const,
+            file_id: att.providerFileId,
+            detail: "auto" as const,
+          };
+        }
+        if (!att.url) return null;
         return {
           type: "input_image" as const,
-          image_url: url,
+          image_url: att.url,
         };
       }
 
@@ -92,8 +117,19 @@ export function convertAttachmentsToOpenAIResponses(attachments: Attachment[]) {
  */
 export function convertAttachmentsToAnthropic(attachments: Attachment[]) {
   return attachments
-    .map((att) => {
+    .map((attachment) => {
+      const att = attachment as ProviderImageAttachment;
       if (!att.mimeType.startsWith("image/")) return null;
+
+      if (att.providerFileId) {
+        return {
+          type: "image" as const,
+          source: {
+            type: "file" as const,
+            file_id: att.providerFileId,
+          },
+        };
+      }
 
       if (att.url) {
         return {
@@ -105,14 +141,7 @@ export function convertAttachmentsToAnthropic(attachments: Attachment[]) {
         };
       }
 
-      return {
-        type: "image" as const,
-        source: {
-          type: "base64" as const,
-          media_type: att.mimeType,
-          data: att.data || "",
-        },
-      };
+      return null;
     })
     .filter(Boolean);
 }
@@ -182,6 +211,11 @@ export async function processAttachmentsForModel(
       },
     });
 
+    if (processedAtt.mimeType.startsWith("image/")) {
+      finalAttachments.push(processedAtt);
+      continue;
+    }
+
     // Resolve OPFS URLs to Base64
     if (
       processedAtt.url &&
@@ -214,7 +248,6 @@ export async function processAttachmentsForModel(
     }
 
     if (
-      processedAtt.mimeType.startsWith("image/") ||
       processedAtt.mimeType.startsWith("audio/") ||
       processedAtt.mimeType.startsWith("video/")
     ) {

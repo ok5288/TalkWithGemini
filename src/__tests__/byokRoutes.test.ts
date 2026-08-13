@@ -98,6 +98,45 @@ const mineruTokenSecret = {
   context: "docs:mineru",
 };
 
+async function createImageEditRequest(payload: Record<string, unknown>) {
+  const formData = new FormData();
+  formData.set(
+    "payload",
+    JSON.stringify({
+      ...payload,
+      attachments: [
+        {
+          id: "att_1",
+          mimeType: "image/png",
+          fileName: "source.png",
+          uploadId: "image-0",
+        },
+      ],
+    }),
+  );
+  formData.set(
+    "image:image-0",
+    new File(
+      [new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])],
+      "source.png",
+      { type: "image/png" },
+    ),
+  );
+  const encoded = new Request("https://neo.test/api/chat/generate-image", {
+    method: "POST",
+    body: formData,
+  });
+  const bytes = await encoded.arrayBuffer();
+  return new Request(encoded.url, {
+    method: "POST",
+    headers: {
+      "content-type": encoded.headers.get("content-type")!,
+      "content-length": String(bytes.byteLength),
+    },
+    body: bytes,
+  });
+}
+
 describe("BYOK route integration", () => {
   beforeEach(() => {
     vi.resetModules();
@@ -305,28 +344,16 @@ describe("BYOK route integration", () => {
     });
 
     const { POST } = await import("../app/api/chat/generate-image/route");
-    const response = await POST(
-      new Request("https://neo.test/api/chat/generate-image", {
-        method: "POST",
-        body: JSON.stringify({
-          provider: {
-            type: "OpenAI Compatible",
-            baseUrl: "https://api.krill-ai.com/v1",
-            apiKeySecret,
-          },
-          modelName: "gpt-image-2",
-          prompt: "edit this image",
-          attachments: [
-            {
-              id: "att_1",
-              mimeType: "image/png",
-              fileName: "source.png",
-              data: "aW1hZ2U=",
-            },
-          ],
-        }),
-      }) as any,
-    );
+    const request = await createImageEditRequest({
+      provider: {
+        type: "OpenAI Compatible",
+        baseUrl: "https://api.krill-ai.com/v1",
+        apiKeySecret,
+      },
+      modelName: "gpt-image-2",
+      prompt: "edit this image",
+    });
+    const response = await POST(request as any);
 
     expect(response.status).toBe(200);
     expect(mocks.safeFetchJson).toHaveBeenCalledWith(
@@ -343,6 +370,7 @@ describe("BYOK route integration", () => {
     const requestInit = mocks.safeFetchJson.mock.calls[0]?.[1] as RequestInit;
     const formData = requestInit.body as FormData;
     expect(formData.has("response_format")).toBe(false);
+    expect(formData.get("image")).toBeInstanceOf(File);
   });
 
   it("returns OpenAI Compatible URL-only edited images", async () => {
@@ -359,28 +387,16 @@ describe("BYOK route integration", () => {
     });
 
     const { POST } = await import("../app/api/chat/generate-image/route");
-    const response = await POST(
-      new Request("https://neo.test/api/chat/generate-image", {
-        method: "POST",
-        body: JSON.stringify({
-          provider: {
-            type: "OpenAI Compatible",
-            baseUrl: "https://api.krill-ai.com/v1",
-            apiKeySecret,
-          },
-          modelName: "gpt-image-2",
-          prompt: "edit this image",
-          attachments: [
-            {
-              id: "att_1",
-              mimeType: "image/png",
-              fileName: "source.png",
-              data: "aW1hZ2U=",
-            },
-          ],
-        }),
-      }) as any,
-    );
+    const request = await createImageEditRequest({
+      provider: {
+        type: "OpenAI Compatible",
+        baseUrl: "https://api.krill-ai.com/v1",
+        apiKeySecret,
+      },
+      modelName: "gpt-image-2",
+      prompt: "edit this image",
+    });
+    const response = await POST(request as any);
 
     expect(response.status).toBe(200);
     const body = await response.json();

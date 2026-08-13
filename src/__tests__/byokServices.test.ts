@@ -247,14 +247,10 @@ describe("BYOK service requests", () => {
       fileName: "output.png",
     };
     const preparedOutput = {
-      ...outputAttachment,
-      data: "Y29tcHJlc3NlZA==",
-      displayCache: {
-        opfsUrl: "opfs://images/generated/output.png",
-        sourceKind: "data" as const,
-        sourceFingerprint: "compressed-fingerprint",
-        createdAt: 1,
-      },
+      id: outputAttachment.id,
+      mimeType: outputAttachment.mimeType,
+      fileName: outputAttachment.fileName,
+      url: "opfs://images/generated/output.png",
     };
     mocks.prepareGeneratedImageAttachments.mockResolvedValue([preparedOutput]);
     const fetchMock = vi
@@ -277,9 +273,20 @@ describe("BYOK service requests", () => {
       },
       { signal: undefined },
     );
-    expect(getJsonRequestBody(fetchMock).attachments).toEqual([
-      inputAttachment,
+    const requestBody = fetchMock.mock.calls[0]?.[1]?.body;
+    expect(requestBody).toBeInstanceOf(FormData);
+    const formData = requestBody as FormData;
+    const payload = JSON.parse(String(formData.get("payload")));
+    expect(payload.attachments).toEqual([
+      {
+        id: "input",
+        mimeType: "image/png",
+        fileName: "input.png",
+        uploadId: "image-0",
+      },
     ]);
+    expect(formData.get("image:image-0")).toBeInstanceOf(File);
+    expect(String(formData.get("payload"))).not.toContain("aW5wdXQ=");
     expect(mocks.prepareGeneratedImageAttachments).toHaveBeenCalledWith(
       [outputAttachment],
       {

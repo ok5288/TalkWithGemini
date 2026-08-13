@@ -2,6 +2,7 @@ import type { Attachment, Message, ToolCall } from "@/types";
 import { allocateContextBudget } from "./contextBudget";
 
 const CHARS_PER_TOKEN = 4;
+const ESTIMATED_IMAGE_INPUT_CHARS = 400;
 const HISTORY_TRUNCATION_NOTICE = "\n[History truncated to context budget.]";
 const ATTACHMENT_OMISSION_NOTICE =
   "\n[Historical attachment omitted to fit the context budget.]";
@@ -29,6 +30,13 @@ function safeJson(value: unknown): string {
 }
 
 function attachmentChars(attachment: Attachment): number {
+  if (attachment.mimeType.toLowerCase().startsWith("image/")) {
+    return (
+      ESTIMATED_IMAGE_INPUT_CHARS +
+      attachment.fileName.length +
+      attachment.mimeType.length
+    );
+  }
   return (
     (attachment.data?.length || 0) +
     (attachment.url?.length || 0) +

@@ -57,6 +57,33 @@ describe("complete request context budget", () => {
     expect(bounded[0].content).toContain("Historical attachment omitted");
   });
 
+  it("does not treat image Base64 bytes as text context", () => {
+    const bounded = boundHistoryForRequest(
+      [
+        {
+          ...message("user", "user", "Describe this image"),
+          attachments: [
+            {
+              id: "image",
+              fileName: "photo.jpg",
+              mimeType: "image/jpeg",
+              data: "x".repeat(50_000),
+            },
+          ],
+        },
+        message("model", "model", "It is a mountain."),
+      ],
+      {
+        newMessage: "What time of day is it?",
+        attachments: [],
+        modelInputTokenLimit: 1_200,
+        reservedOutputTokens: 200,
+      },
+    );
+
+    expect(bounded[0].attachments?.[0].id).toBe("image");
+  });
+
   it("truncates tool results while retaining name and argument summary", () => {
     const bounded = boundHistoryForRequest(
       [

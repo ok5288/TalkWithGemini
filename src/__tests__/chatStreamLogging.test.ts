@@ -85,7 +85,7 @@ describe("chat stream logging", () => {
     );
   });
 
-  it("converts current OpenAI Compatible image attachments before streaming", async () => {
+  it("converts remote OpenAI Compatible image attachments before streaming", async () => {
     mocks.streamOpenAIChatCompletions.mockImplementation(async (request) => {
       request.onChunk({ type: "content", content: "ok" });
     });
@@ -105,7 +105,7 @@ describe("chat stream logging", () => {
           id: "att_1",
           mimeType: "image/png",
           fileName: "image.png",
-          data: "aW1hZ2U=",
+          url: "https://cdn.example.com/image.png",
         },
       ],
     });
@@ -119,11 +119,38 @@ describe("chat stream logging", () => {
         { type: "text", text: "Describe this" },
         {
           type: "image_url",
-          image_url: { url: "data:image/png;base64,aW1hZ2U=" },
+          image_url: { url: "https://cdn.example.com/image.png" },
         },
       ],
     });
     expect(JSON.stringify(request.messages)).not.toContain('"mimeType"');
+  });
+
+  it("rejects local file images for OpenAI Compatible providers", async () => {
+    const { handleChatStream } = await import("../lib/api/chat-handler");
+    const response = await handleChatStream({
+      provider: {
+        type: "OpenAI Compatible",
+        baseUrl: "https://api.example.com/v1",
+        apiKey: "sk-secret",
+      },
+      modelName: "compat-vision",
+      history: [],
+      newMessage: "Describe this",
+      attachments: [
+        {
+          id: "att_1",
+          mimeType: "image/png",
+          fileName: "image.png",
+          file: new File(["image"], "image.png", { type: "image/png" }),
+        } as any,
+      ],
+    });
+
+    await expect(response.text()).resolves.toContain(
+      "does not support file-based image inputs",
+    );
+    expect(mocks.streamOpenAIChatCompletions).not.toHaveBeenCalled();
   });
 
   it("passes the request signal to provider streaming", async () => {

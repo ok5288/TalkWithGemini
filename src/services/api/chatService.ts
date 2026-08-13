@@ -71,6 +71,7 @@ import {
   readJsonResponseOrThrow,
   signedApiFetch,
 } from "@/lib/api/client";
+import { createChatRequestBody } from "@/lib/api/chatImageRequestBody";
 import {
   buildProviderRuntimeConfig,
   fetchWithByokRetry,
@@ -524,22 +525,24 @@ export const generateImage = async (
     const requestAttachments = preparedAttachments
       ? await stripAttachmentsDisplayCacheForModel(preparedAttachments)
       : undefined;
-    const response = await fetchWithByokRetry(async () =>
-      signedApiFetch("/api/chat/generate-image", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
+    const response = await fetchWithByokRetry(async () => {
+      const request = await createChatRequestBody(
+        {
           provider: await buildProviderRuntimeConfig(provider, signal),
           modelName,
           prompt,
           imageCount: options.imageCount,
           attachments: requestAttachments,
-        }),
+        },
+        { signal },
+      );
+      return signedApiFetch("/api/chat/generate-image", {
+        method: "POST",
+        headers: request.headers,
+        body: request.body,
         signal,
-      }),
-    );
+      });
+    });
 
     if (!response.ok) {
       throw new Error(
@@ -988,13 +991,9 @@ export const streamChatResponse = async (
         systemInstruction: effectiveSystemInstruction,
         tools,
       });
-      const response = await fetchWithByokRetry(async () =>
-        signedApiFetch("/api/chat", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
+      const response = await fetchWithByokRetry(async () => {
+        const request = await createChatRequestBody(
+          {
             provider: await buildProviderRuntimeConfig(provider, signal),
             modelName,
             history: boundedRequestHistory,
@@ -1015,10 +1014,16 @@ export const streamChatResponse = async (
               requestConfig?.useSearch &&
               !agentModeEnabled &&
               searchCompatibility.mode === "openai-web",
-          }),
+          },
+          { signal },
+        );
+        return signedApiFetch("/api/chat", {
+          method: "POST",
+          headers: request.headers,
+          body: request.body,
           signal,
-        }),
-      );
+        });
+      });
 
       const contentType = response.headers.get("content-type");
       const isSSE = contentType?.includes("text/event-stream");

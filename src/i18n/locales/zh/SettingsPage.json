@@ -11,6 +11,7 @@
   "tabSync": "加密同步",
   "tabHealth": "部署健康",
   "tabSystem": "系统设置",
+  "tabShortcuts": "快捷键",
   "tabAbout": "关于",
   "searchLabel": "搜索设置",
   "searchPlaceholder": "搜索设置",
@@ -25,6 +26,7 @@
   "searchDescription_sync": "配置加密 WebDAV 或 S3 同步与恢复。",
   "searchDescription_health": "检查部署能力和配置就绪状态。",
   "searchDescription_system": "管理聊天行为、压缩、备份、恢复和本地数据。",
+  "searchDescription_shortcuts": "自定义常用聊天与导航操作的键盘快捷键。",
   "searchDescription_about": "查看应用版本、项目信息和相关链接。",
   "searchKeywords_providers": "供应商 API 密钥 Base URL 模型 能力 附件 工具 图片 推理",
   "searchKeywords_defaults": "默认 标题 相关问题 压缩 提示词优化 RAG 记忆 模型",
@@ -35,5 +37,6 @@
   "searchKeywords_sync": "同步 WebDAV S3 加密 恢复码 设备 冲突",
   "searchKeywords_health": "健康 部署 Worker Docker Cloudflare 诊断",
   "searchKeywords_system": "系统提示词 自动标题 相关问题 压缩 图片 备份 恢复 清理",
+  "searchKeywords_shortcuts": "快捷键 键盘 热键 命令 搜索 新建对话 输入框 侧栏 停止生成",
   "searchKeywords_about": "关于 版本 许可 GitHub"
 }

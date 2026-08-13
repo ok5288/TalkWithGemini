@@ -1,3 +1,5 @@
+import { isChatImageFileCandidate } from "./chatAttachmentFiles";
+
 export function truncateMiddle(text: string, maxLength: number): string {
   if (!text || text.length <= maxLength) return text;
   const separator = "…";
@@ -13,7 +15,7 @@ export function truncateMiddle(text: string, maxLength: number): string {
 
 export function isNativeMediaFile(file: File): boolean {
   return (
-    file.type.startsWith("image/") ||
+    isChatImageFileCandidate(file) ||
     file.type.startsWith("audio/") ||
     file.type.startsWith("video/")
   );

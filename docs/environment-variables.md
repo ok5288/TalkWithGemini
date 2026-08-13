@@ -104,9 +104,9 @@ registry lookups survive across instances.
 
 ## Upload Limits
 
-| Variable                    | Purpose                                                                                       |
-| --------------------------- | --------------------------------------------------------------------------------------------- |
-| `MAX_ATTACHMENT_FILE_BYTES` | Maximum chat attachment file size in bytes. Defaults to `10485760` and is clamped internally. |
+| Variable                    | Purpose                                                                                                                                                                                                                                       |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `MAX_ATTACHMENT_FILE_BYTES` | Maximum prepared chat attachment size in bytes. Defaults to `10485760` and is clamped internally. Image sources may be up to 20 MiB only for client preprocessing; sources over 10 MiB are force-compressed and must finish at 5 MiB or less. |
 
 ## Public URLs
 

@@ -11,6 +11,7 @@
   "tabSync": "暗号化同期",
   "tabHealth": "デプロイ状態",
   "tabSystem": "システム設定",
+  "tabShortcuts": "キーボードショートカット",
   "tabAbout": "このプロジェクトについて",
   "searchLabel": "設定を検索",
   "searchPlaceholder": "設定を検索",
@@ -25,6 +26,7 @@
   "searchDescription_sync": "暗号化 WebDAV または S3 同期と復旧を設定します。",
   "searchDescription_health": "デプロイ機能と設定状態を確認します。",
   "searchDescription_system": "チャット動作、圧縮、バックアップ、復元、ローカルデータを管理します。",
+  "searchDescription_shortcuts": "よく使うチャット操作とナビゲーションのキーを変更します。",
   "searchDescription_about": "アプリのバージョン、プロジェクト情報、リンクを確認します。",
   "searchKeywords_providers": "プロバイダー API キー Base URL モデル 機能 添付 ツール 画像 推論",
   "searchKeywords_defaults": "デフォルト タイトル 関連質問 圧縮 プロンプト最適化 RAG メモリ モデル",
@@ -35,5 +37,6 @@
   "searchKeywords_sync": "同期 WebDAV S3 暗号化 復旧コード デバイス 競合",
   "searchKeywords_health": "ヘルス デプロイ Worker Docker Cloudflare 診断",
   "searchKeywords_system": "システムプロンプト 自動タイトル 関連質問 圧縮 画像 バックアップ 復元 クリーンアップ",
+  "searchKeywords_shortcuts": "キーボード ショートカット ホットキー コマンド 検索 新規チャット 入力欄 サイドバー 生成停止",
   "searchKeywords_about": "このプロジェクト バージョン ライセンス GitHub"
 }

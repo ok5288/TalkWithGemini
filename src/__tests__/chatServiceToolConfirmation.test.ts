@@ -1490,16 +1490,20 @@ describe("chat service tool execution", () => {
     expect(outputSnapshots.flat().some((block) => block.type === "image")).toBe(
       false,
     );
-    const followUpBody = JSON.parse(
-      String((fetchMock.mock.calls[1]?.[1] as RequestInit).body),
-    );
+    const followUpRequestBody = (fetchMock.mock.calls[1]?.[1] as RequestInit)
+      .body;
+    expect(followUpRequestBody).toBeInstanceOf(FormData);
+    const followUpForm = followUpRequestBody as FormData;
+    const followUpBody = JSON.parse(String(followUpForm.get("payload")));
     expect(followUpBody.attachments).toEqual([
       expect.objectContaining({
         mimeType: "image/png",
-        data: "aW1hZ2U=",
         fileName: "plugin-image.png",
+        uploadId: "image-0",
       }),
     ]);
+    expect(followUpBody.attachments[0]).not.toHaveProperty("data");
+    expect(followUpForm.get("image:image-0")).toBeInstanceOf(File);
     expect(followUpBody.newMessage).toContain("attached image outputs");
     const toolResult = followUpBody.history?.[1]?.toolCalls?.[0]
       ?.result as Record<string, unknown>;

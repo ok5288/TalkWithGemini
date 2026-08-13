@@ -182,21 +182,27 @@ Native model image output is stored as ordered `MessageOutputBlock` entries.
 Mixed Gemini text/image responses and OpenAI image-generation events append
 `text` and `image` blocks in the order received, so chat rendering, reading
 mode, PNG export, and PDF print views use `outputBlocks` instead of only
-`message.content`. User-sent and model-generated images can keep OPFS
-display-cache copies mapped to the original `data` or remote `url`; renderers
-resolve those OPFS files to runtime Blob URLs and revoke the Blob URLs when the
-component unmounts or the image source changes. Provider payloads strip the
-display cache and send only base64 data or the original remote URL.
+`message.content`. New local user-sent images and prepared model-generated
+images keep OPFS-backed file references; renderers resolve those files to
+runtime Blob URLs and revoke the Blob URLs when the component unmounts or the
+image source changes. Local image model requests use bounded multipart files
+and native provider file IDs or URIs instead of Base64 payloads.
+
+HEIC and HEIF uploads are converted to JPEG before compression. Images over 20
+MiB are rejected before processing. Images over 10 MiB and at most 20 MiB are
+always compressed even when automatic compression is disabled, and the result
+must be at most 5 MiB. The composer remains locked during preparation and shows
+separate conversion, compression, and document-parsing status text.
 
 Remote image URLs still pass through the existing client and server URL safety
 policies. The app does not fetch private-network image edit sources on behalf
-of users; image edit requests use uploaded inline attachments or provider-side
-file URLs that pass validation. If a provider or route does not support a
+of users; image edit requests use uploaded files or provider-side file URLs
+that pass validation. If a provider or route does not support a
 requested image option such as multiple images, the provider error is surfaced
 as a generation failure instead of silently downgrading to another model.
 
-If OPFS display-cache writes or reads fail, rendering falls back to the
-canonical message image data instead of failing the generation.
+Legacy inline and remote images retain their existing rendering fallbacks. A
+new local image is not attached when its required OPFS write fails.
 
 Mermaid and mind map fullscreen views normalize generated SVG root attributes
 for stable sizing and export snapshots. Fullscreen dialogs and reader views trap

@@ -117,6 +117,20 @@ describe("provider response lifecycle limits", () => {
     });
   });
 
+  it("allows image-sized time budgets for provider file uploads", async () => {
+    const { getProviderResponseLimits } = await import("../lib/providers/base");
+
+    expect(
+      getProviderResponseLimits("https://api.example.test/v1/files", {
+        method: "POST",
+        body: new FormData(),
+      }),
+    ).toMatchObject({
+      timeoutMs: 120_000,
+      maxResponseBytes: 36 * 1024 * 1024,
+    });
+  });
+
   it("keeps timeout and size codes at the public error boundary", async () => {
     const { toPublicErrorPayload } = await import("../lib/errors");
     const { ResponseSizeLimitError, ResponseTimeoutError } =

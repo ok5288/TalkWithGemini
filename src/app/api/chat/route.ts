@@ -2,11 +2,18 @@ import { NextRequest } from "next/server";
 import { handleChatStream } from "@/lib/api/chat-handler";
 import { withStreamApiHandler, logRequest } from "@/lib/api/middleware";
 import { ChatRequestSchema } from "@/lib/api/schemas";
+import {
+  hydrateChatImageUploads,
+  readChatRequestBody,
+} from "@/lib/api/chatMultipart";
 import { resolveProviderRuntimeConfig } from "@/lib/byok/server";
 
 export const POST = withStreamApiHandler(
   async (request: NextRequest, body: any) => {
-    const parsed = ChatRequestSchema.parse(body);
+    const parsed = await hydrateChatImageUploads(
+      ChatRequestSchema.parse(body.payload),
+      body.files,
+    );
 
     logRequest("Chat", {
       providerType: parsed.provider.type,
@@ -29,4 +36,5 @@ export const POST = withStreamApiHandler(
       signal: request.signal,
     });
   },
+  readChatRequestBody,
 );

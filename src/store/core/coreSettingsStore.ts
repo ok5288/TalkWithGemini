@@ -26,11 +26,22 @@ import {
   migrateProviderLocalSecret,
   stripProviderPlainSecret,
 } from "@/lib/settings/localSecretMigration";
+import {
+  DEFAULT_SHORTCUT_BINDINGS,
+  SHORTCUT_ACTION_IDS,
+  cloneShortcutBindings,
+  findShortcutConflict,
+  normalizeShortcutBindings,
+  validateShortcutBinding,
+  type ShortcutActionId,
+  type ShortcutBinding,
+  type ShortcutBindings,
+} from "@/lib/shortcuts";
 
 /**
  * Core Settings Store
- * Stores theme, language, providers, and defaultModels in localStorage
- * for fast synchronous access during initialization
+ * Stores theme, language, providers, defaultModels, and shortcut bindings in
+ * localStorage for fast synchronous access during initialization.
  */
 
 const EMPTY_DEFAULT_MODELS: DefaultModels = {
@@ -103,6 +114,7 @@ interface CoreSettingsState {
   language: string;
   providers: ModelProvider[];
   defaultModels: DefaultModels;
+  shortcutBindings: ShortcutBindings;
   serverDefaultProviderEnabled?: boolean;
 
   // Actions
@@ -118,6 +130,14 @@ interface CoreSettingsState {
 
   // Default Models Actions
   updateDefaultModels: (models: Partial<DefaultModels>) => void;
+
+  // Shortcut Actions
+  setShortcutBinding: (
+    actionId: ShortcutActionId,
+    binding: ShortcutBinding | null,
+  ) => void;
+  resetShortcutBinding: (actionId: ShortcutActionId) => void;
+  resetShortcutBindings: () => void;
 }
 
 // Helper to generate random 6-letter ID
@@ -143,6 +163,7 @@ export const useCoreSettingsStore = create<CoreSettingsState>()(
       providers: [],
       serverDefaultProviderEnabled: undefined,
       defaultModels: { ...EMPTY_DEFAULT_MODELS },
+      shortcutBindings: cloneShortcutBindings(),
 
       setTheme: (theme) => set({ theme }),
       setLanguage: (language) => set({ language }),
@@ -308,6 +329,49 @@ export const useCoreSettingsStore = create<CoreSettingsState>()(
         set((state) => ({
           defaultModels: { ...state.defaultModels, ...models },
         })),
+
+      setShortcutBinding: (actionId, binding) =>
+        set((state) => {
+          if (!SHORTCUT_ACTION_IDS.includes(actionId)) return state;
+          if (binding && !validateShortcutBinding(binding).valid) return state;
+          if (
+            binding &&
+            findShortcutConflict(state.shortcutBindings, binding, actionId)
+          ) {
+            return state;
+          }
+
+          return {
+            shortcutBindings: {
+              ...state.shortcutBindings,
+              [actionId]: binding ? { ...binding } : null,
+            },
+          };
+        }),
+
+      resetShortcutBinding: (actionId) =>
+        set((state) => {
+          if (!SHORTCUT_ACTION_IDS.includes(actionId)) return state;
+          const defaultBinding = DEFAULT_SHORTCUT_BINDINGS[actionId];
+          const conflict = defaultBinding
+            ? findShortcutConflict(
+                state.shortcutBindings,
+                defaultBinding,
+                actionId,
+              )
+            : null;
+          const shortcutBindings = { ...state.shortcutBindings };
+          if (conflict) shortcutBindings[conflict] = null;
+          shortcutBindings[actionId] = defaultBinding
+            ? { ...defaultBinding }
+            : null;
+          return { shortcutBindings };
+        }),
+
+      resetShortcutBindings: () =>
+        set({
+          shortcutBindings: cloneShortcutBindings(),
+        }),
     }),
     {
       name: STORAGE_KEYS.CORE_SETTINGS,
@@ -329,17 +393,32 @@ export const useCoreSettingsStore = create<CoreSettingsState>()(
           language: state.language || "auto",
           serverDefaultProviderEnabled: undefined,
           providers,
+          shortcutBindings: normalizeShortcutBindings(state.shortcutBindings),
           defaultModels: pruneUnavailableDefaultModels(
             { ...EMPTY_DEFAULT_MODELS, ...state.defaultModels },
             providers,
           ),
         } as CoreSettingsState;
       },
+      merge: (persistedState, currentState) => {
+        const persisted =
+          persistedState && typeof persistedState === "object"
+            ? (persistedState as Partial<CoreSettingsState>)
+            : {};
+        return {
+          ...currentState,
+          ...persisted,
+          shortcutBindings: normalizeShortcutBindings(
+            persisted.shortcutBindings,
+          ),
+        };
+      },
       partialize: (state) => ({
         theme: state.theme,
         language: state.language,
         providers: state.providers.map(stripProviderPlainSecret),
         defaultModels: state.defaultModels,
+        shortcutBindings: state.shortcutBindings,
       }),
       onRehydrateStorage: () => {
         return (state, error) => {

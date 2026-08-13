@@ -11,6 +11,7 @@
   "tabSync": "Encrypted Sync",
   "tabHealth": "Deployment Health",
   "tabSystem": "System Settings",
+  "tabShortcuts": "Keyboard Shortcuts",
   "tabAbout": "About",
   "searchLabel": "Search settings",
   "searchPlaceholder": "Search settings",
@@ -25,6 +26,7 @@
   "searchDescription_sync": "Configure encrypted WebDAV or S3 synchronization and recovery.",
   "searchDescription_health": "Inspect deployment capabilities and configuration readiness.",
   "searchDescription_system": "Control chat behavior, compression, backup, restore, and local data.",
+  "searchDescription_shortcuts": "Customize keyboard commands for common chat and navigation actions.",
   "searchDescription_about": "View application version, project information, and links.",
   "searchKeywords_providers": "provider api key base url model capability attachment tools image reasoning",
   "searchKeywords_defaults": "default title related questions compression prompt optimization rag memory model",
@@ -35,5 +37,6 @@
   "searchKeywords_sync": "sync webdav s3 encryption recovery code device conflict",
   "searchKeywords_health": "health deployment worker docker cloudflare diagnostics",
   "searchKeywords_system": "system prompt auto title questions compression image backup restore cleanup",
+  "searchKeywords_shortcuts": "keyboard shortcut hotkey command keys search new chat composer sidebar stop generation",
   "searchKeywords_about": "about version license github"
 }

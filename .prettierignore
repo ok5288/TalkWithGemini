@@ -18,6 +18,7 @@ pnpm-lock.yaml
 cloudflare-env.d.ts
 next-env.d.ts
 *.tsbuildinfo
+public/vendor
 
 # Static host configuration
 public/_headers

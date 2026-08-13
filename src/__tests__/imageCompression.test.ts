@@ -3,13 +3,17 @@ import type { Attachment } from "../types";
 import {
   compressImageAttachment,
   compressImageFile,
+  convertHeicToJpegFile,
   getImageCompressionConfig,
+  ImageAttachmentPreparationError,
+  prepareImageFileForAttachment,
   prepareConversationImageAttachments,
   prepareGeneratedImageAttachments,
   type ImageCompressionConfig,
   type ImageCompressor,
   type ImageDimensions,
 } from "../lib/utils/imageCompression";
+import { IMAGE_ATTACHMENT_LIMITS } from "../config/limits";
 
 const DEFAULT_CONFIG: ImageCompressionConfig = {
   enabled: true,
@@ -60,6 +64,134 @@ async function compressWithDimensions(
 }
 
 describe("image compression", () => {
+  it.each([
+    ["image/heic", "photo.heic"],
+    ["image/heif", "photo.heif"],
+    ["", "PHOTO.HEIC"],
+  ])("converts %s %s images to JPEG before compression", async (type, name) => {
+    const file = createImageFile({ type, name });
+    const convertHeic = vi.fn(async () =>
+      createImageFile({ size: 512, type: "image/jpeg", name: "ignored.jpg" }),
+    );
+    const onStage = vi.fn();
+
+    const converted = await convertHeicToJpegFile(file, {
+      convertHeic,
+      onStage,
+    });
+
+    expect(convertHeic).toHaveBeenCalledWith({
+      blob: file,
+      type: "image/jpeg",
+      quality: 0.9,
+    });
+    expect(onStage).toHaveBeenCalledWith("converting");
+    expect(converted).toMatchObject({
+      name: name.replace(/\.(?:heic|heif)$/i, ".jpg"),
+      type: "image/jpeg",
+      lastModified: file.lastModified,
+    });
+  });
+
+  it("does not load the HEIC converter for ordinary images", async () => {
+    const file = createImageFile({ type: "image/jpeg", name: "photo.jpg" });
+    const convertHeic = vi.fn();
+
+    await expect(convertHeicToJpegFile(file, { convertHeic })).resolves.toBe(
+      file,
+    );
+    expect(convertHeic).not.toHaveBeenCalled();
+  });
+
+  it("restores common mobile image MIME types from file extensions", async () => {
+    const file = createImageFile({ type: "", name: "camera.JPG" });
+    const compress = vi.fn<ImageCompressor>();
+
+    const prepared = await prepareImageFileForAttachment(
+      file,
+      { ...DEFAULT_CONFIG, enabled: false },
+      { compress },
+    );
+
+    expect(prepared).toMatchObject({
+      name: "camera.JPG",
+      type: "image/jpeg",
+    });
+    expect(compress).not.toHaveBeenCalled();
+  });
+
+  it("forces 10-20 MiB images through compression even when disabled", async () => {
+    const file = createImageFile({
+      size: IMAGE_ATTACHMENT_LIMITS.compressionThresholdBytes + 1,
+      type: "image/jpeg",
+      name: "large.jpg",
+    });
+    const compress = vi.fn<ImageCompressor>(async () =>
+      createImageFile({
+        size: IMAGE_ATTACHMENT_LIMITS.maxCompressedBytes,
+        type: "image/jpeg",
+        name: "large.jpg",
+      }),
+    );
+    const onStage = vi.fn();
+
+    const prepared = await prepareImageFileForAttachment(
+      file,
+      { ...DEFAULT_CONFIG, enabled: false, maxSizeMB: 5 },
+      {
+        readDimensions: async () => ({ width: 4000, height: 3000 }),
+        compress,
+        onStage,
+      },
+    );
+
+    expect(compress).toHaveBeenCalledTimes(1);
+    expect(onStage).toHaveBeenCalledWith("compressing");
+    expect(prepared.size).toBe(IMAGE_ATTACHMENT_LIMITS.maxCompressedBytes);
+  });
+
+  it("rejects forced compression that remains over 5 MiB", async () => {
+    const file = createImageFile({
+      size: IMAGE_ATTACHMENT_LIMITS.compressionThresholdBytes + 1,
+      type: "image/jpeg",
+      name: "large.jpg",
+    });
+
+    await expect(
+      prepareImageFileForAttachment(file, DEFAULT_CONFIG, {
+        readDimensions: async () => ({ width: 4000, height: 3000 }),
+        compress: async () =>
+          createImageFile({
+            size: IMAGE_ATTACHMENT_LIMITS.maxCompressedBytes + 1,
+            type: "image/jpeg",
+            name: "large.jpg",
+          }),
+      }),
+    ).rejects.toMatchObject({
+      code: "compressed-too-large",
+      limitBytes: IMAGE_ATTACHMENT_LIMITS.maxCompressedBytes,
+    } satisfies Partial<ImageAttachmentPreparationError>);
+  });
+
+  it("rejects images over 20 MiB without conversion or compression", async () => {
+    const file = createImageFile({
+      size: IMAGE_ATTACHMENT_LIMITS.maxSourceBytes + 1,
+      type: "image/heic",
+      name: "too-large.heic",
+    });
+    const convertHeic = vi.fn();
+    const compress = vi.fn<ImageCompressor>();
+
+    await expect(
+      prepareImageFileForAttachment(file, DEFAULT_CONFIG, {
+        convertHeic,
+        compress,
+      }),
+    ).rejects.toMatchObject({ code: "source-too-large" });
+    expect(convertHeic).not.toHaveBeenCalled();
+    expect(compress).not.toHaveBeenCalled();
+  });
+
   it("derives normalized defaults and preserves an explicit disabled value", () => {
     expect(getImageCompressionConfig(undefined)).toEqual(DEFAULT_CONFIG);
     expect(
@@ -289,6 +421,25 @@ describe("image compression", () => {
     expect(compress).not.toHaveBeenCalled();
   });
 
+  it("keeps request-time compressed images as Files instead of Base64", async () => {
+    const attachment: Attachment = {
+      id: "legacy-inline",
+      mimeType: "image/png",
+      fileName: "legacy.png",
+      data: Buffer.from(new Uint8Array(10)).toString("base64"),
+    };
+
+    const result = (await compressImageAttachment(attachment, DEFAULT_CONFIG, {
+      readDimensions: async () => ({ width: 1600, height: 900 }),
+      compress: async () => createImageFile({ size: 5 }),
+    })) as Attachment & { file?: File };
+
+    expect(result.file).toBeInstanceOf(File);
+    expect(result.file).toMatchObject({ size: 5, type: "image/png" });
+    expect(result).not.toHaveProperty("data");
+    expect(result).not.toHaveProperty("url");
+  });
+
   it("compresses legacy OPFS images before creating the conversation cache", async () => {
     const originalBytes = new Uint8Array(10);
     const compressedBytes = new Uint8Array(5);
@@ -320,13 +471,10 @@ describe("image compression", () => {
     expect(savedSizes).toEqual([compressedBytes.byteLength]);
     expect(prepared[0]).toMatchObject({
       id: "legacy",
-      data: Buffer.from(compressedBytes).toString("base64"),
-      displayCache: {
-        opfsUrl: "opfs://chat/images/compressed.png",
-        createdAt: 789,
-      },
+      url: "opfs://chat/images/compressed.png",
     });
-    expect(prepared[0]).not.toHaveProperty("url");
+    expect(prepared[0]).not.toHaveProperty("data");
+    expect(prepared[0]).not.toHaveProperty("displayCache");
   });
 
   it("compresses and caches generated inline images sequentially", async () => {
@@ -373,12 +521,10 @@ describe("image compression", () => {
     expect(maxActive).toBe(1);
     expect(prepared).toHaveLength(2);
     expect(prepared[0]).toMatchObject({
-      data: Buffer.from(new Uint8Array(5)).toString("base64"),
-      displayCache: {
-        opfsUrl: "opfs://images/generated/first.png",
-        createdAt: 456,
-      },
+      url: "opfs://images/generated/first.png",
     });
+    expect(prepared[0]).not.toHaveProperty("data");
+    expect(prepared[0]).not.toHaveProperty("displayCache");
     expect(saveFile).toHaveBeenCalledTimes(2);
   });
 });
