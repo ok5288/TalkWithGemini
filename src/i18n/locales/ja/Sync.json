@@ -52,7 +52,7 @@
   "saveProvider": "プロバイダーを保存",
   "testConnection": "接続をテスト",
   "vaultTitle": "個人用保管庫",
-  "vaultDescription": "復旧コードは別の端末で保管庫を復号する唯一の方法です。Neo Chat では復元できません。",
+  "vaultDescription": "復旧コードは別の端末で保管庫を復号する唯一の方法です。Ed iChat では復元できません。",
   "vaultId": "保管庫 ID",
   "saveRecoveryWarning": "同期を有効にする前に復旧コードを保存してください。コードを持つ人は保管庫を復号できます。",
   "recoveryCode": "復旧コード",
