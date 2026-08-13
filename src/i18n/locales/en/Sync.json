@@ -52,7 +52,7 @@
   "saveProvider": "Save provider",
   "testConnection": "Test connection",
   "vaultTitle": "Personal vault",
-  "vaultDescription": "The recovery code is the only way to decrypt this vault on another device. Neo Chat cannot recover it for you.",
+  "vaultDescription": "The recovery code is the only way to decrypt this vault on another device. Ed iChat cannot recover it for you.",
   "vaultId": "Vault ID",
   "saveRecoveryWarning": "Save this recovery code before activating sync. Anyone with it can decrypt your vault.",
   "recoveryCode": "Recovery code",
