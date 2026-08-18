@@ -26,12 +26,19 @@ export interface AccessFailureResult extends AccessAttemptState {
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
-export function getAccessPassword(): string {
-  return process.env[ACCESS_PASSWORD_ENV]?.trim() || "";
+function getAccessPasswords(): string[] {
+  return (process.env[ACCESS_PASSWORD_ENV] || "")
+    .split(",")
+    .map((password) => password.trim())
+    .filter(Boolean);
+}
+
+function getAccessPasswordSigningSecret(): string {
+  return getAccessPasswords().join(",");
 }
 
 export function isAccessPasswordEnabled(): boolean {
-  return Boolean(getAccessPassword());
+  return getAccessPasswords().length > 0;
 }
 
 async function hashAccessPassword(value: string): Promise<Uint8Array> {
@@ -53,13 +60,18 @@ function timingSafeBytesEqual(a: Uint8Array, b: Uint8Array): boolean {
 export async function isValidAccessPassword(
   candidate: string,
 ): Promise<boolean> {
-  const password = getAccessPassword();
-  if (!password) return false;
+  const passwords = getAccessPasswords();
+  if (passwords.length === 0) return false;
 
-  return timingSafeBytesEqual(
-    await hashAccessPassword(candidate.trim()),
-    await hashAccessPassword(password),
+  const [candidateHash, ...passwordHashes] = await Promise.all(
+    [candidate.trim(), ...passwords].map(hashAccessPassword),
   );
+  let matches = 0;
+  for (const passwordHash of passwordHashes) {
+    matches |= Number(timingSafeBytesEqual(candidateHash, passwordHash));
+  }
+
+  return matches !== 0;
 }
 
 function normalizeCookieValue(value: string | undefined | null): string {
@@ -102,7 +114,7 @@ function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
 
 async function importSigningKey(
   purpose: AccessCookiePurpose,
-  password = getAccessPassword(),
+  password = getAccessPasswordSigningSecret(),
 ): Promise<CryptoKey | null> {
   if (!password) return null;
 

@@ -14,7 +14,7 @@ Recommended settings:
 
 ```bash
 DEPLOYMENT_MODE=local
-ACCESS_PASSWORD=choose-a-strong-password
+ACCESS_PASSWORD=first-strong-password,second-strong-password
 ALLOW_INSECURE_LOCAL_PRODUCTION=false
 ALLOW_LOCAL_NETWORK_PROXY=
 TRUST_PROXY_HEADERS=false
@@ -26,6 +26,10 @@ BYOK_KEY_ID=prod-2026-07
 Production `local` mode now fails closed for `/api/*` when `ACCESS_PASSWORD` is
 empty. Set `ALLOW_INSECURE_LOCAL_PRODUCTION=true` only for a private deployment
 that is not exposed to the internet and has another access boundary.
+
+`ACCESS_PASSWORD` accepts one or more comma-separated passwords. Surrounding
+whitespace and empty entries are ignored, commas cannot be part of a password,
+and changing the list invalidates existing access sessions.
 
 If the deployment has more than one instance, use Upstash for shared request
 limits, document parse jobs, and server-registered plugins:
@@ -250,10 +254,11 @@ when the job is created.
 
 ## Access Password Boundary
 
-`ACCESS_PASSWORD` is a deployment gate for a single private deployment. It is
-not a user account system. Before offering Neo Chat as a public multi-user SaaS,
-add account authentication, tenant isolation, server-side secret storage,
-quotas, audit logs, abuse controls, and provider spend limits.
+`ACCESS_PASSWORD` accepts multiple credentials, but it remains one deployment
+gate for a single private deployment. It does not identify users and is not a
+user account system. Before offering Neo Chat as a public multi-user SaaS, add
+account authentication, tenant isolation, server-side secret storage, quotas,
+audit logs, abuse controls, and provider spend limits.
 
 ## Dependency Gate
 

@@ -16,6 +16,7 @@ import {
   isDefaultDocumentProcessingAvailable,
 } from "../defaultConfig/server";
 import { getDeploymentMode } from "../security/deployment";
+import { isAccessPasswordEnabled } from "../security/accessControl";
 import { getApiProofPublicStatus } from "../security/requestProof";
 import { isLocalhostName, isPrivateIpAddress } from "../security/urlPolicy";
 
@@ -91,7 +92,7 @@ function apiProofHealth(): ServiceHealthItem {
 }
 
 function accessPasswordHealth(hosted: boolean): ServiceHealthItem {
-  if (env("ACCESS_PASSWORD")) {
+  if (isAccessPasswordEnabled()) {
     return item("accessPassword", "available", "ACCESS_PASSWORD_CONFIGURED");
   }
   return item(

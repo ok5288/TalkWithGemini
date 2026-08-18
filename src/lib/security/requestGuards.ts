@@ -13,6 +13,7 @@ import {
   enforceApiRequestProof,
   getRequestProofRateLimitIdentity,
 } from "./requestProof";
+import { isAccessPasswordEnabled } from "./accessControl";
 
 export const REQUEST_GUARD_ERROR_CODES = {
   csrf: "CSRF_ORIGIN_BLOCKED",
@@ -46,7 +47,7 @@ function isProductionLocalOpenApiBlocked(): boolean {
   return (
     process.env.NODE_ENV === "production" &&
     getDeploymentMode() === "local" &&
-    !process.env.ACCESS_PASSWORD?.trim() &&
+    !isAccessPasswordEnabled() &&
     !envBool("ALLOW_INSECURE_LOCAL_PRODUCTION")
   );
 }
