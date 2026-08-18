@@ -28,6 +28,7 @@ import {
 import { normalizeProviderTypeValue } from "../providers/providerTypes";
 import { normalizeModelMetadata } from "../providers/metadata";
 import { getDeploymentMode } from "../security/deployment";
+import { isAccessPasswordEnabled } from "../security/accessControl";
 import {
   DEFAULT_ELEVENLABS_TTS_MODEL,
   isElevenLabsSTTModel,
@@ -653,7 +654,7 @@ export function getPublicServerConfig(): PublicServerConfig {
     },
     deployment: {
       mode: deploymentMode,
-      accessPasswordEnabled: Boolean(env("ACCESS_PASSWORD")),
+      accessPasswordEnabled: isAccessPasswordEnabled(),
       trustedProxyHeaders: envBool("TRUST_PROXY_HEADERS") === true,
       byokStableKeyConfigured: Boolean(env("BYOK_PRIVATE_KEY_PEM")),
       byokEphemeralAllowed: envBool("BYOK_ALLOW_EPHEMERAL_KEY") === true,

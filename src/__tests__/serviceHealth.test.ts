@@ -104,6 +104,20 @@ describe("service health status", () => {
     });
   });
 
+  it("treats a separator-only access password list as unconfigured", async () => {
+    vi.stubEnv("DEPLOYMENT_MODE", "hosted");
+    vi.stubEnv("ACCESS_PASSWORD", " , , ");
+
+    const { getServiceHealthStatus } =
+      await import("../lib/services/serviceHealth");
+    const health = getServiceHealthStatus({ now: 1_700_000_000_000 });
+
+    expect(health.services.accessPassword).toMatchObject({
+      status: "missing_key",
+      code: "ACCESS_PASSWORD_RECOMMENDED",
+    });
+  });
+
   it("warns when hosted rate limits cannot identify clients by trusted proxy headers", async () => {
     vi.stubEnv("DEPLOYMENT_MODE", "hosted");
     vi.stubEnv("TRUST_PROXY_HEADERS", "false");

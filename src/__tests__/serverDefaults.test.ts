@@ -325,7 +325,7 @@ describe("server default configuration", () => {
 
   it("publishes deployment health without exposing deployment secrets", async () => {
     setEnv({
-      ACCESS_PASSWORD: "super-secret-password",
+      ACCESS_PASSWORD: "first-secret-password, second-secret-password",
       BYOK_PRIVATE_KEY_PEM: "private-key-secret",
       BYOK_ALLOW_EPHEMERAL_KEY: "false",
       DEPLOYMENT_MODE: "hosted",
@@ -361,7 +361,8 @@ describe("server default configuration", () => {
       pluginRegistryStore: "shared",
     });
     for (const secret of [
-      "super-secret-password",
+      "first-secret-password",
+      "second-secret-password",
       "private-key-secret",
       "redis-secret",
       "redis.internal",

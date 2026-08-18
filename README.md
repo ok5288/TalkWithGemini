@@ -318,8 +318,8 @@ Neo Chat is local-first by default:
 Important server-side settings:
 
 ```bash
-# Access gate
-ACCESS_PASSWORD="your-access-password"
+# Access gate (separate multiple accepted passwords with commas)
+ACCESS_PASSWORD="first-password,second-password"
 
 # Stable BYOK server key for production
 BYOK_PRIVATE_KEY_PEM="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
@@ -537,7 +537,10 @@ Neo Chat is self-hosting friendly, not a turnkey public SaaS security boundary.
   and rejected when the deployment default is unavailable or has changed type.
 - API schemas reject unknown high-risk fields and oversized payloads.
 - Plugin execution remains server-proxied and validated. Tool calls run automatically by default; an optional System setting pauses only destructive calls for one-time approval or denial. Destructive approval is never persisted for the chat.
-- `ACCESS_PASSWORD` is a deployment gate, not an account system.
+- `ACCESS_PASSWORD` accepts comma-separated passwords (surrounding whitespace
+  and empty entries are ignored), but it remains a deployment gate rather than
+  an account system. Commas cannot be part of a password, and changing the list
+  invalidates existing access sessions.
 
 Before exposing Neo Chat as a public multi-user service, add account authentication, tenant isolation, server-side secret storage, quotas, audit logs, abuse controls, and provider spend limits.
 

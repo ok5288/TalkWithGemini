@@ -48,9 +48,12 @@ the browser.
 
 ## Access Control
 
-| Variable          | Purpose                                                                           |
-| ----------------- | --------------------------------------------------------------------------------- |
-| `ACCESS_PASSWORD` | Optional deployment-level password gate. This is not an account or tenant system. |
+| Variable          | Purpose                                                                                                                                                                                   |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ACCESS_PASSWORD` | Optional deployment-level password gate. Separate multiple accepted passwords with commas; surrounding whitespace and empty entries are ignored. This is not an account or tenant system. |
+
+Commas are separators and cannot be part of an access password. Changing the
+configured list invalidates existing access sessions.
 
 ## BYOK Server Key
 

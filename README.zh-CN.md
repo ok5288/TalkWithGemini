@@ -272,8 +272,8 @@ Neo Chat 默认本地优先：
 重要服务端配置：
 
 ```bash
-# 访问门禁
-ACCESS_PASSWORD="your-access-password"
+# 访问门禁（多个可用密码使用英文逗号分隔）
+ACCESS_PASSWORD="first-password,second-password"
 
 # 生产环境稳定 BYOK server key
 BYOK_PRIVATE_KEY_PEM="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
@@ -474,7 +474,9 @@ Neo Chat 适合自托管，但不是开箱即用的公共 SaaS 安全边界。
   或类型发生变化时，请求会被拒绝。
 - API schema 会拒绝未知高风险字段和过大的 payload。
 - 插件执行仍然通过服务端代理和校验。工具调用默认自动执行；可在系统设置中选择仅让破坏性调用暂停，等待单次允许或拒绝。破坏性授权不会在本会话持久化。
-- `ACCESS_PASSWORD` 是部署门禁，不是账号系统。
+- `ACCESS_PASSWORD` 支持使用英文逗号分隔多个密码（会忽略首尾空白与空项），
+  但它仍然只是部署门禁，不是账号系统。密码本身不能包含英文逗号；修改密码列表
+  会使现有访问会话失效。
 
 如果要把 Neo Chat 作为公共多用户服务提供，请先补齐账号认证、租户隔离、服务端密钥存储、配额、审计日志、滥用控制和供应商费用控制。
 

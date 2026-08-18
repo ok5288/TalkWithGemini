@@ -53,9 +53,11 @@ describe("access control helpers", () => {
     clearRequestRateLimitBuckets();
   });
 
-  it("is disabled when ACCESS_PASSWORD is empty", () => {
-    vi.stubEnv("ACCESS_PASSWORD", "");
-    expect(isAccessPasswordEnabled()).toBe(false);
+  it("is disabled when ACCESS_PASSWORD has no non-empty values", () => {
+    for (const value of ["", " , , "]) {
+      vi.stubEnv("ACCESS_PASSWORD", value);
+      expect(isAccessPasswordEnabled()).toBe(false);
+    }
   });
 
   it("validates signed session cookies and rejects tampering or env changes", async () => {
@@ -111,6 +113,18 @@ describe("access control helpers", () => {
     await expect(isValidAccessPassword("wrong")).resolves.toBe(false);
     await expect(isValidAccessPassword("")).resolves.toBe(false);
   });
+
+  it("validates every non-empty comma-separated access password", async () => {
+    vi.stubEnv("ACCESS_PASSWORD", " primary, secondary ,, tertiary ");
+
+    await expect(isValidAccessPassword("primary")).resolves.toBe(true);
+    await expect(isValidAccessPassword("secondary")).resolves.toBe(true);
+    await expect(isValidAccessPassword("tertiary")).resolves.toBe(true);
+    await expect(isValidAccessPassword("wrong")).resolves.toBe(false);
+    await expect(isValidAccessPassword("primary,secondary")).resolves.toBe(
+      false,
+    );
+  });
 });
 
 describe("access password verification route", () => {
@@ -120,10 +134,10 @@ describe("access password verification route", () => {
   });
 
   it("sets a valid session cookie for the correct password", async () => {
-    vi.stubEnv("ACCESS_PASSWORD", "secret");
+    vi.stubEnv("ACCESS_PASSWORD", "primary, secondary");
     const { POST } = await import("../app/api/access/verify/route");
 
-    const response = await POST(makeVerifyRequest("secret"));
+    const response = await POST(makeVerifyRequest("secondary"));
     const setCookie = response.headers.get("set-cookie") || "";
     const sessionValue = extractCookieValue(setCookie, ACCESS_SESSION_COOKIE);
 
@@ -362,7 +376,7 @@ describe("access proxy", () => {
   it("fails closed for production local API deployments without access control", async () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("DEPLOYMENT_MODE", "local");
-    vi.stubEnv("ACCESS_PASSWORD", "");
+    vi.stubEnv("ACCESS_PASSWORD", " , , ");
     vi.stubEnv("ALLOW_INSECURE_LOCAL_PRODUCTION", "");
 
     const response = await applyRequestGuards(
