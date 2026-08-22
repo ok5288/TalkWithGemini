@@ -1,17 +1,20 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-describe("app viewport", () => {
-  it("locks mobile viewport zoom while keeping device-width layout", () => {
-    const layout = readFileSync(
-      resolve(process.cwd(), "src/app/layout.tsx"),
-      "utf8",
-    );
+import { viewport } from "@/app/layout";
 
-    expect(layout).toContain('width: "device-width"');
-    expect(layout).toContain("initialScale: 1");
-    expect(layout).toContain("maximumScale: 1");
-    expect(layout).toContain("userScalable: false");
+describe("app viewport", () => {
+  it("keeps device-width layout without blocking zoom (WCAG 1.4.4)", () => {
+    expect(viewport.width).toBe("device-width");
+    expect(viewport.initialScale).toBe(1);
+  });
+
+  it("lets users scale the page to at least 200%", () => {
+    // `userScalable: false` / `maximumScale: 1` fail WCAG 1.4.4 (Resize Text).
+    // Absent values leave the browser default, which permits pinch-zoom.
+    expect(viewport.userScalable).not.toBe(false);
+
+    if (viewport.maximumScale !== undefined) {
+      expect(viewport.maximumScale).toBeGreaterThanOrEqual(2);
+    }
   });
 });

@@ -10,6 +10,7 @@ import {
   isKnowledgeCollectionAttachment,
   isKnowledgeFileAttachment,
 } from "@/lib/utils/knowledgeAttachments";
+import { Button } from "@/components/ui/primitives";
 
 interface MessageInputAttachmentTrayProps {
   attachments: Attachment[];
@@ -138,7 +139,8 @@ const AttachmentPreviewCard: React.FC<{
           ) : null}
         </div>
       </div>
-      <button
+      <Button
+        variant="bare"
         type="button"
         aria-label={t("removeAttachment", {
           fileName: attachment.fileName,
@@ -147,7 +149,7 @@ const AttachmentPreviewCard: React.FC<{
         className={`absolute right-2 top-2 z-10 rounded-full bg-black/50 p-0.5 text-white opacity-100 transition-[background-color,opacity] hover:bg-red-500 md:opacity-0 md:group-hover/attachment:opacity-100 ${iconButtonFocusClass}`}
       >
         <X size={10} aria-hidden="true" />
-      </button>
+      </Button>
     </li>
   );
 };

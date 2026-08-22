@@ -9,7 +9,7 @@ import { parseModelString } from "@/lib/utils/model";
 import { useChatStore } from "@/store/core/chatStore";
 import { useCoreSettingsStore } from "@/store/core/coreSettingsStore";
 import { useSettingsStore } from "@/store/core/settingsStore";
-import { SearchProviderItem } from "./SettingsUI";
+import { SearchProviderItem } from "./SearchProviderItem";
 import { SEARCH_CONFIG_LIMITS } from "@/config/limits";
 // Base URLs moved to API routes
 const TAVILY_BASE_URL = "https://api.tavily.com";

@@ -18,7 +18,7 @@ pnpm-lock.yaml
 cloudflare-env.d.ts
 next-env.d.ts
 *.tsbuildinfo
-public/vendor
+public/heic-to.min.js
 
 # Static host configuration
 public/_headers

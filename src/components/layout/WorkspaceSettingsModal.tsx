@@ -24,7 +24,7 @@ import { useKnowledgeStore } from "@/store/core/knowledgeStore";
 import { useChatStore } from "@/store/core/chatStore";
 import { useSettingsStore, getTaskModel } from "@/store/core/settingsStore";
 import { v7 as uuidv7 } from "uuid";
-import { SimpleSwitch } from "../settings/SettingsUI";
+import { SimpleSwitch } from "@/components/ui/controls";
 import { optimizeSystemPrompt } from "@/services/artifactService";
 import { streamGenerateContent } from "@/services/api/chatService";
 import { deleteFromOPFS, saveToOPFS } from "@/utils/opfs";
@@ -43,6 +43,7 @@ import {
   compressImageFile,
   getImageCompressionConfig,
 } from "@/lib/utils/imageCompression";
+import { Button } from "@/components/ui/primitives";
 
 interface WorkspaceSettingsModalProps {
   onClose: () => void;
@@ -532,7 +533,8 @@ const WorkspaceSettingsModal: React.FC<WorkspaceSettingsModalProps> = ({
             <FolderCog size={20} className="text-blue-500" aria-hidden="true" />
             {workspace ? t("editWorkspace") : t("newWorkspace")}
           </h2>
-          <button
+          <Button
+            variant="bare"
             type="button"
             aria-label={t("close")}
             onClick={() => void handleCloseRequest()}
@@ -540,7 +542,7 @@ const WorkspaceSettingsModal: React.FC<WorkspaceSettingsModalProps> = ({
             className="rounded-full p-1 text-gray-500 transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-muted"
           >
             <X size={20} aria-hidden="true" />
-          </button>
+          </Button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
@@ -580,7 +582,8 @@ const WorkspaceSettingsModal: React.FC<WorkspaceSettingsModalProps> = ({
                 className="flex flex-wrap gap-3"
               >
                 {WORKSPACE_COLORS.map((c) => (
-                  <button
+                  <Button
+                    variant="bare"
                     type="button"
                     key={c.name}
                     aria-label={t("useColorAria", { color: c.name })}
@@ -596,7 +599,7 @@ const WorkspaceSettingsModal: React.FC<WorkspaceSettingsModalProps> = ({
                         aria-hidden="true"
                       />
                     )}
-                  </button>
+                  </Button>
                 ))}
               </div>
             </div>
@@ -609,7 +612,8 @@ const WorkspaceSettingsModal: React.FC<WorkspaceSettingsModalProps> = ({
                 >
                   {t("systemInstruction")}
                 </label>
-                <button
+                <Button
+                  variant="bare"
                   type="button"
                   aria-label={t("optimizeAria")}
                   aria-busy={isOptimizing}
@@ -627,7 +631,7 @@ const WorkspaceSettingsModal: React.FC<WorkspaceSettingsModalProps> = ({
                     <Sparkles size={12} aria-hidden="true" />
                   )}
                   {t("optimize")}
-                </button>
+                </Button>
               </div>
               <textarea
                 id={systemPromptInputId}
@@ -709,7 +713,8 @@ const WorkspaceSettingsModal: React.FC<WorkspaceSettingsModalProps> = ({
                     installedPlugins.map((rawPlugin) => {
                       const plugin = localizePluginMeta(rawPlugin, tConfig);
                       return (
-                        <button
+                        <Button
+                          variant="bare"
                           type="button"
                           key={plugin.id}
                           aria-label={
@@ -740,7 +745,7 @@ const WorkspaceSettingsModal: React.FC<WorkspaceSettingsModalProps> = ({
                           {activePlugins.includes(plugin.id) && (
                             <Check size={12} aria-hidden="true" />
                           )}
-                        </button>
+                        </Button>
                       );
                     })
                   ) : (
@@ -765,7 +770,8 @@ const WorkspaceSettingsModal: React.FC<WorkspaceSettingsModalProps> = ({
                 >
                   {installedSkills.length > 0 ? (
                     installedSkills.map((skill) => (
-                      <button
+                      <Button
+                        variant="bare"
                         type="button"
                         key={skill.id}
                         aria-label={
@@ -786,7 +792,7 @@ const WorkspaceSettingsModal: React.FC<WorkspaceSettingsModalProps> = ({
                         {activeSkills.includes(skill.id) && (
                           <Check size={12} aria-hidden="true" />
                         )}
-                      </button>
+                      </Button>
                     ))
                   ) : (
                     <div className="text-xs italic text-gray-400">
@@ -813,7 +819,8 @@ const WorkspaceSettingsModal: React.FC<WorkspaceSettingsModalProps> = ({
               >
                 {collections.length > 0 ? (
                   collections.map((col) => (
-                    <button
+                    <Button
+                      variant="bare"
                       type="button"
                       key={col.id}
                       aria-label={
@@ -835,7 +842,7 @@ const WorkspaceSettingsModal: React.FC<WorkspaceSettingsModalProps> = ({
                       >
                         {col.name}
                       </span>
-                    </button>
+                    </Button>
                   ))
                 ) : (
                   <div className="text-xs text-gray-400 italic">
@@ -890,7 +897,8 @@ const WorkspaceSettingsModal: React.FC<WorkspaceSettingsModalProps> = ({
                         ) : null}
                       </span>
                     </div>
-                    <button
+                    <Button
+                      variant="bare"
                       type="button"
                       aria-label={t("removePresetFileAria", {
                         fileName: file.fileName,
@@ -900,11 +908,12 @@ const WorkspaceSettingsModal: React.FC<WorkspaceSettingsModalProps> = ({
                       className="rounded text-gray-400 transition-colors hover:text-red-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <X size={14} aria-hidden="true" />
-                    </button>
+                    </Button>
                   </div>
                 ))}
 
-                <button
+                <Button
+                  variant="bare"
                   type="button"
                   aria-label={t("uploadPresetFilesAria")}
                   aria-describedby={
@@ -929,7 +938,7 @@ const WorkspaceSettingsModal: React.FC<WorkspaceSettingsModalProps> = ({
                     <UploadCloud size={14} aria-hidden="true" />
                   )}
                   {isUploadingFiles ? t("uploading") : t("uploadDefaultFile")}
-                </button>
+                </Button>
                 {fileUploadError && (
                   <div
                     id={fileUploadStatusId}
@@ -962,7 +971,8 @@ const WorkspaceSettingsModal: React.FC<WorkspaceSettingsModalProps> = ({
         <div className="p-5 border-t border-gray-100 dark:border-border bg-gray-50/50 dark:bg-card/50 flex justify-between gap-3">
           <div>
             {workspace && (
-              <button
+              <Button
+                variant="bare"
                 type="button"
                 aria-label={
                   isDeleteConfirming
@@ -989,19 +999,21 @@ const WorkspaceSettingsModal: React.FC<WorkspaceSettingsModalProps> = ({
                   <Trash2 size={16} aria-hidden="true" />
                 )}
                 {isDeleteConfirming ? t("confirmDelete") : t("delete")}
-              </button>
+              </Button>
             )}
           </div>
           <div className="flex gap-3">
-            <button
+            <Button
+              variant="bare"
               type="button"
               onClick={() => void handleCloseRequest()}
               disabled={isActionPending}
               className="px-4 py-2 text-sm text-gray-600 dark:text-muted-foreground hover:bg-gray-100 dark:hover:bg-muted rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {t("cancel")}
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="bare"
               type="button"
               onClick={handleSubmit}
               disabled={!trimmedName || isActionPending || isUploadingFiles}
@@ -1017,7 +1029,7 @@ const WorkspaceSettingsModal: React.FC<WorkspaceSettingsModalProps> = ({
                 <Save size={16} aria-hidden="true" />
               )}
               {t("saveWorkspace")}
-            </button>
+            </Button>
           </div>
         </div>
       </div>

@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import { Check, FileText, Library, Loader2, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useKnowledgeStore } from "@/store/core/knowledgeStore";
+import { Button } from "@/components/ui/primitives";
 
 interface AddToKnowledgeModalProps {
   onClose: () => void;
@@ -116,14 +117,15 @@ const AddToKnowledgeModal: React.FC<AddToKnowledgeModalProps> = ({
             <Library size={20} className="text-purple-500" aria-hidden="true" />
             {t("addToKnowledge")}
           </h3>
-          <button
+          <Button
+            variant="bare"
             type="button"
             aria-label={t("closeSelection")}
             onClick={onClose}
             className="rounded-full p-1.5 text-gray-500 transition-colors hover:bg-gray-200/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/60 dark:hover:bg-accent/50"
           >
             <X size={18} aria-hidden="true" />
-          </button>
+          </Button>
         </div>
 
         <div className="custom-scrollbar flex-1 space-y-4 overflow-y-auto p-5">
@@ -196,14 +198,16 @@ const AddToKnowledgeModal: React.FC<AddToKnowledgeModalProps> = ({
         </div>
 
         <div className="flex justify-end gap-3 rounded-b-2xl border-t border-gray-200/50 bg-gray-50/50 p-5 dark:border-border dark:bg-card/50">
-          <button
+          <Button
+            variant="bare"
             type="button"
             onClick={onClose}
             className="rounded-xl px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/60 dark:text-muted-foreground dark:hover:bg-muted"
           >
             {t("cancel")}
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="bare"
             type="button"
             onClick={handleSave}
             disabled={!canSave}
@@ -215,7 +219,7 @@ const AddToKnowledgeModal: React.FC<AddToKnowledgeModalProps> = ({
               <Check size={16} aria-hidden="true" />
             )}
             {t("save")}
-          </button>
+          </Button>
         </div>
       </div>
     </div>,

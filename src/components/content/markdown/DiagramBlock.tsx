@@ -26,6 +26,7 @@ import {
 import { copyTextToClipboard } from "@/lib/utils/clipboard";
 import type { ExportMindMapToSVGOptions } from "@xiangfa/mindmap";
 import Tooltip from "@/components/ui/Tooltip";
+import { Button } from "@/components/ui/primitives";
 
 export type DiagramTheme = "light" | "dark";
 
@@ -146,30 +147,33 @@ const DiagramSvgView = ({
         {({ zoomIn, zoomOut, resetTransform }) => (
           <div className="markdown-diagram-viewport">
             <div className="markdown-diagram-zoom-controls">
-              <button
+              <Button
+                variant="bare"
                 type="button"
                 onClick={() => zoomOut()}
                 aria-label={tMedia("zoomOut")}
                 title={tMedia("zoomOut")}
               >
                 <ZoomOut size={16} aria-hidden="true" />
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="bare"
                 type="button"
                 onClick={() => resetTransform()}
                 aria-label={tMedia("resetZoom")}
                 title={tMedia("resetZoom")}
               >
                 <RotateCcw size={16} aria-hidden="true" />
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="bare"
                 type="button"
                 onClick={() => zoomIn()}
                 aria-label={tMedia("zoomIn")}
                 title={tMedia("zoomIn")}
               >
                 <ZoomIn size={16} aria-hidden="true" />
-              </button>
+              </Button>
             </div>
             <TransformComponent
               wrapperClass="markdown-diagram-transform-wrapper"
@@ -681,7 +685,8 @@ export const DiagramBlock = ({
         }
         position="bottom"
       >
-        <button
+        <Button
+          variant="bare"
           type="button"
           onClick={handleCopy}
           aria-label={
@@ -702,17 +707,18 @@ export const DiagramBlock = ({
           ) : (
             <Copy size={14} aria-hidden="true" />
           )}
-        </button>
+        </Button>
       </Tooltip>
       <Tooltip content={t("fullscreenDiagram")} position="bottom">
-        <button
+        <Button
+          variant="bare"
           type="button"
           onClick={() => setIsFullscreen(true)}
           aria-label={t("fullscreenDiagramAria", { type: label })}
           className="markdown-icon-button markdown-focus-ring flex items-center justify-center rounded p-1.5"
         >
           <Maximize2 size={14} aria-hidden="true" />
-        </button>
+        </Button>
       </Tooltip>
     </div>
   );
@@ -736,7 +742,8 @@ export const DiagramBlock = ({
               >
                 {t("diagramFullscreenTitle", { type: label })}
               </h2>
-              <button
+              <Button
+                variant="bare"
                 ref={closeButtonRef}
                 type="button"
                 onClick={() => setIsFullscreen(false)}
@@ -744,7 +751,7 @@ export const DiagramBlock = ({
                 className="markdown-icon-button markdown-focus-ring rounded-lg p-1.5"
               >
                 <X size={20} aria-hidden="true" />
-              </button>
+              </Button>
             </div>
             <div className="markdown-diagram-fullscreen flex-1 overflow-auto p-4">
               <DiagramRenderer

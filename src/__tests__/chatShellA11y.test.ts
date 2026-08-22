@@ -141,15 +141,8 @@ describe("chat shell accessibility", () => {
     expect(messageInput).toContain("getSearchUnavailableMessage");
   });
 
-  it("does not force mobile keyboards open when editing an old message", () => {
-    const userMessageEditor = readFileSync(
-      resolve(process.cwd(), "src/components/chat/UserMessageEditor.tsx"),
-      "utf8",
-    );
-
-    expect(userMessageEditor).not.toContain("autoFocus");
-    expect(userMessageEditor).toContain("preventScroll");
-  });
+  // Editing an old message is covered behaviourally in componentA11y.test.tsx:
+  // it renders UserMessageEditor and asserts focus/preventScroll per viewport.
 
   it("uses the configured medium font before hydration", () => {
     const globals = readFileSync(
@@ -171,6 +164,39 @@ describe("chat shell accessibility", () => {
     expect(themeInit).toContain("document.documentElement.dataset.fontSize");
     expect(themeEffects).toContain(
       'localStorage.setItem("neo-chat-font-size", fontSize)',
+    );
+  });
+
+  it("scales app chrome from the font size setting, not just message content", () => {
+    const globals = readFileSync(
+      resolve(process.cwd(), "src/app/globals.css"),
+      "utf8",
+    );
+    const htmlRule = globals.slice(
+      globals.indexOf("\nhtml {"),
+      globals.indexOf("}", globals.indexOf("\nhtml {")),
+    );
+
+    // rem-based Tailwind sizes resolve against html, so the scale has to be
+    // declared there; on body it only ever reached opted-in content.
+    expect(htmlRule).toContain("font-size: var(--neo-font-scale)");
+    expect(globals).toContain("--neo-font-scale: 100%");
+    expect(globals).toMatch(
+      /html\[data-font-size="small"\]\s*\{[^}]*--neo-font-scale:\s*87\.5%/,
+    );
+    expect(globals).toMatch(
+      /html\[data-font-size="large"\]\s*\{[^}]*--neo-font-scale:\s*112\.5%/,
+    );
+  });
+
+  it("holds touch form controls at 16px so restored zoom does not trigger iOS focus zoom", () => {
+    const globals = readFileSync(
+      resolve(process.cwd(), "src/app/globals.css"),
+      "utf8",
+    );
+
+    expect(globals).toMatch(
+      /@media \(pointer: coarse\)\s*\{[\s\S]*?font-size: max\(16px, var\(--neo-font-size-base\)\)/,
     );
   });
 

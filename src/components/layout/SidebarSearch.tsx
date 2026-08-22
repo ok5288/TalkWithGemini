@@ -7,6 +7,7 @@ import {
   ShortcutTooltipContent,
   useShortcutPresentation,
 } from "@/components/shortcuts/ShortcutHint";
+import { Button } from "@/components/ui/primitives";
 
 interface SidebarSearchProps {
   isOpen: boolean;
@@ -31,10 +32,12 @@ const SidebarSearch: React.FC<SidebarSearchProps> = ({
             shortcut={searchShortcut.display}
           />
         }
+        disabled={isOpen}
         position="right"
         className={isOpen ? "w-full" : "w-full justify-center"}
       >
-        <button
+        <Button
+          variant="bare"
           type="button"
           aria-label={t("openGlobalSearch")}
           aria-keyshortcuts={searchShortcut.ariaKeyShortcuts}
@@ -52,7 +55,7 @@ const SidebarSearch: React.FC<SidebarSearchProps> = ({
             aria-hidden="true"
           />
           {isOpen && <span className="truncate">{t("globalSearch")}</span>}
-        </button>
+        </Button>
       </Tooltip>
     </div>
   );

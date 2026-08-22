@@ -67,6 +67,7 @@ import Tooltip from "../ui/Tooltip";
 import { DiagramBlock, type DiagramTheme } from "./markdown/DiagramBlock";
 
 import "katex/dist/katex.min.css";
+import { Button } from "@/components/ui/primitives";
 
 export interface MarkdownRendererProps {
   content: string;
@@ -536,14 +537,15 @@ const FileCard = ({
   }
 
   return (
-    <button
+    <Button
+      variant="bare"
       type="button"
       aria-label={t("openGeneratedFileAria", { name })}
       onClick={() => onClick(file)}
       className={`${className} markdown-file-card-interactive markdown-focus-ring cursor-pointer`}
     >
       {cardBody}
-    </button>
+    </Button>
   );
 };
 
@@ -889,14 +891,15 @@ const ArtifactBlock = ({
         {/* Preview Toggle for HTML */}
         {isHtml && !isFullscreenMode && (
           <Tooltip content={t("preview")} position="bottom">
-            <button
+            <Button
+              variant="bare"
               type="button"
               onClick={() => setIsPreviewOpen(true)}
               aria-label={t("previewHtml")}
               className="markdown-icon-button markdown-focus-ring flex items-center justify-center rounded p-1.5"
             >
               <SquareCode size={14} aria-hidden="true" />
-            </button>
+            </Button>
           </Tooltip>
         )}
 
@@ -906,7 +909,8 @@ const ArtifactBlock = ({
             content={t("runCodeWithMode", { mode: executionModeLabel })}
             position="bottom"
           >
-            <button
+            <Button
+              variant="bare"
               type="button"
               onClick={handleExecute}
               disabled={isExecuting}
@@ -928,7 +932,7 @@ const ArtifactBlock = ({
               ) : (
                 <SquareTerminal size={14} aria-hidden="true" />
               )}
-            </button>
+            </Button>
           </Tooltip>
         )}
 
@@ -943,7 +947,8 @@ const ArtifactBlock = ({
           }
           position="bottom"
         >
-          <button
+          <Button
+            variant="bare"
             type="button"
             onClick={handleCopy}
             aria-label={
@@ -977,7 +982,7 @@ const ArtifactBlock = ({
                   ? t("copyFailed")
                   : t("copyCodeAria")}
             </span>
-          </button>
+          </Button>
         </Tooltip>
 
         {/* Fullscreen Toggle */}
@@ -985,7 +990,8 @@ const ArtifactBlock = ({
           content={isFullscreenMode ? t("exitFullscreen") : t("fullscreen")}
           position="bottom"
         >
-          <button
+          <Button
+            variant="bare"
             type="button"
             onClick={toggleFullscreen}
             aria-label={
@@ -999,7 +1005,7 @@ const ArtifactBlock = ({
             ) : (
               <Maximize2 size={14} aria-hidden="true" />
             )}
-          </button>
+          </Button>
         </Tooltip>
 
         {/* Expand/Collapse */}
@@ -1008,7 +1014,8 @@ const ArtifactBlock = ({
             content={isCollapsed ? t("expand") : t("collapse")}
             position="bottom"
           >
-            <button
+            <Button
+              variant="bare"
               type="button"
               onClick={toggleCollapse}
               aria-controls={codeContentId}
@@ -1023,7 +1030,7 @@ const ArtifactBlock = ({
                 className={`transition-transform duration-300 ${!isCollapsed ? "rotate-180" : ""}`}
                 aria-hidden="true"
               />
-            </button>
+            </Button>
           </Tooltip>
         )}
       </div>
@@ -1092,7 +1099,8 @@ const ArtifactBlock = ({
                 {previewTitle}
               </span>
             </h2>
-            <button
+            <Button
+              variant="bare"
               ref={previewCloseButtonRef}
               type="button"
               onClick={() => setIsPreviewOpen(false)}
@@ -1100,7 +1108,7 @@ const ArtifactBlock = ({
               className="markdown-icon-button markdown-focus-ring rounded-lg p-1.5"
             >
               <X size={20} aria-hidden="true" />
-            </button>
+            </Button>
           </div>
           <div className="markdown-preview-canvas flex-1 relative">
             <iframe
@@ -1318,7 +1326,8 @@ const MarkdownImage = ({
   }
 
   return (
-    <button
+    <Button
+      variant="bare"
       type="button"
       aria-label={alt ? t("previewImageWithAlt", { alt }) : t("previewImage")}
       className="markdown-image-button my-2 mx-auto block max-w-full cursor-zoom-in rounded-lg"
@@ -1332,7 +1341,7 @@ const MarkdownImage = ({
       }}
     >
       {image}
-    </button>
+    </Button>
   );
 };
 

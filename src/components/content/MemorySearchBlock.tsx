@@ -4,6 +4,7 @@ import React, { useId, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { ChevronDown, LoaderCircle, Brain } from "lucide-react";
 import type { ToolCall } from "@/types";
+import { Button } from "@/components/ui/primitives";
 
 interface MemorySearchBlockProps {
   toolCalls: ToolCall[];
@@ -90,7 +91,8 @@ const MemorySearchBlock: React.FC<MemorySearchBlockProps> = ({ toolCalls }) => {
 
   return (
     <div className="mb-3 overflow-hidden rounded-lg border border-gray-200 bg-gray-50/40 transition-colors dark:border-border dark:bg-muted/20">
-      <button
+      <Button
+        variant="bare"
         type="button"
         aria-expanded={isExpanded}
         aria-controls={panelId}
@@ -119,7 +121,7 @@ const MemorySearchBlock: React.FC<MemorySearchBlockProps> = ({ toolCalls }) => {
           }`}
           aria-hidden="true"
         />
-      </button>
+      </Button>
 
       <div
         id={panelId}

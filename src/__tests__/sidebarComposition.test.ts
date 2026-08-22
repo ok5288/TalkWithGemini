@@ -36,6 +36,8 @@ describe("Sidebar composition", () => {
     expect(sidebarSearch).toContain(
       'isOpen ? "w-full" : "w-10 justify-center px-0"',
     );
+    expect(sidebar.match(/disabled=\{isOpen\}/g)).toHaveLength(4);
+    expect(sidebarSearch).toContain("disabled={isOpen}");
     expect(sidebarSearch).not.toContain("<kbd");
     expect(sidebarSearch).not.toContain("⌘/Ctrl K");
   });
@@ -93,6 +95,7 @@ describe("Sidebar composition", () => {
     expect(source).toMatch(/onValueChange=\{\(value\) =>[\s\S]*setTheme/);
     expect(source).toMatch(/onValueChange=\{\(value\) =>[\s\S]*setLocale/);
     expect(source).toContain("onSelect={() => onOpenSettings()}");
+    expect(source).toContain("bg-sidebar-accent/70");
   });
 
   it("animates the settings dropdown chevron when the menu opens", () => {

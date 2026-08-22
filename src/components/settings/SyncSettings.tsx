@@ -30,6 +30,7 @@ import {
   inspectLocalStorageHealth,
   type LocalStorageHealthSnapshot,
 } from "@/lib/data/storageHealth";
+import { Button } from "@/components/ui/primitives";
 
 type ProviderKind = "webdav" | "s3";
 
@@ -329,7 +330,8 @@ const SyncSettings: React.FC = () => {
           </div>
         ) : null}
         <div className="mt-4 flex flex-wrap gap-2">
-          <button
+          <Button
+            variant="bare"
             type="button"
             className={primaryButton}
             disabled={!canSync}
@@ -341,24 +343,26 @@ const SyncSettings: React.FC = () => {
               <RefreshCw size={16} aria-hidden="true" />
             )}
             {t("syncNow")}
-          </button>
+          </Button>
           {store.activeController ? (
-            <button
+            <Button
+              variant="bare"
               type="button"
               className={secondaryButton}
               onClick={store.cancelSync}
             >
               {t("cancel")}
-            </button>
+            </Button>
           ) : null}
           {store.requiresReload ? (
-            <button
+            <Button
+              variant="bare"
               type="button"
               className={secondaryButton}
               onClick={() => window.location.reload()}
             >
               {t("reload")}
-            </button>
+            </Button>
           ) : null}
         </div>
       </section>
@@ -373,7 +377,8 @@ const SyncSettings: React.FC = () => {
               {t("storageHealthDescription")}
             </p>
           </div>
-          <button
+          <Button
+            variant="bare"
             type="button"
             className={secondaryButton}
             disabled={storageHealthLoading}
@@ -385,7 +390,7 @@ const SyncSettings: React.FC = () => {
               aria-hidden="true"
             />
             {storageHealthLoading ? t("healthChecking") : t("refreshHealth")}
-          </button>
+          </Button>
         </div>
 
         <dl className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -466,7 +471,8 @@ const SyncSettings: React.FC = () => {
           aria-label={t("providerType")}
         >
           {(["webdav", "s3"] as const).map((kind) => (
-            <button
+            <Button
+              variant="bare"
               key={kind}
               type="button"
               role="radio"
@@ -480,7 +486,7 @@ const SyncSettings: React.FC = () => {
               onClick={() => setProviderKind(kind)}
             >
               {kind === "webdav" ? "WebDAV" : "S3 / MinIO"}
-            </button>
+            </Button>
           ))}
         </div>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
@@ -599,7 +605,8 @@ const SyncSettings: React.FC = () => {
           )}
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
-          <button
+          <Button
+            variant="bare"
             type="button"
             className={primaryButton}
             disabled={localBusy || !isOnline || !endpoint.trim()}
@@ -607,8 +614,9 @@ const SyncSettings: React.FC = () => {
           >
             <HardDrive size={16} aria-hidden="true" />
             {t("saveProvider")}
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="bare"
             type="button"
             className={secondaryButton}
             disabled={
@@ -621,7 +629,7 @@ const SyncSettings: React.FC = () => {
           >
             <Check size={16} aria-hidden="true" />
             {t("testConnection")}
-          </button>
+          </Button>
         </div>
       </section>
 
@@ -658,7 +666,8 @@ const SyncSettings: React.FC = () => {
                 errorLabel={t("recoveryQrError")}
               />
             </div>
-            <button
+            <Button
+              variant="bare"
               type="button"
               className={secondaryButton}
               onClick={() => void copyRecoveryCode()}
@@ -669,7 +678,7 @@ const SyncSettings: React.FC = () => {
                 <Copy size={16} aria-hidden="true" />
               )}
               {copied ? t("copied") : t("copy")}
-            </button>
+            </Button>
             <label className="flex items-start gap-2 text-sm text-amber-950 dark:text-amber-100">
               <input
                 className="mt-0.5"
@@ -679,7 +688,8 @@ const SyncSettings: React.FC = () => {
               />
               {t("recoverySavedConfirmation")}
             </label>
-            <button
+            <Button
+              variant="bare"
               type="button"
               className={primaryButton}
               disabled={!recoverySaved || localBusy || !isOnline}
@@ -687,11 +697,12 @@ const SyncSettings: React.FC = () => {
             >
               <ShieldCheck size={16} aria-hidden="true" />
               {t("activateVault")}
-            </button>
+            </Button>
           </div>
         ) : (
           <div className="mt-4 flex flex-wrap gap-2">
-            <button
+            <Button
+              variant="bare"
               type="button"
               className={primaryButton}
               disabled={localBusy || !isOnline}
@@ -699,7 +710,7 @@ const SyncSettings: React.FC = () => {
             >
               <KeyRound size={16} aria-hidden="true" />
               {store.vaultId ? t("newVault") : t("createVault")}
-            </button>
+            </Button>
             {store.vaultId ? (
               <p className="w-full text-xs leading-5 text-muted-foreground">
                 {t("newVaultHint")}
@@ -719,14 +730,15 @@ const SyncSettings: React.FC = () => {
             onChange={(event) => setRecoveryInput(event.target.value)}
           />
         </Field>
-        <button
+        <Button
+          variant="bare"
           type="button"
           className={`${secondaryButton} mt-3`}
           disabled={localBusy || !isOnline || !recoveryInput.trim()}
           onClick={() => void importVault()}
         >
           {t("importVault")}
-        </button>
+        </Button>
       </section>
 
       <section className="rounded-xl border border-border bg-card p-4 md:p-5">
@@ -795,7 +807,8 @@ const SyncSettings: React.FC = () => {
                 </code>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {conflict.values.map((value, index) => (
-                    <button
+                    <Button
+                      variant="bare"
                       key={`${conflict.id}-${index}`}
                       type="button"
                       className={secondaryButton}
@@ -807,7 +820,7 @@ const SyncSettings: React.FC = () => {
                       {t("chooseValue", {
                         value: JSON.stringify(value).slice(0, 80),
                       })}
-                    </button>
+                    </Button>
                   ))}
                 </div>
               </div>
@@ -818,13 +831,14 @@ const SyncSettings: React.FC = () => {
 
       {store.enabled ? (
         <section className="rounded-xl border border-border p-4">
-          <button
+          <Button
+            variant="bare"
             type="button"
             className={secondaryButton}
             onClick={store.disableSync}
           >
             {t("disableSync")}
-          </button>
+          </Button>
           <p className="mt-2 text-xs text-muted-foreground">
             {t("disableHint")}
           </p>

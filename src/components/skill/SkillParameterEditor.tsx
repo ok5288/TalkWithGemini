@@ -3,6 +3,7 @@
 import { Plus, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { SkillParameterDefinition, SkillParameterInput } from "@/types";
+import { Button } from "@/components/ui/primitives";
 
 interface SkillParameterEditorProps {
   parameters: SkillParameterDefinition[];
@@ -37,7 +38,8 @@ export default function SkillParameterEditor({
             {t("parameters.description")}
           </p>
         </div>
-        <button
+        <Button
+          variant="bare"
           type="button"
           disabled={parameters.length >= 20}
           onClick={() =>
@@ -55,7 +57,7 @@ export default function SkillParameterEditor({
         >
           <Plus size={13} aria-hidden="true" />
           {t("parameters.add")}
-        </button>
+        </Button>
       </div>
 
       {parameters.length === 0 ? (
@@ -179,7 +181,8 @@ export default function SkillParameterEditor({
                   />
                   {t("parameters.required")}
                 </label>
-                <button
+                <Button
+                  variant="bare"
                   type="button"
                   aria-label={t("parameters.removeAria", {
                     label: parameter.label,
@@ -194,7 +197,7 @@ export default function SkillParameterEditor({
                   className="rounded-lg p-2 text-red-500 hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60 dark:hover:bg-red-950/30"
                 >
                   <Trash2 size={14} aria-hidden="true" />
-                </button>
+                </Button>
               </div>
             </div>
           ))}

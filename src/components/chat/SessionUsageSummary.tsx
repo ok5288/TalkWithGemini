@@ -17,6 +17,7 @@ import {
   summarizeSessionUsage,
 } from "@/lib/chat/sessionUsage";
 import type { Message } from "@/types";
+import { Button } from "@/components/ui/primitives";
 
 interface SessionUsageSummaryProps {
   messages: Message[];
@@ -48,7 +49,8 @@ const SessionUsageSummary = ({
     <DropdownMenu>
       <Tooltip content={t("sessionUsage")} position="bottom">
         <DropdownMenuTrigger asChild>
-          <button
+          <Button
+            variant="bare"
             type="button"
             aria-label={t("sessionUsageAria", {
               count: usage.totalTokens,
@@ -59,7 +61,7 @@ const SessionUsageSummary = ({
             <span className="hidden font-mono sm:inline">
               {formatNumber.format(usage.totalTokens)}
             </span>
-          </button>
+          </Button>
         </DropdownMenuTrigger>
       </Tooltip>
       <DropdownMenuContent align="end" className="w-72">

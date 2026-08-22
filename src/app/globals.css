@@ -40,6 +40,7 @@
   --brand: #1d88e1;
   --brand-foreground: oklch(0.985 0 0);
   --brand-soft: color-mix(in srgb, var(--brand) 10%, transparent);
+  --brand-hover: color-mix(in srgb, var(--brand) 88%, black);
   --success: oklch(0.53 0.125 158);
   --warning: oklch(0.61 0.137 66);
   --surface: var(--muted);
@@ -98,6 +99,7 @@
   --markdown-surface-muted: #f9fafb;
   --markdown-surface-hover: #f3f4f6;
   --neo-font-size-base: 14px;
+  --neo-font-scale: 100%;
 }
 
 html.dark {
@@ -136,6 +138,7 @@ html.dark {
   --brand: #1d88e1;
   --brand-foreground: oklch(0.985 0 0);
   --brand-soft: color-mix(in srgb, var(--brand) 16%, transparent);
+  --brand-hover: color-mix(in srgb, var(--brand) 82%, white);
   --success: oklch(0.696 0.17 162.48);
   --warning: oklch(0.769 0.188 70.08);
   --html-visual-surface: #0b1220;
@@ -196,13 +199,18 @@ html.dark {
 
 html[data-font-size="small"] {
   --neo-font-size-base: 12px;
+  --neo-font-scale: 87.5%;
 }
 
 html[data-font-size="large"] {
   --neo-font-size-base: 18px;
+  --neo-font-scale: 112.5%;
 }
 
 html {
+  /* Drives every rem-based Tailwind size, so the Font Size setting scales app
+     chrome and not just message content. */
+  font-size: var(--neo-font-scale);
   color-scheme: light;
   -webkit-tap-highlight-color: transparent;
 }
@@ -248,6 +256,7 @@ html {
   --color-brand: var(--brand);
   --color-brand-foreground: var(--brand-foreground);
   --color-brand-soft: var(--brand-soft);
+  --color-brand-hover: var(--brand-hover);
   --color-surface: var(--surface);
   --color-surface-strong: var(--surface-strong);
   --radius-sm: calc(var(--radius) * 0.6);
@@ -285,6 +294,17 @@ pre,
 kbd,
 samp {
   font-family: var(--font-mono);
+}
+
+/* Pinch-zoom is enabled (WCAG 1.4.4), so the viewport no longer suppresses
+   iOS Safari's auto-zoom on focus. That zoom triggers below 16px, so hold
+   touch-device form controls at the threshold instead. */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  textarea,
+  select {
+    font-size: max(16px, var(--neo-font-size-base));
+  }
 }
 
 /* Custom scrollbar for webkit */

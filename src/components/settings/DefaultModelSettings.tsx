@@ -11,7 +11,7 @@ import { useTranslations } from "next-intl";
 import { useSettingsStore, formatModelName } from "@/store/core/settingsStore";
 import { useCoreSettingsStore } from "@/store/core/coreSettingsStore";
 import { useDefaultModels } from "@/store/hooks/useShallowStore";
-import { CustomSelect, GroupedSelectOption } from "./SettingsUI";
+import { CustomSelect, GroupedSelectOption } from "@/components/ui/controls";
 import { DefaultModels } from "@/types";
 import { getDefaultModelSelectValue } from "@/lib/utils/defaultModels";
 

@@ -15,7 +15,7 @@ import { useTranslations } from "next-intl";
 import { useSettingsStore } from "@/store/core/settingsStore";
 import { useCoreSettingsStore } from "@/store/core/coreSettingsStore";
 import { useSetLocale } from "@/i18n/useSetLocale";
-import { SegmentedControl, SimpleSwitch } from "./SettingsUI";
+import { SegmentedControl, SimpleSwitch } from "@/components/ui/controls";
 import { AppSettings, SystemPersonality } from "@/types";
 import { SYSTEM_SETTINGS_LIMITS } from "@/config/limits";
 import {
@@ -31,6 +31,7 @@ import {
   clearAppRestoreCredentialNotice,
   readAppRestoreCredentialNotice,
 } from "@/lib/data/appRestoreJournal";
+import { Button } from "@/components/ui/primitives";
 
 type TranslationOption<T extends string> = {
   value: T;
@@ -303,7 +304,8 @@ function RadioDropdown<T extends string>({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button
+        <Button
+          variant="bare"
           type="button"
           aria-label={ariaLabel}
           className="flex min-h-11 w-full items-center justify-between gap-3 rounded-lg border border-input bg-background px-3 py-2 text-left text-sm text-foreground shadow-sm transition-[border-color,background-color,box-shadow] hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
@@ -336,7 +338,7 @@ function RadioDropdown<T extends string>({
             className="shrink-0 text-muted-foreground"
             aria-hidden="true"
           />
-        </button>
+        </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="end"
@@ -1078,7 +1080,8 @@ const SystemSettings = () => {
           description={t("exportAllDataDesc")}
         >
           <div className="flex justify-start sm:justify-end">
-            <button
+            <Button
+              variant="bare"
               type="button"
               onClick={handleExportAllData}
               disabled={isClearingData || isRestoringData}
@@ -1096,7 +1099,7 @@ const SystemSettings = () => {
                 <Download size={14} aria-hidden="true" />
               )}
               {isExportingData ? t("cancelBackup") : t("exportData")}
-            </button>
+            </Button>
           </div>
           {exportProgress ? (
             <div
@@ -1135,7 +1138,8 @@ const SystemSettings = () => {
             aria-label={t("restoreAria")}
           />
           <div className="flex justify-start sm:justify-end">
-            <button
+            <Button
+              variant="bare"
               type="button"
               onClick={() => restoreInputRef.current?.click()}
               disabled={
@@ -1157,7 +1161,7 @@ const SystemSettings = () => {
                 <Upload size={14} aria-hidden="true" />
               )}
               {isInspectingBackup ? t("inspectingBackup") : t("selectBackup")}
-            </button>
+            </Button>
           </div>
 
           {restoreInspection ? (
@@ -1186,15 +1190,17 @@ const SystemSettings = () => {
                 </div>
               ) : null}
               <div className="mt-3 flex flex-wrap justify-end gap-2">
-                <button
+                <Button
+                  variant="bare"
                   type="button"
                   onClick={clearRestoreSelection}
                   disabled={isRestoringData}
                   className="min-h-9 rounded-lg border border-border bg-background px-3 py-2 font-medium text-foreground hover:bg-accent disabled:opacity-60"
                 >
                   {t("cancelRestore")}
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="bare"
                   type="button"
                   onClick={handleRestoreAction}
                   disabled={
@@ -1217,7 +1223,7 @@ const SystemSettings = () => {
                       ? t("restoringBackup")
                       : t("cancelRestoreOperation")
                     : t("confirmRestore")}
-                </button>
+                </Button>
               </div>
               {restoreProgress ? (
                 <div
@@ -1274,7 +1280,8 @@ const SystemSettings = () => {
                       ).toLocaleString(),
                     })}
                   </div>
-                  <button
+                  <Button
+                    variant="bare"
                     type="button"
                     onClick={() => {
                       clearAppRestoreCredentialNotice();
@@ -1283,7 +1290,7 @@ const SystemSettings = () => {
                     className="mt-3 min-h-8 rounded-md border border-amber-300 bg-background px-3 py-1.5 font-medium text-amber-900 hover:bg-amber-100 dark:border-amber-800 dark:text-amber-100 dark:hover:bg-amber-900/40"
                   >
                     {t("restoreCredentialDismiss")}
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>
@@ -1291,7 +1298,8 @@ const SystemSettings = () => {
         </SettingRow>
 
         <div>
-          <button
+          <Button
+            variant="bare"
             type="button"
             aria-expanded={isDataCleanupOpen}
             aria-controls="system-data-cleanup-panel"
@@ -1314,7 +1322,7 @@ const SystemSettings = () => {
                 aria-hidden="true"
               />
             </span>
-          </button>
+          </Button>
 
           {isDataCleanupOpen ? (
             <div
@@ -1381,7 +1389,8 @@ const SystemSettings = () => {
                     count: selectedDataSources.length,
                   })}
                 </div>
-                <button
+                <Button
+                  variant="bare"
                   type="button"
                   onClick={handleClearSelectedData}
                   disabled={
@@ -1408,7 +1417,7 @@ const SystemSettings = () => {
                     : isClearConfirming
                       ? t("confirmClear")
                       : t("clearSelectedData")}
-                </button>
+                </Button>
               </div>
 
               {isClearConfirming && !isClearingData ? (

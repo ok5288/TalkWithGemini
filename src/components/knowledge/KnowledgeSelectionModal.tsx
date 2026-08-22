@@ -17,6 +17,7 @@ import {
   createKnowledgeCollectionAttachment,
   createKnowledgeFileAttachment,
 } from "@/lib/utils/knowledgeAttachments";
+import { Button } from "@/components/ui/primitives";
 
 interface KnowledgeSelectionModalProps {
   onClose: () => void;
@@ -152,7 +153,8 @@ const KnowledgeSelectionModal: React.FC<KnowledgeSelectionModalProps> = ({
             : "bg-white dark:bg-muted border-gray-200 dark:border-border hover:border-purple-300 dark:hover:border-purple-700"
         }`}
       >
-        <button
+        <Button
+          variant="bare"
           type="button"
           aria-label={
             isSelected
@@ -164,9 +166,10 @@ const KnowledgeSelectionModal: React.FC<KnowledgeSelectionModalProps> = ({
           className={`shrink-0 rounded-lg p-1 ${menuItemFocusClass}`}
         >
           {renderSelectionDot(isSelected)}
-        </button>
+        </Button>
 
-        <button
+        <Button
+          variant="bare"
           type="button"
           onClick={() => setActiveCollectionId(collection.id)}
           className={`flex min-w-0 flex-1 items-center rounded-lg p-1 text-left ${menuItemFocusClass}`}
@@ -201,7 +204,7 @@ const KnowledgeSelectionModal: React.FC<KnowledgeSelectionModalProps> = ({
             className="ml-2 shrink-0 text-gray-400"
             aria-hidden="true"
           />
-        </button>
+        </Button>
       </div>
     );
   };
@@ -212,7 +215,8 @@ const KnowledgeSelectionModal: React.FC<KnowledgeSelectionModalProps> = ({
 
     return (
       <div className="space-y-2">
-        <button
+        <Button
+          variant="bare"
           type="button"
           aria-pressed={isCollectionSelected}
           onClick={() => toggleSelection(collectionSelectionKey)}
@@ -232,7 +236,7 @@ const KnowledgeSelectionModal: React.FC<KnowledgeSelectionModalProps> = ({
               {collection.name}
             </span>
           </span>
-        </button>
+        </Button>
 
         {collection.files.length === 0 ? (
           <div className="rounded-xl border border-dashed border-gray-200 p-8 text-center text-sm text-gray-400 dark:border-border">
@@ -243,7 +247,8 @@ const KnowledgeSelectionModal: React.FC<KnowledgeSelectionModalProps> = ({
             const key = fileKey(collection.id, file.id);
             const isSelected = selectedKeys.has(key);
             return (
-              <button
+              <Button
+                variant="bare"
                 type="button"
                 key={file.id}
                 aria-pressed={isSelected}
@@ -268,7 +273,7 @@ const KnowledgeSelectionModal: React.FC<KnowledgeSelectionModalProps> = ({
                     {t(getKnowledgeStatusLabelKey(file.status))}
                   </span>
                 </span>
-              </button>
+              </Button>
             );
           })
         )}
@@ -351,24 +356,26 @@ const KnowledgeSelectionModal: React.FC<KnowledgeSelectionModalProps> = ({
               {t("selectKnowledgeBase")}
             </h3>
             {activeCollection ? (
-              <button
+              <Button
+                variant="bare"
                 type="button"
                 onClick={() => setActiveCollectionId(null)}
                 className={`mt-1 inline-flex max-w-full items-center gap-1 text-xs text-gray-500 hover:text-purple-600 dark:text-muted-foreground dark:hover:text-purple-300 ${menuItemFocusClass}`}
               >
                 <ChevronLeft size={12} aria-hidden="true" />
                 <span className="truncate">{activeCollection.name}</span>
-              </button>
+              </Button>
             ) : null}
           </div>
-          <button
+          <Button
+            variant="bare"
             type="button"
             aria-label={t("closeSelection")}
             onClick={onClose}
             className="p-1.5 hover:bg-gray-200/50 dark:hover:bg-accent/50 rounded-full transition-colors text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/60"
           >
             <X size={18} aria-hidden="true" />
-          </button>
+          </Button>
         </div>
 
         <div
@@ -393,14 +400,16 @@ const KnowledgeSelectionModal: React.FC<KnowledgeSelectionModalProps> = ({
             {t("selectedCount", { count: selectedKeys.size })}
           </span>
           <div className="flex gap-3">
-            <button
+            <Button
+              variant="bare"
               type="button"
               onClick={onClose}
               className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-muted-foreground hover:bg-white dark:hover:bg-muted rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/60"
             >
               {t("cancel")}
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="bare"
               type="button"
               onClick={handleConfirm}
               disabled={selectedKeys.size === 0}
@@ -408,7 +417,7 @@ const KnowledgeSelectionModal: React.FC<KnowledgeSelectionModalProps> = ({
             >
               <Check size={16} aria-hidden="true" />
               {t("attachSelected")}
-            </button>
+            </Button>
           </div>
         </div>
       </div>

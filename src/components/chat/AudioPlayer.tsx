@@ -2,6 +2,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Play, Pause } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { Button } from "@/components/ui/primitives";
 
 interface AudioPlayerProps {
   src: string; // Base64 data URI or URL
@@ -123,7 +124,8 @@ const AudioPlayerInner: React.FC<AudioPlayerProps> = ({ src, fileName }) => {
         <audio ref={audioRef} src={src} preload="metadata" />
 
         {/* Play Button */}
-        <button
+        <Button
+          variant="bare"
           type="button"
           aria-label={isPlaying ? t("pause") : t("play")}
           onClick={togglePlay}
@@ -139,7 +141,7 @@ const AudioPlayerInner: React.FC<AudioPlayerProps> = ({ src, fileName }) => {
               aria-hidden="true"
             />
           )}
-        </button>
+        </Button>
 
         <div className="flex-1 flex items-center gap-1 min-w-0">
           {/* Progress Bar */}

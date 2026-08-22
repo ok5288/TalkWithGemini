@@ -90,6 +90,7 @@ import {
 } from "@/lib/utils/documentAttachments";
 import { hasUnsafeContinuationToolState } from "@/lib/chat/streamResilience";
 import type { MessageBranchOption } from "@/lib/chat/messageTree";
+import { Button } from "@/components/ui/primitives";
 
 interface MessageItemProps {
   message: Message;
@@ -321,6 +322,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
   onSubmitUserEdit,
   onVersionChange,
   onVersionSelect,
+  isLast,
   isTyping = false,
   onToolConfirmationDecision,
   onRevokeToolSessionApproval,
@@ -962,32 +964,12 @@ const MessageItem: React.FC<MessageItemProps> = ({
     }
   };
 
-  // Heuristic: If content is empty for a model, we are probably waiting for tokens (Regenerating),
-  // even if isTyping (which is based on last message) is false for mid-chat edits.
-  const isWaitingForResponse =
-    message.role === "model" &&
-    message.content.length === 0 &&
-    !message.attachments?.length &&
-    !message.reasoning &&
-    !message.generationError &&
-    !message.searchSources &&
-    (!message.toolCalls || message.toolCalls.length === 0);
-
   const tokenCount = useMemo(() => {
     return getMessageDisplayTokenCount(message);
   }, [message]);
 
-  // Optimized Loading State: Show bubbles if active (typing/waiting) AND no content is displayed yet.
-  const hasOutputEvents = Boolean(
-    message.outputBlocks?.length ||
-    message.reasoning ||
-    message.isSearching ||
-    message.searchSources?.length ||
-    message.searchImages?.length ||
-    message.toolCalls?.length,
-  );
-  const isLoading =
-    (isTyping || isWaitingForResponse) && !displayedContent && !hasOutputEvents;
+  const isModelResponseLoading =
+    isLast && isTyping && message.role === "model" && !message.generationError;
 
   // Detect error messages for styling (starts with Error:)
   const isErrorMessage =
@@ -1298,7 +1280,8 @@ const MessageItem: React.FC<MessageItemProps> = ({
                   </div>
                   <div className="flex shrink-0 items-center gap-1">
                     <Tooltip content={readerCopyTooltip} position="bottom">
-                      <button
+                      <Button
+                        variant="bare"
                         type="button"
                         aria-label={t("copyFileAria", {
                           name: readingFile.name,
@@ -1315,9 +1298,10 @@ const MessageItem: React.FC<MessageItemProps> = ({
                         ) : (
                           <Copy size={18} aria-hidden="true" />
                         )}
-                      </button>
+                      </Button>
                     </Tooltip>
-                    <button
+                    <Button
+                      variant="bare"
                       type="button"
                       aria-label={t("downloadFileAria", {
                         name: readingFile.name,
@@ -1326,7 +1310,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
                       className={`p-1.5 text-gray-500 hover:text-gray-700 dark:text-muted-foreground dark:hover:text-foreground hover:bg-gray-100 dark:hover:bg-muted rounded-lg transition-colors ${actionButtonFocusClass}`}
                     >
                       <Download size={18} aria-hidden="true" />
-                    </button>
+                    </Button>
                   </div>
                 </div>
               )}
@@ -1366,7 +1350,8 @@ const MessageItem: React.FC<MessageItemProps> = ({
               </div>
 
               <div className="sticky bottom-[max(1rem,env(safe-area-inset-bottom))] mt-4 left-0 right-0 flex justify-center pointer-events-none shrink-0">
-                <button
+                <Button
+                  variant="bare"
                   type="button"
                   onClick={closeReadingMode}
                   className={`pointer-events-auto flex items-center gap-2 px-5 py-2.5 bg-red-500/80 hover:bg-red-600/80 backdrop-blur-md text-white rounded-full shadow-lg transition-[background-color,box-shadow,color] font-medium text-sm ${actionButtonFocusClass}`}
@@ -1377,7 +1362,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
                     <Minimize2 size={18} aria-hidden="true" />
                   )}
                   {readingFile ? t("closeFile") : t("exitReading")}
-                </button>
+                </Button>
               </div>
             </div>
           </div>,
@@ -1429,7 +1414,8 @@ const MessageItem: React.FC<MessageItemProps> = ({
           className="flex-1 min-w-0 pl-1 md:pl-0"
         >
           {message.replyTo ? (
-            <button
+            <Button
+              variant="bare"
               type="button"
               onClick={() => onNavigateToMessage?.(message.replyTo!.messageId)}
               className={`mb-2 flex max-w-full items-start gap-2 rounded-md border border-border/70 bg-muted/30 px-2.5 py-2 text-left text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground ${actionButtonFocusClass}`}
@@ -1439,7 +1425,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
               <span className="line-clamp-2 wrap-break-word">
                 {message.replyTo.excerpt || t("replySourceUnavailable")}
               </span>
-            </button>
+            </Button>
           ) : null}
 
           {/* Attachments */}
@@ -1547,53 +1533,53 @@ const MessageItem: React.FC<MessageItemProps> = ({
                     </div>
                   </div>
                   {!continuationBlocked && onContinue ? (
-                    <button
+                    <Button
+                      variant="bare"
                       type="button"
                       onClick={onContinue}
                       disabled={mutationActionsDisabled}
                       className={`rounded-md border border-amber-300 bg-white/70 px-2.5 py-1 text-xs font-medium transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50 dark:border-amber-800 dark:bg-amber-950 dark:hover:bg-amber-900 ${actionButtonFocusClass}`}
                     >
                       {t("continueGeneration")}
-                    </button>
+                    </Button>
                   ) : null}
                 </div>
               ) : null}
 
-              {/* Loading State */}
-              {isLoading ? (
+              <MessageOutputRenderer
+                message={message}
+                displayedContent={displayedContent}
+                isTyping={isTyping}
+                isThinking={isThinking}
+                isErrorMessage={isErrorMessage}
+                searchSources={sources}
+                ragSources={ragSources}
+                onFileClick={handleFileClick}
+                onImageCached={persistCachedOutputImage}
+                onToolConfirmationDecision={
+                  confirmationActionsDisabled
+                    ? undefined
+                    : onToolConfirmationDecision
+                }
+                onRevokeToolSessionApproval={
+                  confirmationActionsDisabled
+                    ? undefined
+                    : onRevokeToolSessionApproval
+                }
+              />
+
+              {isModelResponseLoading ? (
                 <div
-                  className="relative -top-0.5 h-8 w-14 text-red-300 dark:text-red-400"
+                  className="mt-2 h-8 w-14 text-red-300 dark:text-red-400"
                   role="status"
                   aria-label={t("generatingResponse")}
                 >
                   <BubblesLoading
-                    className="w-full h-full"
+                    className="h-full w-full"
                     aria-hidden="true"
                   />
                 </div>
-              ) : (
-                <MessageOutputRenderer
-                  message={message}
-                  displayedContent={displayedContent}
-                  isTyping={isTyping}
-                  isThinking={isThinking}
-                  isErrorMessage={isErrorMessage}
-                  searchSources={sources}
-                  ragSources={ragSources}
-                  onFileClick={handleFileClick}
-                  onImageCached={persistCachedOutputImage}
-                  onToolConfirmationDecision={
-                    confirmationActionsDisabled
-                      ? undefined
-                      : onToolConfirmationDecision
-                  }
-                  onRevokeToolSessionApproval={
-                    confirmationActionsDisabled
-                      ? undefined
-                      : onRevokeToolSessionApproval
-                  }
-                />
-              )}
+              ) : null}
             </>
           )}
 
@@ -1665,13 +1651,14 @@ const MessageItem: React.FC<MessageItemProps> = ({
                       }
                       position="right"
                     >
-                      <button
+                      <Button
+                        variant="bare"
                         type="button"
                         aria-label={mobileMetaRows.join(", ")}
                         className={`rounded-lg p-1 text-gray-400 transition-[background-color,color] hover:bg-gray-100 hover:text-gray-600 dark:text-muted-foreground/70 dark:hover:bg-muted dark:hover:text-foreground/85 ${actionButtonFocusClass}`}
                       >
                         <Info size={13} aria-hidden="true" />
-                      </button>
+                      </Button>
                     </Tooltip>
                   </span>
                 )}
@@ -1701,13 +1688,14 @@ const MessageItem: React.FC<MessageItemProps> = ({
                             position="top"
                           >
                             <DropdownMenuTrigger asChild>
-                              <button
+                              <Button
+                                variant="bare"
                                 type="button"
                                 aria-label={t("openBranchNavigator")}
                                 className="inline-flex rounded px-1 py-0.5 font-mono text-[9px] text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/50 dark:hover:bg-accent dark:hover:text-foreground"
                               >
                                 {currentBranchIndex + 1}/{branchCount}
-                              </button>
+                              </Button>
                             </DropdownMenuTrigger>
                           </Tooltip>
                           <DropdownMenuContent
@@ -1858,14 +1846,15 @@ const MessageItem: React.FC<MessageItemProps> = ({
                             position="top"
                           >
                             <DropdownMenuTrigger asChild>
-                              <button
+                              <Button
+                                variant="bare"
                                 type="button"
                                 aria-label={t("regenerateWithModel")}
                                 disabled={mutationActionsDisabled}
                                 className={`-ml-1 rounded-lg p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-muted dark:hover:text-foreground ${actionButtonFocusClass}`}
                               >
                                 <ChevronDown size={11} aria-hidden="true" />
-                              </button>
+                              </Button>
                             </DropdownMenuTrigger>
                           </Tooltip>
                           <DropdownMenuContent
@@ -1952,7 +1941,8 @@ const MessageItem: React.FC<MessageItemProps> = ({
                           position="top"
                         >
                           <DropdownMenuTrigger asChild>
-                            <button
+                            <Button
+                              variant="bare"
                               type="button"
                               aria-label={
                                 isDownloading
@@ -1972,7 +1962,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
                               ) : (
                                 <Download size={13} aria-hidden="true" />
                               )}
-                            </button>
+                            </Button>
                           </DropdownMenuTrigger>
                         </Tooltip>
                         <DropdownMenuContent side="top" align="end">
@@ -2054,7 +2044,8 @@ const MessageItem: React.FC<MessageItemProps> = ({
                         position="top"
                       >
                         <DropdownMenuTrigger asChild>
-                          <button
+                          <Button
+                            variant="bare"
                             type="button"
                             aria-label={t("more")}
                             aria-busy={isDownloading}
@@ -2074,7 +2065,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
                             ) : (
                               <MoreHorizontal size={13} aria-hidden="true" />
                             )}
-                          </button>
+                          </Button>
                         </DropdownMenuTrigger>
                       </Tooltip>
 
@@ -2244,7 +2235,8 @@ const ActionButton = ({
 
   return (
     <Tooltip content={tooltip} position="top" className={containerClass}>
-      <button
+      <Button
+        variant="bare"
         type="button"
         aria-label={tooltip}
         aria-pressed={ariaPressed}
@@ -2256,7 +2248,7 @@ const ActionButton = ({
         className={`p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-muted hover:text-gray-700 dark:hover:text-foreground/85 transition-[background-color,border-color,color,opacity] relative group/btn border border-transparent hover:border-white/50 dark:hover:border-border flex items-center justify-center disabled:cursor-not-allowed disabled:opacity-40 ${actionButtonFocusClass} ${className}`}
       >
         {renderedIcon}
-      </button>
+      </Button>
     </Tooltip>
   );
 };

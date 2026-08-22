@@ -72,6 +72,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/primitives";
 
 interface SidebarProps {
   sessions: Session[];
@@ -653,26 +654,29 @@ const Sidebar: React.FC<SidebarProps> = ({
               className="flex-1 rounded border border-blue-300 bg-white px-1 py-0.5 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/40 dark:bg-muted dark:text-foreground"
               onClick={(e) => e.stopPropagation()}
             />
-            <button
+            <Button
+              variant="bare"
               type="button"
               aria-label={t("saveTitleAria", { title: displayTitle })}
               className="rounded p-0.5 text-green-600 transition-colors hover:bg-green-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500/60 dark:hover:bg-green-900/30"
               onMouseDown={submitRename}
             >
               <Check size={12} aria-hidden="true" />
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="bare"
               type="button"
               aria-label={t("cancelRenameAria", { title: displayTitle })}
               className="rounded p-0.5 text-red-500 transition-colors hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60 dark:hover:bg-red-900/30"
               onMouseDown={() => setRenamingId(null)}
             >
               <X size={12} aria-hidden="true" />
-            </button>
+            </Button>
           </div>
         ) : (
           <>
-            <button
+            <Button
+              variant="bare"
               type="button"
               aria-current={isActive ? "page" : undefined}
               className="flex min-w-0 flex-1 items-center gap-1.5 rounded-md pr-6 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
@@ -688,16 +692,17 @@ const Sidebar: React.FC<SidebarProps> = ({
                 />
               )}
               <span className="truncate">{displayTitle}</span>
-            </button>
+            </Button>
 
-            <button
+            <Button
+              variant="bare"
               type="button"
               aria-label={t("moreActionsAria", { title: displayTitle })}
               className={`absolute right-2 rounded-lg p-1 opacity-100 transition-[opacity,background-color] hover:bg-white/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 md:opacity-0 md:group-hover:opacity-100 dark:hover:bg-accent ${contextMenu?.sessionId === session.id ? "opacity-100" : ""}`}
               onClick={(e) => handleContextMenu(e, session.id)}
             >
               <MoreVertical size={14} aria-hidden="true" />
-            </button>
+            </Button>
           </>
         )}
       </div>
@@ -718,7 +723,8 @@ const Sidebar: React.FC<SidebarProps> = ({
     if (hiddenCount <= 0) return null;
 
     return (
-      <button
+      <Button
+        variant="bare"
         type="button"
         aria-expanded={expanded}
         aria-controls={controlId}
@@ -726,7 +732,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         className="mt-1 flex w-full items-center rounded-md px-3 py-1 text-left text-xs font-medium text-gray-400 transition-colors hover:bg-gray-100/70 hover:text-gray-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:text-muted-foreground/70 dark:hover:bg-muted/60 dark:hover:text-foreground/85"
       >
         {expanded ? t("showLess") : t("showAll", { count: hiddenCount })}
-      </button>
+      </Button>
     );
   };
 
@@ -747,7 +753,8 @@ const Sidebar: React.FC<SidebarProps> = ({
 
     return (
       <div className="mb-2">
-        <button
+        <Button
+          variant="bare"
           type="button"
           aria-expanded={isExpanded}
           aria-controls={contentId}
@@ -760,7 +767,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             className={`transition-transform duration-200 ${isExpanded ? "" : "-rotate-90"}`}
             aria-hidden="true"
           />
-        </button>
+        </Button>
         <div
           id={contentId}
           inert={isExpanded ? undefined : true}
@@ -819,7 +826,8 @@ const Sidebar: React.FC<SidebarProps> = ({
         >
           {isOpen ? (
             <>
-              <button
+              <Button
+                variant="bare"
                 type="button"
                 aria-label={t("goHomeAria")}
                 className="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 text-lg font-bold text-gray-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:text-foreground"
@@ -831,7 +839,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 <span className="truncate bg-clip-text text-transparent bg-[linear-gradient(to_right,#00DEB9,#03B2DE,#1D88E1)] animate-in fade-in duration-300 whitespace-nowrap">
                   {PRODUCT_NAME}
                 </span>
-              </button>
+              </Button>
               <Tooltip
                 content={
                   <ShortcutTooltipContent
@@ -841,7 +849,8 @@ const Sidebar: React.FC<SidebarProps> = ({
                 }
                 position="left"
               >
-                <button
+                <Button
+                  variant="bare"
                   type="button"
                   aria-label={chatT("closeSidebarAria")}
                   aria-keyshortcuts={toggleSidebarShortcut.ariaKeyShortcuts}
@@ -849,7 +858,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                   className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-gray-500 transition-[background-color,color,box-shadow] hover:bg-gray-200/70 hover:text-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:text-muted-foreground dark:hover:bg-muted/80 dark:hover:text-foreground"
                 >
                   <PanelLeftClose size={18} aria-hidden="true" />
-                </button>
+                </Button>
               </Tooltip>
             </>
           ) : (
@@ -862,7 +871,8 @@ const Sidebar: React.FC<SidebarProps> = ({
               }
               position="right"
             >
-              <button
+              <Button
+                variant="bare"
                 type="button"
                 aria-label={chatT("openSidebarAria")}
                 aria-keyshortcuts={toggleSidebarShortcut.ariaKeyShortcuts}
@@ -877,7 +887,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                   aria-hidden="true"
                   className="scale-75 opacity-0 transition-[opacity,transform] duration-200 group-hover:scale-100 group-hover:opacity-100 group-focus-visible:scale-100 group-focus-visible:opacity-100"
                 />
-              </button>
+              </Button>
             </Tooltip>
           )}
         </div>
@@ -885,10 +895,12 @@ const Sidebar: React.FC<SidebarProps> = ({
         <div className="px-3 pb-2 space-y-1 shrink-0">
           <Tooltip
             content={t("assistantHub")}
+            disabled={isOpen}
             position="right"
             className={isOpen ? "w-full" : "w-full justify-center"}
           >
-            <button
+            <Button
+              variant="bare"
               type="button"
               aria-label={t("openAssistantHub")}
               aria-current={isAssistantHubOpen ? "page" : undefined}
@@ -905,15 +917,17 @@ const Sidebar: React.FC<SidebarProps> = ({
                 aria-hidden="true"
               />
               {isOpen && <span className="truncate">{t("assistantHub")}</span>}
-            </button>
+            </Button>
           </Tooltip>
 
           <Tooltip
             content={t("skillMarket")}
+            disabled={isOpen}
             position="right"
             className={isOpen ? "w-full" : "w-full justify-center"}
           >
-            <button
+            <Button
+              variant="bare"
               type="button"
               aria-label={t("openSkillMarket")}
               aria-current={isSkillMarketOpen ? "page" : undefined}
@@ -930,15 +944,17 @@ const Sidebar: React.FC<SidebarProps> = ({
                 aria-hidden="true"
               />
               {isOpen && <span className="truncate">{t("skillMarket")}</span>}
-            </button>
+            </Button>
           </Tooltip>
 
           <Tooltip
             content={t("pluginMarket")}
+            disabled={isOpen}
             position="right"
             className={isOpen ? "w-full" : "w-full justify-center"}
           >
-            <button
+            <Button
+              variant="bare"
               type="button"
               aria-label={t("openPluginMarket")}
               aria-current={isPluginMarketOpen ? "page" : undefined}
@@ -955,15 +971,17 @@ const Sidebar: React.FC<SidebarProps> = ({
                 aria-hidden="true"
               />
               {isOpen && <span className="truncate">{t("pluginMarket")}</span>}
-            </button>
+            </Button>
           </Tooltip>
 
           <Tooltip
             content={t("knowledgeBase")}
+            disabled={isOpen}
             position="right"
             className={isOpen ? "w-full" : "w-full justify-center"}
           >
-            <button
+            <Button
+              variant="bare"
               type="button"
               aria-label={t("openKnowledgeBase")}
               aria-current={isKnowledgeBaseOpen ? "page" : undefined}
@@ -980,7 +998,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 aria-hidden="true"
               />
               {isOpen && <span className="truncate">{t("knowledgeBase")}</span>}
-            </button>
+            </Button>
           </Tooltip>
         </div>
 
@@ -1017,7 +1035,8 @@ const Sidebar: React.FC<SidebarProps> = ({
                     {t("workspaces")}
                   </span>
                   <Tooltip content={t("newWorkspace")} position="left">
-                    <button
+                    <Button
+                      variant="bare"
                       type="button"
                       aria-label={t("createWorkspaceAria")}
                       onClick={() => {
@@ -1027,7 +1046,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                       className="p-1.5 text-gray-500 dark:text-muted-foreground hover:bg-gray-200 dark:hover:bg-accent/80 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
                     >
                       <FolderPlus size={16} aria-hidden="true" />
-                    </button>
+                    </Button>
                   </Tooltip>
                 </div>
 
@@ -1068,7 +1087,8 @@ const Sidebar: React.FC<SidebarProps> = ({
                               handleWorkspaceContextMenu(e, ws.id)
                             }
                           >
-                            <button
+                            <Button
+                              variant="bare"
                               type="button"
                               aria-expanded={isExpanded}
                               aria-controls={workspaceContentId}
@@ -1091,9 +1111,10 @@ const Sidebar: React.FC<SidebarProps> = ({
                               <span className="text-sm text-gray-700 dark:text-foreground/85 truncate font-medium">
                                 {ws.name}
                               </span>
-                            </button>
+                            </Button>
 
-                            <button
+                            <Button
+                              variant="bare"
                               type="button"
                               aria-label={t("workspaceMoreActionsAria", {
                                 name: ws.name,
@@ -1104,7 +1125,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                               className={`p-1 text-gray-400 hover:text-gray-600 dark:hover:text-foreground/85 hover:bg-gray-200 dark:hover:bg-accent rounded transition-[opacity,color,background-color] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 ${workspaceMenu?.workspaceId === ws.id ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100"}`}
                             >
                               <EllipsisVertical size={14} aria-hidden="true" />
-                            </button>
+                            </Button>
                           </div>
 
                           {isExpanded && (
@@ -1162,7 +1183,8 @@ const Sidebar: React.FC<SidebarProps> = ({
                     }
                     position="left"
                   >
-                    <button
+                    <Button
+                      variant="bare"
                       type="button"
                       aria-label={t("createChatAria")}
                       aria-keyshortcuts={newChatShortcut.ariaKeyShortcuts}
@@ -1170,7 +1192,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                       className="p-1.5 text-gray-500 dark:text-muted-foreground hover:bg-gray-200 dark:hover:bg-accent/80 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
                     >
                       <MessageSquarePlus size={16} aria-hidden="true" />
-                    </button>
+                    </Button>
                   </Tooltip>
                 </div>
 
@@ -1252,7 +1274,8 @@ const Sidebar: React.FC<SidebarProps> = ({
                 position="right"
                 className="justify-center"
               >
-                <button
+                <Button
+                  variant="bare"
                   type="button"
                   aria-label={t("createWorkspaceAria")}
                   onClick={() => {
@@ -1262,7 +1285,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                   className="p-2 text-gray-500 hover:bg-gray-100/80 dark:hover:bg-muted/60 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
                 >
                   <FolderPlus size={18} aria-hidden="true" />
-                </button>
+                </Button>
               </Tooltip>
 
               <Tooltip
@@ -1275,7 +1298,8 @@ const Sidebar: React.FC<SidebarProps> = ({
                 position="right"
                 className="justify-center"
               >
-                <button
+                <Button
+                  variant="bare"
                   type="button"
                   aria-label={t("createChatAria")}
                   aria-keyshortcuts={newChatShortcut.ariaKeyShortcuts}
@@ -1283,7 +1307,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                   className="p-2 text-gray-500 hover:bg-gray-100/80 dark:hover:bg-muted/60 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
                 >
                   <MessageSquarePlus size={18} aria-hidden="true" />
-                </button>
+                </Button>
               </Tooltip>
             </div>
           )}
@@ -1300,14 +1324,15 @@ const Sidebar: React.FC<SidebarProps> = ({
               className={isOpen ? "w-full" : "w-full justify-center"}
             >
               <DropdownMenuTrigger asChild>
-                <button
+                <Button
+                  variant="bare"
                   type="button"
                   aria-label={t("openSettingsMenu")}
                   aria-current={isSettingsOpen ? "page" : undefined}
                   className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-[color,background-color] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 ${
                     isSettingsOpen
                       ? "bg-slate-100 text-slate-700 dark:bg-sidebar-accent dark:text-sidebar-accent-foreground"
-                      : "text-gray-600 hover:bg-gray-100/80 dark:text-muted-foreground dark:hover:bg-muted/60"
+                      : "bg-sidebar-accent/70 text-gray-600 hover:bg-sidebar-accent dark:text-muted-foreground"
                   } ${isOpen ? "w-full" : "w-10 justify-center px-0"}`}
                 >
                   <Settings
@@ -1325,7 +1350,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                       aria-hidden="true"
                     />
                   )}
-                </button>
+                </Button>
               </DropdownMenuTrigger>
             </Tooltip>
             <DropdownMenuContent
@@ -1459,7 +1484,8 @@ const Sidebar: React.FC<SidebarProps> = ({
             }}
           >
             <DropdownMenuTrigger asChild>
-              <button
+              <Button
+                variant="bare"
                 type="button"
                 aria-label={t("chatActions")}
                 className="fixed z-50 h-px w-px opacity-0"
@@ -1650,7 +1676,8 @@ const Sidebar: React.FC<SidebarProps> = ({
             }}
           >
             <DropdownMenuTrigger asChild>
-              <button
+              <Button
+                variant="bare"
                 type="button"
                 aria-label={t("workspaceActions")}
                 className="fixed z-50 h-px w-px opacity-0"

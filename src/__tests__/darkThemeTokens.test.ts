@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -7,6 +7,42 @@ function readProjectFile(path: string) {
 }
 
 describe("dark theme token contract", () => {
+  it("defines every brand and surface utility referenced by components", () => {
+    const globals = readProjectFile("src/app/globals.css");
+    const themeBlock = globals.slice(
+      globals.indexOf("@theme inline {"),
+      globals.indexOf("}", globals.indexOf("@theme inline {")),
+    );
+    const defined = new Set(
+      [...themeBlock.matchAll(/--color-([a-z0-9-]+):/g)].map(
+        (match) => match[1],
+      ),
+    );
+
+    const utility =
+      /(?<![\w-])(?:bg|text|border|ring|outline|fill|stroke|from|via|to|divide|caret|decoration|shadow|accent)-(brand|surface)(?:-([a-z0-9-]+))?(?![\w-])/g;
+
+    const missing = new Set<string>();
+    for (const entry of readdirSync(resolve(process.cwd(), "src"), {
+      recursive: true,
+      withFileTypes: true,
+    })) {
+      if (!entry.isFile() || !/\.tsx?$/.test(entry.name)) continue;
+      const source = readFileSync(
+        resolve(entry.parentPath, entry.name),
+        "utf8",
+      );
+      for (const [, family, suffix] of source.matchAll(utility)) {
+        const name = suffix ? `${family}-${suffix}` : family;
+        if (!defined.has(name)) missing.add(name);
+      }
+    }
+
+    // A utility with no `--color-*` behind it silently renders nothing, which
+    // is how `hover:bg-brand-hover` sat dead in the chat shell.
+    expect([...missing]).toEqual([]);
+  });
+
   it("exposes shadcn-style semantic color utilities and Neo brand tokens", () => {
     const globals = readProjectFile("src/app/globals.css");
 

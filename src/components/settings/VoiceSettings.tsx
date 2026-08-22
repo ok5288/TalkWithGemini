@@ -4,7 +4,11 @@ import { Mic, Volume2, MessageSquare, ExternalLink } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useSettingsStore } from "@/store/core/settingsStore";
 import { useCoreSettingsStore } from "@/store/core/coreSettingsStore";
-import { CustomSelect, SecretInput, SimpleSwitch } from "./SettingsUI";
+import {
+  CustomSelect,
+  SecretInput,
+  SimpleSwitch,
+} from "@/components/ui/controls";
 import {
   STTProvider,
   TTSProvider,

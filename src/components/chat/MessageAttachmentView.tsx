@@ -12,6 +12,7 @@ import {
   isKnowledgeFileAttachment,
 } from "@/lib/utils/knowledgeAttachments";
 import { isTextDocumentMimeType } from "@/lib/utils/documentAttachments";
+import { Button } from "@/components/ui/primitives";
 
 interface MessageAttachmentViewProps {
   attachment: Attachment;
@@ -149,7 +150,8 @@ const MessageAttachmentView: React.FC<MessageAttachmentViewProps> = ({
 
   if (attachment.mimeType.startsWith("image/")) {
     return (
-      <button
+      <Button
+        variant="bare"
         type="button"
         className={`group/attachment relative cursor-pointer overflow-hidden rounded-lg border border-gray-200 bg-gray-50 shadow-sm transition-shadow hover:shadow-md dark:border-border dark:bg-muted ${actionButtonFocusClass}`}
         onClick={onImageClick}
@@ -167,7 +169,7 @@ const MessageAttachmentView: React.FC<MessageAttachmentViewProps> = ({
           referrerPolicy="no-referrer"
           className="h-32 w-auto rounded-lg object-cover transition-transform duration-300 group-hover/attachment:scale-110"
         />
-      </button>
+      </Button>
     );
   }
 
@@ -195,7 +197,8 @@ const MessageAttachmentView: React.FC<MessageAttachmentViewProps> = ({
 
   if (isReadableDocument && onDocumentClick) {
     return (
-      <button
+      <Button
+        variant="bare"
         type="button"
         aria-label={t("openDocumentAttachmentAria", {
           fileName: attachment.fileName,
@@ -204,7 +207,7 @@ const MessageAttachmentView: React.FC<MessageAttachmentViewProps> = ({
         className={`${documentCardClass} markdown-file-card-interactive markdown-focus-ring cursor-pointer`}
       >
         {documentCardBody}
-      </button>
+      </Button>
     );
   }
 

@@ -15,6 +15,7 @@ import Tooltip from "../ui/Tooltip";
 import { createStreamingReplacement } from "@/lib/utils/streamingText";
 import { logDevError } from "@/lib/utils/devLogger";
 import { useTranslations } from "next-intl";
+import { Button } from "@/components/ui/primitives";
 
 interface AssistantHeaderProps {
   instruction: string;
@@ -147,7 +148,8 @@ const AssistantHeader: React.FC<AssistantHeaderProps> = ({
 
           {/* Optimize Button in Header */}
           <Tooltip content={t("optimizePrompt")} position="right">
-            <button
+            <Button
+              variant="bare"
               type="button"
               aria-label={t("optimizePrompt")}
               aria-busy={isOptimizing}
@@ -164,13 +166,14 @@ const AssistantHeader: React.FC<AssistantHeaderProps> = ({
               ) : (
                 <Sparkles size={14} aria-hidden="true" />
               )}
-            </button>
+            </Button>
           </Tooltip>
         </div>
 
         {!isEditing ? (
           <div className="flex items-center gap-1">
-            <button
+            <Button
+              variant="bare"
               type="button"
               aria-label={t("editInstructions")}
               onClick={() => setIsEditing(true)}
@@ -178,9 +181,10 @@ const AssistantHeader: React.FC<AssistantHeaderProps> = ({
               className={`p-1.5 hover:bg-white/50 dark:hover:bg-accent/50 rounded-lg text-gray-500 dark:text-muted-foreground transition-colors ${iconButtonFocusClass}`}
             >
               <PenLine size={14} aria-hidden="true" />
-            </button>
+            </Button>
             {onDelete && (
-              <button
+              <Button
+                variant="bare"
                 type="button"
                 aria-label={t("clearInstructions")}
                 onClick={onDelete}
@@ -188,20 +192,22 @@ const AssistantHeader: React.FC<AssistantHeaderProps> = ({
                 className={`p-1.5 hover:bg-red-50 dark:hover:bg-red-900/30 text-gray-400 hover:text-red-500 dark:text-muted-foreground/70 dark:hover:text-red-400 rounded-lg transition-colors ${iconButtonFocusClass}`}
               >
                 <X size={16} aria-hidden="true" />
-              </button>
+              </Button>
             )}
           </div>
         ) : (
           <div className="flex gap-1">
-            <button
+            <Button
+              variant="bare"
               type="button"
               aria-label={t("cancelEditing")}
               onClick={() => setIsEditing(false)}
               className={`p-1 hover:bg-white/50 dark:hover:bg-accent/50 rounded-lg text-gray-500 dark:text-muted-foreground transition-colors ${iconButtonFocusClass}`}
             >
               <X size={16} aria-hidden="true" />
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="bare"
               type="button"
               aria-label={t("saveInstructions")}
               onClick={handleSave}
@@ -209,7 +215,7 @@ const AssistantHeader: React.FC<AssistantHeaderProps> = ({
               className={`p-1 hover:bg-red-50 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg transition-colors ${iconButtonFocusClass}`}
             >
               <Save size={16} aria-hidden="true" />
-            </button>
+            </Button>
           </div>
         )}
       </div>

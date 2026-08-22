@@ -30,6 +30,7 @@ import AboutSettings from "./AboutSettings";
 import ShortcutsSettings from "./ShortcutsSettings";
 import type { SettingsTabId } from "@/lib/chat/panelUrlState";
 import { useShortcutPresentation } from "@/components/shortcuts/ShortcutHint";
+import { Button } from "@/components/ui/primitives";
 
 const SyncSettings = dynamic(() => import("./SyncSettings"), {
   ssr: false,
@@ -279,7 +280,8 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
             >
               {searchResults.length > 0 ? (
                 searchResults.map((entry) => (
-                  <button
+                  <Button
+                    variant="bare"
                     key={entry.id}
                     id={`settings-search-option-${entry.id}`}
                     type="button"
@@ -305,7 +307,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                     <span className="mt-0.5 block text-xs leading-5 text-muted-foreground">
                       {entry.description}
                     </span>
-                  </button>
+                  </Button>
                 ))
               ) : (
                 <p className="px-3 py-4 text-center text-xs text-muted-foreground">
@@ -316,14 +318,15 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
           ) : null}
         </div>
         {onClose && (
-          <button
+          <Button
+            variant="bare"
             type="button"
             aria-label={t("close")}
             onClick={onClose}
             className="shrink-0 rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <X size={20} aria-hidden="true" />
-          </button>
+          </Button>
         )}
       </div>
 
@@ -338,7 +341,8 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
               const isSelected = resolvedActiveTab === id;
 
               return (
-                <button
+                <Button
+                  variant="bare"
                   key={id}
                   id={`settings-tab-${id}`}
                   type="button"
@@ -361,7 +365,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({
                 >
                   <Icon size={16} aria-hidden="true" />
                   <span>{t(labelKey)}</span>
-                </button>
+                </Button>
               );
             })}
           </div>

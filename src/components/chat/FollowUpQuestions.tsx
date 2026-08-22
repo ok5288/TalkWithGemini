@@ -1,5 +1,6 @@
 import React, { useId } from "react";
 import { useTranslations } from "next-intl";
+import { Button } from "@/components/ui/primitives";
 
 interface FollowUpQuestionsProps {
   questions: string[];
@@ -35,7 +36,8 @@ const FollowUpQuestions: React.FC<FollowUpQuestionsProps> = ({
         <ul className="flex flex-col divide-y divide-gray-100 dark:divide-border">
           {visibleQuestions.map((question, idx) => (
             <li key={`${question}-${idx}`} className="min-w-0">
-              <button
+              <Button
+                variant="bare"
                 type="button"
                 aria-label={t("askAria", { question })}
                 onClick={() => onClick(question)}
@@ -43,7 +45,7 @@ const FollowUpQuestions: React.FC<FollowUpQuestionsProps> = ({
                 className="w-full rounded-md px-2 py-1 text-left text-sm leading-relaxed text-gray-400 transition-colors hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-50 dark:text-muted-foreground/70 dark:hover:text-foreground dark:focus-visible:ring-blue-400/60 dark:focus-visible:ring-offset-background md:py-1.5"
               >
                 <span className="block min-w-0 break-words">{question}</span>
-              </button>
+              </Button>
             </li>
           ))}
         </ul>

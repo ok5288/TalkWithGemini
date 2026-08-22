@@ -32,6 +32,7 @@ import {
   trapModalFocus,
   useModalLifecycle,
 } from "@/components/ui/useModalLifecycle";
+import { Button } from "@/components/ui/primitives";
 
 type CopyStatus = "idle" | "copied" | "error";
 
@@ -65,7 +66,8 @@ const CapabilityIconToggle = ({
   const t = useTranslations("ModelEditor");
   return (
     <Tooltip content={label} position="top">
-      <button
+      <Button
+        variant="bare"
         type="button"
         aria-label={
           checked
@@ -81,7 +83,7 @@ const CapabilityIconToggle = ({
         }`}
       >
         <Icon size={14} aria-hidden="true" />
-      </button>
+      </Button>
     </Tooltip>
   );
 };
@@ -251,14 +253,15 @@ const ModelEditor = ({
           >
             {t("editModel")}
           </h3>
-          <button
+          <Button
+            variant="bare"
             type="button"
             aria-label={t("close")}
             onClick={onClose}
             className="p-1 hover:bg-gray-200 dark:hover:bg-accent rounded-full transition-colors text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-background"
           >
             <X size={16} aria-hidden="true" />
-          </button>
+          </Button>
         </div>
 
         <div className="p-4 space-y-5 overflow-y-auto custom-scrollbar">
@@ -279,7 +282,8 @@ const ModelEditor = ({
                 value={modelId}
                 className="w-full bg-gray-50 dark:bg-muted border border-gray-200 dark:border-border rounded-xl pl-3 pr-9 py-2.5 text-xs font-mono text-gray-600 dark:text-foreground/85 break-all focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
               />
-              <button
+              <Button
+                variant="bare"
                 type="button"
                 aria-label={
                   idCopyStatus === "copied"
@@ -302,7 +306,7 @@ const ModelEditor = ({
                 ) : (
                   <Copy size={14} aria-hidden="true" />
                 )}
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -330,7 +334,8 @@ const ModelEditor = ({
                 onFocus={() => setShowSuggestions(true)}
                 className="w-full bg-white dark:bg-card border border-gray-200 dark:border-border rounded-xl pl-3 pr-9 py-2.5 text-sm text-gray-800 dark:text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-[background-color,border-color,box-shadow,color]"
               />
-              <button
+              <Button
+                variant="bare"
                 type="button"
                 aria-label={
                   nameCopyStatus === "copied"
@@ -353,7 +358,7 @@ const ModelEditor = ({
                 ) : (
                   <Copy size={14} aria-hidden="true" />
                 )}
-              </button>
+              </Button>
             </div>
 
             {/* Auto-complete Dropdown */}
@@ -369,7 +374,8 @@ const ModelEditor = ({
               className="bg-white dark:bg-muted border border-gray-200 dark:border-border rounded-xl shadow-xl z-[10000] overflow-y-auto custom-scrollbar"
             >
               {suggestions.map((s) => (
-                <button
+                <Button
+                  variant="bare"
                   type="button"
                   role="option"
                   aria-selected={false}
@@ -378,7 +384,7 @@ const ModelEditor = ({
                   className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 dark:hover:bg-blue-900/20 text-gray-700 dark:text-foreground transition-colors flex justify-between focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 focus-visible:ring-inset"
                 >
                   <span className="truncate flex-1">{s.name}</span>
-                </button>
+                </Button>
               ))}
             </AnchoredPortal>
           </div>
@@ -448,13 +454,14 @@ const ModelEditor = ({
         </div>
 
         <div className="p-4 border-t border-gray-100 dark:border-border bg-gray-50/50 dark:bg-muted/50">
-          <button
+          <Button
+            variant="bare"
             type="button"
             onClick={handleSave}
             className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-colors shadow-lg shadow-blue-500/20 text-sm"
           >
             {t("saveChanges")}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

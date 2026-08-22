@@ -238,18 +238,22 @@ test("loads the local chat shell", async ({ page }) => {
   await expect(page.locator('textarea[name="message"]')).toBeVisible();
 });
 
-test("loads the HEIC converter from a same-origin static module", async ({
+test("loads the HEIC converter from the checked-in public script", async ({
   page,
 }) => {
   await page.goto("/");
+  await page.addScriptTag({ url: "/heic-to.min.js" });
 
-  const exports = await page.evaluate(async (moduleUrl) => {
-    const vendorModule = await import(moduleUrl);
+  const exports = await page.evaluate(() => {
+    const heicTo = Reflect.get(window, "HeicTo");
     return {
-      heicTo: typeof vendorModule.heicTo,
-      isHeic: typeof vendorModule.isHeic,
+      heicTo: typeof heicTo,
+      isHeic:
+        typeof heicTo === "function"
+          ? typeof Reflect.get(heicTo, "isHeic")
+          : "undefined",
     };
-  }, "/vendor/heic-to-csp.mjs");
+  });
 
   expect(exports).toEqual({
     heicTo: "function",

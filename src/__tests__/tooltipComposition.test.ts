@@ -3,6 +3,18 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 describe("Tooltip composition", () => {
+  it("can disable tooltip content and accessible descriptions", () => {
+    const tooltip = readFileSync(
+      resolve(process.cwd(), "src/components/ui/Tooltip.tsx"),
+      "utf8",
+    );
+
+    expect(tooltip).toContain("disabled?: boolean");
+    expect(tooltip).toContain("if (disabled) return children;");
+    expect(tooltip).toContain("if (disabled) hideTooltip(false);");
+    expect(tooltip).toContain("disabled\n        ? null");
+  });
+
   it("auto-dismisses visible tooltips until a fresh trigger cycle", () => {
     const tooltip = readFileSync(
       resolve(process.cwd(), "src/components/ui/Tooltip.tsx"),

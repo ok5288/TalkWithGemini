@@ -26,7 +26,7 @@ import {
 import { useCoreSettingsStore } from "@/store/core/coreSettingsStore";
 import Tooltip from "../ui/Tooltip";
 import ModelEditor from "./ModelEditor";
-import { CustomSelect, SecretInput } from "./SettingsUI";
+import { CustomSelect, SecretInput } from "@/components/ui/controls";
 import { PROVIDER_CONFIG_LIMITS } from "@/config/limits";
 import {
   getResponseErrorMessage,
@@ -54,6 +54,7 @@ import {
   supportsImageGeneration,
   supportsModality,
 } from "@/lib/utils/model";
+import { Button } from "@/components/ui/primitives";
 
 type ProviderTypeOption = {
   value: ProviderType;
@@ -479,13 +480,14 @@ const ProviderSettings = () => {
             <div className="text-sm font-medium text-gray-500 dark:text-muted-foreground uppercase tracking-wider">
               {t("configureProviders")}
             </div>
-            <button
+            <Button
+              variant="bare"
               type="button"
               onClick={handleAddProvider}
               className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium flex items-center gap-1 bg-blue-50 dark:bg-blue-900/20 px-3 py-1.5 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
             >
               <Plus size={16} aria-hidden="true" /> {t("add")}
-            </button>
+            </Button>
           </div>
           <div
             role="group"
@@ -493,7 +495,8 @@ const ProviderSettings = () => {
             className="flex items-center gap-2 overflow-x-auto pb-2 mb-4 custom-scrollbar"
           >
             {providers.map((provider) => (
-              <button
+              <Button
+                variant="bare"
                 type="button"
                 key={provider.id}
                 aria-pressed={selectedProviderId === provider.id}
@@ -510,7 +513,7 @@ const ProviderSettings = () => {
                   className={`w-2 h-2 rounded-full ${provider.enabled ? "bg-green-500" : "bg-gray-300 dark:bg-accent/80"}`}
                 />
                 <span>{provider.name}</span>
-              </button>
+              </Button>
             ))}
           </div>
           {currentProvider && (
@@ -704,7 +707,8 @@ const ProviderSettings = () => {
                     </span>
                   </label>
                   {!isServerDefaultProvider && providers.length > 1 && (
-                    <button
+                    <Button
+                      variant="bare"
                       type="button"
                       aria-label={
                         deleteConfirmProviderId === currentProvider.id
@@ -728,7 +732,7 @@ const ProviderSettings = () => {
                       {deleteConfirmProviderId === currentProvider.id
                         ? t("confirmDelete")
                         : t("deleteProvider")}
-                    </button>
+                    </Button>
                   )}
                 </div>
               </div>
@@ -737,7 +741,8 @@ const ProviderSettings = () => {
                   <div className="text-sm font-medium text-gray-700 dark:text-foreground/85">
                     {t("availableModels")}
                   </div>
-                  <button
+                  <Button
+                    variant="bare"
                     type="button"
                     aria-label={t("fetchModelsAria", {
                       name: currentProvider.name,
@@ -754,7 +759,7 @@ const ProviderSettings = () => {
                       }
                     />
                     <span>{t("fetchModels")}</span>
-                  </button>
+                  </Button>
                 </div>
                 {fetchError ? (
                   <div
@@ -808,7 +813,8 @@ const ProviderSettings = () => {
                             {renderModelCapabilities(model)}
                           </div>
                         </label>
-                        <button
+                        <Button
+                          variant="bare"
                           type="button"
                           aria-label={t("editMetadataAria", {
                             name: formatModelName(
@@ -825,7 +831,7 @@ const ProviderSettings = () => {
                           className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-foreground hover:bg-gray-200 dark:hover:bg-accent/80 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
                         >
                           <Settings size={14} aria-hidden="true" />
-                        </button>
+                        </Button>
                       </div>
                     ))}
                   </div>

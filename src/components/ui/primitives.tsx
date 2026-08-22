@@ -3,15 +3,20 @@
 import React, { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-function cx(...values: Array<string | false | null | undefined>) {
-  return values.filter(Boolean).join(" ");
-}
+import { cn as cx } from "@/lib/utils/cn";
 
 const focusRing =
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-background";
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+
+const disabledState = "disabled:cursor-not-allowed disabled:opacity-50";
 
 export type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: "primary" | "secondary" | "danger" | "ghost";
+  /**
+   * `bare` contributes no colour, geometry, or typography — only the shared
+   * focus ring and disabled affordance. It exists so an existing call site can
+   * adopt the primitive without its own look changing.
+   */
+  variant?: "primary" | "secondary" | "danger" | "ghost" | "bare";
   size?: "sm" | "md";
 };
 
@@ -27,31 +32,37 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       ...props
     },
     ref,
-  ) => (
-    <button
-      {...props}
-      ref={ref}
-      type={type}
-      disabled={disabled}
-      className={cx(
-        "inline-flex min-w-0 items-center justify-center gap-2 rounded-md font-medium transition-[background-color,color,border-color,box-shadow] disabled:cursor-not-allowed disabled:opacity-50",
-        size === "sm" && "h-8 px-2.5 text-sm",
-        size === "md" && "h-9 px-3 text-sm",
-        variant === "primary" &&
-          "bg-red-600 text-white hover:bg-red-700 dark:bg-red-500 dark:text-white dark:hover:bg-red-400",
-        variant === "secondary" &&
-          "border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 dark:border-border dark:bg-card dark:text-foreground dark:hover:bg-muted",
-        variant === "danger" &&
-          "border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200 dark:hover:bg-red-900/40",
-        variant === "ghost" &&
-          "text-gray-700 hover:bg-gray-100 dark:text-foreground/85 dark:hover:bg-muted",
-        focusRing,
-        className,
-      )}
-    >
-      {children}
-    </button>
-  ),
+  ) => {
+    const styled = variant !== "bare";
+
+    return (
+      <button
+        {...props}
+        ref={ref}
+        type={type}
+        disabled={disabled}
+        className={cx(
+          styled &&
+            "inline-flex min-w-0 items-center justify-center gap-2 rounded-md font-medium transition-[background-color,color,border-color,box-shadow]",
+          styled && size === "sm" && "h-8 px-2.5 text-sm",
+          styled && size === "md" && "h-9 px-3 text-sm",
+          variant === "primary" &&
+            "bg-red-600 text-white hover:bg-red-700 dark:bg-red-500 dark:text-white dark:hover:bg-red-400",
+          variant === "secondary" &&
+            "border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 dark:border-border dark:bg-card dark:text-foreground dark:hover:bg-muted",
+          variant === "danger" &&
+            "border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200 dark:hover:bg-red-900/40",
+          variant === "ghost" &&
+            "text-gray-700 hover:bg-gray-100 dark:text-foreground/85 dark:hover:bg-muted",
+          disabledState,
+          focusRing,
+          className,
+        )}
+      >
+        {children}
+      </button>
+    );
+  },
 );
 Button.displayName = "Button";
 

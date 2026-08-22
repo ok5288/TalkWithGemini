@@ -3,6 +3,7 @@ import { useTranslations } from "next-intl";
 import { LobeAgent } from "@/types";
 import { BotMessageSquare, RefreshCw } from "lucide-react";
 import SafeImage from "@/components/ui/SafeImage";
+import { Button } from "@/components/ui/primitives";
 
 interface AssistantListProps {
   agents: LobeAgent[];
@@ -57,7 +58,8 @@ const AssistantList: React.FC<AssistantListProps> = ({
           />
           <span>{t("listHeading")}</span>
         </div>
-        <button
+        <Button
+          variant="bare"
           type="button"
           aria-label={t("refreshRecommendationsAria")}
           aria-busy={isRefreshing}
@@ -70,13 +72,14 @@ const AssistantList: React.FC<AssistantListProps> = ({
             aria-hidden="true"
             className={`${isRefreshing ? "animate-spin" : ""}`}
           />
-        </button>
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-3">
         {agents.length > 0
           ? agents.map((agent) => (
-              <button
+              <Button
+                variant="bare"
                 type="button"
                 key={agent.identifier}
                 aria-label={t("selectAssistantAria", {
@@ -96,7 +99,7 @@ const AssistantList: React.FC<AssistantListProps> = ({
                 <p className="text-xs text-gray-500 dark:text-muted-foreground line-clamp-2 leading-relaxed h-9">
                   {agent.meta.description}
                 </p>
-              </button>
+              </Button>
             ))
           : // Loading Skeletons
             [1, 2, 3, 4].map((i) => (
