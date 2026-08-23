@@ -1,6 +1,7 @@
 "use client";
 
 import { PRODUCT_NAME } from "@/lib/product";
+import { Button } from "@/components/ui/primitives";
 
 export default function Error({
   error,
@@ -36,13 +37,14 @@ export default function Error({
             </span>
           </p>
         ) : null}
-        <button
+        <Button
+          variant="bare"
           type="button"
           onClick={reset}
           className="mt-4 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 active:bg-primary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
           Try again
-        </button>
+        </Button>
       </section>
     </main>
   );

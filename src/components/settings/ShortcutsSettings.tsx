@@ -14,6 +14,7 @@ import {
   type ShortcutBinding,
 } from "@/lib/shortcuts";
 import { useCoreSettingsStore } from "@/store/core/coreSettingsStore";
+import { Button } from "@/components/ui/primitives";
 
 type RecordingError =
   | { actionId: ShortcutActionId; kind: "invalid" }
@@ -136,7 +137,8 @@ const ShortcutsSettings: React.FC = () => {
             {t("description")}
           </p>
         </div>
-        <button
+        <Button
+          variant="bare"
           type="button"
           aria-label={t("resetAllAria")}
           onClick={() => {
@@ -148,7 +150,7 @@ const ShortcutsSettings: React.FC = () => {
         >
           <RotateCcw size={15} aria-hidden="true" />
           {t("resetAll")}
-        </button>
+        </Button>
       </div>
 
       <div className="overflow-hidden rounded-xl border border-border bg-card">
@@ -198,7 +200,8 @@ const ShortcutsSettings: React.FC = () => {
                 <kbd className="inline-flex min-h-8 min-w-20 items-center justify-center rounded-md border border-border bg-muted px-2.5 font-mono text-xs font-semibold text-foreground shadow-[inset_0_-1px_0_hsl(var(--border))]">
                   {binding ? formatShortcutBinding(binding) : t("unassigned")}
                 </kbd>
-                <button
+                <Button
+                  variant="bare"
                   type="button"
                   aria-label={
                     isRecording
@@ -222,8 +225,9 @@ const ShortcutsSettings: React.FC = () => {
                   }`}
                 >
                   {isRecording ? t("recording") : t("record")}
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="bare"
                   type="button"
                   disabled={binding === null}
                   aria-label={t("clearAria", {
@@ -237,8 +241,9 @@ const ShortcutsSettings: React.FC = () => {
                   className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-35"
                 >
                   <Trash2 size={15} aria-hidden="true" />
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="bare"
                   type="button"
                   disabled={isDefault}
                   aria-label={t("restoreAria", {
@@ -252,7 +257,7 @@ const ShortcutsSettings: React.FC = () => {
                   className="inline-flex min-h-8 items-center justify-center rounded-md px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-35"
                 >
                   {t("restore")}
-                </button>
+                </Button>
               </div>
             </div>
           );

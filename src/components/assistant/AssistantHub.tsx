@@ -44,6 +44,7 @@ import { normalizeLocalAgent } from "@/lib/market/agents";
 import { logDevError } from "@/lib/utils/devLogger";
 import type { MarketLoadResult } from "@/lib/market/loadResult";
 import MarketLoadNotice from "@/components/ui/MarketLoadNotice";
+import { Button } from "@/components/ui/primitives";
 
 interface AssistantHubProps {
   onClose: () => void;
@@ -336,7 +337,8 @@ const AssistantEditorModal = ({
           >
             {isEditing ? t("editAssistant") : t("createAssistant")}
           </h3>
-          <button
+          <Button
+            variant="bare"
             ref={closeButtonRef}
             type="button"
             aria-label={t("closeEditor")}
@@ -344,7 +346,7 @@ const AssistantEditorModal = ({
             className="rounded-full p-1 text-gray-500 transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:hover:bg-muted"
           >
             <X size={20} aria-hidden="true" />
-          </button>
+          </Button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 space-y-4 custom-scrollbar">
@@ -476,7 +478,8 @@ const AssistantEditorModal = ({
                 {t("systemPrompt")}
               </label>
 
-              <button
+              <Button
+                variant="bare"
                 type="button"
                 aria-label={t("optimizeSystemPromptAria")}
                 aria-busy={isOptimizing || undefined}
@@ -494,7 +497,7 @@ const AssistantEditorModal = ({
                   <Sparkles size={10} aria-hidden="true" />
                 )}
                 {t("optimize")}
-              </button>
+              </Button>
             </div>
             <div className="relative">
               {optimizeError && (
@@ -550,14 +553,15 @@ const AssistantEditorModal = ({
                   className="flex items-center gap-1 px-2 py-1 bg-gray-100 dark:bg-muted rounded-lg text-xs text-gray-600 dark:text-foreground/85"
                 >
                   #{tag}
-                  <button
+                  <Button
+                    variant="bare"
                     type="button"
                     aria-label={t("removeTagAria", { tag })}
                     onClick={() => removeTag(tag)}
                     className="rounded-sm hover:text-red-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60"
                   >
                     <X size={12} aria-hidden="true" />
-                  </button>
+                  </Button>
                 </span>
               ))}
             </div>
@@ -579,7 +583,8 @@ const AssistantEditorModal = ({
                   }
                 }}
               />
-              <button
+              <Button
+                variant="bare"
                 type="button"
                 aria-label={t("addTagAria")}
                 onClick={handleAddTag}
@@ -587,14 +592,15 @@ const AssistantEditorModal = ({
                 className="rounded-xl bg-gray-100 px-3 py-2 text-gray-600 hover:bg-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-muted dark:text-foreground/85 dark:hover:bg-accent"
               >
                 <Plus size={16} aria-hidden="true" />
-              </button>
+              </Button>
             </div>
           </div>
         </div>
 
         <div className="p-5 border-t border-gray-100 dark:border-border bg-gray-50/50 dark:bg-card/50 flex justify-between gap-3">
           {onDelete && (
-            <button
+            <Button
+              variant="bare"
               type="button"
               aria-label={
                 isDeleteConfirming
@@ -616,25 +622,27 @@ const AssistantEditorModal = ({
                 <Trash2 size={16} aria-hidden="true" />
               )}
               {isDeleteConfirming ? t("confirmDelete") : t("delete")}
-            </button>
+            </Button>
           )}
           {!onDelete && <div></div>}
 
           <div className="flex gap-3">
-            <button
+            <Button
+              variant="bare"
               type="button"
               onClick={onClose}
               className="rounded-xl px-4 py-2 text-sm text-gray-600 transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:text-muted-foreground dark:hover:bg-muted"
             >
               {t("cancel")}
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="bare"
               type="button"
               onClick={handleSubmit}
               className="flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-2 text-sm font-medium text-white shadow-lg shadow-blue-500/20 transition-colors hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-background"
             >
               <Save size={16} aria-hidden="true" /> {t("saveAssistant")}
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -778,7 +786,8 @@ const AssistantCard: React.FC<AssistantCardProps> = ({
           : "border-gray-200 hover:border-rose-300 hover:shadow-lg hover:shadow-rose-500/5 dark:border-border dark:hover:border-rose-700"
       }`}
     >
-      <button
+      <Button
+        variant="bare"
         type="button"
         aria-label={t("selectAssistantAria", { title: agent.meta.title })}
         onClick={() => onClick(agent)}
@@ -836,10 +845,11 @@ const AssistantCard: React.FC<AssistantCardProps> = ({
             )}
           </div>
         </div>
-      </button>
+      </Button>
 
       <div className="absolute right-4 top-4 z-10 flex shrink-0 items-center gap-1 opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-within:opacity-100">
-        <button
+        <Button
+          variant="bare"
           type="button"
           aria-label={t("editAssistantAria", { title: agent.meta.title })}
           aria-busy={isDetailLoading || undefined}
@@ -856,9 +866,10 @@ const AssistantCard: React.FC<AssistantCardProps> = ({
           ) : (
             <PenLine size={14} aria-hidden="true" />
           )}
-        </button>
+        </Button>
         {onDelete && (
-          <button
+          <Button
+            variant="bare"
             type="button"
             aria-label={
               isDeleteConfirming
@@ -877,10 +888,11 @@ const AssistantCard: React.FC<AssistantCardProps> = ({
             ) : (
               <Trash2 size={14} aria-hidden="true" />
             )}
-          </button>
+          </Button>
         )}
         {hasOverride && onReset && !onDelete && (
-          <button
+          <Button
+            variant="bare"
             type="button"
             aria-label={
               isResetConfirming
@@ -899,7 +911,7 @@ const AssistantCard: React.FC<AssistantCardProps> = ({
             ) : (
               <RefreshCcw size={14} aria-hidden="true" />
             )}
-          </button>
+          </Button>
         )}
       </div>
     </article>
@@ -1260,7 +1272,8 @@ const AssistantHub: React.FC<AssistantHubProps> = ({ onClose, onSelect }) => {
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <button
+          <Button
+            variant="bare"
             type="button"
             aria-label={t("refreshAgentsAria")}
             aria-busy={isRefreshing || undefined}
@@ -1273,15 +1286,16 @@ const AssistantHub: React.FC<AssistantHubProps> = ({ onClose, onSelect }) => {
               className={isRefreshing ? "animate-spin" : ""}
               aria-hidden="true"
             />
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="bare"
             type="button"
             aria-label={t("closeHubAria")}
             onClick={onClose}
             className="rounded-full p-2 text-gray-500 transition-colors hover:bg-gray-200/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/60 dark:text-muted-foreground dark:hover:bg-accent/50"
           >
             <X size={20} aria-hidden="true" />
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -1339,14 +1353,15 @@ const AssistantHub: React.FC<AssistantHubProps> = ({ onClose, onSelect }) => {
                 />
                 <span className="truncate">{t("localAssistants")}</span>
               </h2>
-              <button
+              <Button
+                variant="bare"
                 type="button"
                 aria-label={t("createCustomAria")}
                 onClick={handleCreateNew}
                 className="flex shrink-0 items-center gap-1 rounded-lg bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-600 transition-colors hover:bg-rose-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/60 dark:bg-rose-900/20 dark:text-rose-400 dark:hover:bg-rose-900/30"
               >
                 <Plus size={14} aria-hidden="true" /> {t("custom")}
-              </button>
+              </Button>
             </div>
 
             {filteredLocalAgents.length > 0 ? (
@@ -1387,7 +1402,8 @@ const AssistantHub: React.FC<AssistantHubProps> = ({ onClose, onSelect }) => {
                   onOpenChange={setShowCategoryFilter}
                 >
                   <DropdownMenuTrigger asChild>
-                    <button
+                    <Button
+                      variant="bare"
                       type="button"
                       aria-label={
                         selectedCategories.length > 0
@@ -1410,7 +1426,7 @@ const AssistantHub: React.FC<AssistantHubProps> = ({ onClose, onSelect }) => {
                             })
                           : t("filter")}
                       </span>
-                    </button>
+                    </Button>
                   </DropdownMenuTrigger>
 
                   <DropdownMenuContent
@@ -1486,7 +1502,8 @@ const AssistantHub: React.FC<AssistantHubProps> = ({ onClose, onSelect }) => {
                 {/* Pagination Controls */}
                 {totalPages > 1 && (
                   <div className="py-6 flex items-center justify-center gap-4 mt-auto">
-                    <button
+                    <Button
+                      variant="bare"
                       type="button"
                       aria-label={t("prevPageAria")}
                       onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
@@ -1494,11 +1511,12 @@ const AssistantHub: React.FC<AssistantHubProps> = ({ onClose, onSelect }) => {
                       className="rounded-lg border border-gray-200 bg-white p-2 text-gray-600 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/60 disabled:cursor-not-allowed disabled:opacity-50 dark:border-border dark:bg-muted dark:text-foreground/85 dark:hover:bg-accent"
                     >
                       <ChevronLeft size={16} aria-hidden="true" />
-                    </button>
+                    </Button>
                     <span className="text-sm font-medium tabular-nums text-gray-600 dark:text-foreground/85">
                       {t("pageOf", { currentPage, totalPages })}
                     </span>
-                    <button
+                    <Button
+                      variant="bare"
                       type="button"
                       aria-label={t("nextPageAria")}
                       onClick={() =>
@@ -1508,7 +1526,7 @@ const AssistantHub: React.FC<AssistantHubProps> = ({ onClose, onSelect }) => {
                       className="rounded-lg border border-gray-200 bg-white p-2 text-gray-600 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/60 disabled:cursor-not-allowed disabled:opacity-50 dark:border-border dark:bg-muted dark:text-foreground/85 dark:hover:bg-accent"
                     >
                       <ChevronRight size={16} aria-hidden="true" />
-                    </button>
+                    </Button>
                   </div>
                 )}
               </>

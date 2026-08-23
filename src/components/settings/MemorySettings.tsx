@@ -18,7 +18,8 @@ import { MEMORY_LIMITS } from "@/config/limits";
 import { performMemoryDream } from "@/services/api/chatService";
 import { useMemoryStore } from "@/store/core/memoryStore";
 import type { MemoryRecord, MemoryType } from "@/types";
-import { CustomSelect, SimpleSwitch } from "./SettingsUI";
+import { CustomSelect, SimpleSwitch } from "@/components/ui/controls";
+import { Button } from "@/components/ui/primitives";
 
 const MEMORY_TYPE_OPTIONS: Array<{ value: MemoryType; labelKey: string }> = [
   { value: "fact", labelKey: "typeFact" },
@@ -240,7 +241,8 @@ const MemorySettings = ({ focusMemoryId }: MemorySettingsProps) => {
               <Database size={16} className="text-cyan-500" aria-hidden />
               {t("status")}
             </div>
-            <button
+            <Button
+              variant="bare"
               type="button"
               onClick={handleDreamNow}
               disabled={
@@ -252,7 +254,7 @@ const MemorySettings = ({ focusMemoryId }: MemorySettingsProps) => {
             >
               <Sparkles size={14} aria-hidden />
               {dreamStatus.isRunning ? t("dreaming") : t("dreamNow")}
-            </button>
+            </Button>
           </div>
 
           <div className="grid grid-cols-2 gap-3 text-sm">
@@ -341,22 +343,24 @@ const MemorySettings = ({ focusMemoryId }: MemorySettingsProps) => {
               className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
             <div className="flex gap-2">
-              <button
+              <Button
+                variant="bare"
                 type="submit"
                 className="inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-lg bg-cyan-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-cyan-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 {editingId ? <Save size={16} /> : <Plus size={16} />}
                 {editingId ? t("saveEdit") : t("add")}
-              </button>
+              </Button>
               {editingId && (
-                <button
+                <Button
+                  variant="bare"
                   type="button"
                   onClick={resetForm}
                   className="inline-flex items-center justify-center rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-600 transition-colors hover:bg-gray-50 dark:border-border dark:text-muted-foreground dark:hover:bg-muted"
                   aria-label={t("cancelEdit")}
                 >
                   <X size={16} aria-hidden />
-                </button>
+                </Button>
               )}
             </div>
           </form>
@@ -421,15 +425,17 @@ const MemorySettings = ({ focusMemoryId }: MemorySettingsProps) => {
                     )}
                   </div>
                   <div className="flex shrink-0 gap-1">
-                    <button
+                    <Button
+                      variant="bare"
                       type="button"
                       onClick={() => handleEdit(memory)}
                       aria-label={t("editAria")}
                       className="inline-flex size-10 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:text-muted-foreground dark:hover:bg-muted dark:hover:text-foreground"
                     >
                       <Pencil size={15} aria-hidden />
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      variant="bare"
                       type="button"
                       onClick={() => {
                         if (pendingDeleteId !== memory.id) {
@@ -458,7 +464,7 @@ const MemorySettings = ({ focusMemoryId }: MemorySettingsProps) => {
                       ) : (
                         <Trash2 size={15} aria-hidden />
                       )}
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </article>

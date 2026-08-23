@@ -45,6 +45,7 @@ import {
   KNOWLEDGE_SOURCE_NAVIGATE_EVENT,
   type KnowledgeSourceNavigationDetail,
 } from "@/lib/knowledge/navigation";
+import { Button } from "@/components/ui/primitives";
 
 const ImagePreview = dynamic(() => import("@/components/media/ImagePreview"), {
   ssr: false,
@@ -617,13 +618,14 @@ const ChatAppShell = ({
                 {pendingToolConfirmation.functionName}
               </p>
             </div>
-            <button
+            <Button
+              variant="bare"
               type="button"
               onClick={() => void returnToPendingToolSession()}
               className="rounded-md bg-amber-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-amber-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
             >
               {t("reviewToolAction")}
-            </button>
+            </Button>
           </div>
         ) : null}
         {viewMode === "plugins" ? (
@@ -666,7 +668,8 @@ const ChatAppShell = ({
                   position="right"
                   className="lg:hidden"
                 >
-                  <button
+                  <Button
+                    variant="bare"
                     type="button"
                     aria-label={
                       isSidebarOpen
@@ -682,7 +685,7 @@ const ChatAppShell = ({
                     ) : (
                       <PanelLeftOpen size={16} aria-hidden="true" />
                     )}
-                  </button>
+                  </Button>
                 </Tooltip>
               </div>
 
@@ -708,7 +711,8 @@ const ChatAppShell = ({
                     }
                     position="left"
                   >
-                    <button
+                    <Button
+                      variant="bare"
                       type="button"
                       aria-label={t("newChatAria")}
                       aria-keyshortcuts={newChatShortcut.ariaKeyShortcuts}
@@ -716,7 +720,7 @@ const ChatAppShell = ({
                       className="p-2 -mr-2 rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                     >
                       <MessageSquarePlus size={16} aria-hidden="true" />
-                    </button>
+                    </Button>
                   </Tooltip>
                 )}
               </div>
@@ -848,13 +852,14 @@ const ChatAppShell = ({
                         {t("noModelsDescription")}
                       </p>
                     </div>
-                    <button
+                    <Button
+                      variant="bare"
                       type="button"
                       onClick={() => navigateToPanel("settings", "providers")}
                       className="shrink-0 self-start rounded-lg bg-brand px-3 py-1.5 text-xs font-medium text-brand-foreground transition-colors hover:bg-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50 focus-visible:ring-offset-2 focus-visible:ring-offset-card sm:self-auto"
                     >
                       {t("configureProviders")}
-                    </button>
+                    </Button>
                   </div>
                 )}
                 <MessageInput

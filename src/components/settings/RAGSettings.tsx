@@ -12,7 +12,11 @@ import {
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useSettingsStore } from "@/store/core/settingsStore";
-import { SecretInput, SegmentedControl, SimpleSwitch } from "./SettingsUI";
+import {
+  SecretInput,
+  SegmentedControl,
+  SimpleSwitch,
+} from "@/components/ui/controls";
 import { RAG_LIMITS } from "@/config/limits";
 import {
   encryptLocalSecret,

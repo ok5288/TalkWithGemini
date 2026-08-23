@@ -79,6 +79,7 @@ import {
   type KnowledgeFileBatchResult,
   type KnowledgeFileStatusFilter,
 } from "@/lib/knowledge/fileProductivity";
+import { Button } from "@/components/ui/primitives";
 
 const formatBytes = (bytes: number, decimals = 2) => {
   if (!+bytes) return "0 Bytes";
@@ -327,14 +328,15 @@ const CollectionModalContent = ({
           >
             {title}
           </h2>
-          <button
+          <Button
+            variant="bare"
             type="button"
             aria-label={t("closeEditor")}
             onClick={handleClose}
             className="rounded-full p-1 text-gray-500 transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:hover:bg-muted"
           >
             <X size={20} aria-hidden="true" />
-          </button>
+          </Button>
         </div>
 
         {/* Body */}
@@ -444,7 +446,8 @@ const CollectionModalContent = ({
               </label>
             </div>
             {initialData?.files?.length ? (
-              <button
+              <Button
+                variant="bare"
                 type="button"
                 onClick={() => void handlePreview()}
                 disabled={isPreviewing}
@@ -456,7 +459,7 @@ const CollectionModalContent = ({
                   className={isPreviewing ? "animate-spin" : ""}
                 />
                 {t("chunking.preview")}
-              </button>
+              </Button>
             ) : (
               <p className="text-[11px] text-gray-500 dark:text-muted-foreground">
                 {t("chunking.previewEmpty")}
@@ -507,7 +510,8 @@ const CollectionModalContent = ({
                 className="flex flex-wrap gap-3"
               >
                 {COLLECTION_COLORS.map((c) => (
-                  <button
+                  <Button
+                    variant="bare"
                     type="button"
                     key={c.name}
                     aria-label={t("useThemeColorAria", { color: c.name })}
@@ -523,7 +527,7 @@ const CollectionModalContent = ({
                         aria-hidden="true"
                       />
                     )}
-                  </button>
+                  </Button>
                 ))}
               </div>
             </div>
@@ -541,7 +545,8 @@ const CollectionModalContent = ({
                 className="flex flex-wrap gap-2"
               >
                 {COLLECTION_ICONS.map((IconData) => (
-                  <button
+                  <Button
+                    variant="bare"
                     type="button"
                     key={IconData.name}
                     aria-label={t("useIconAria", { icon: IconData.name })}
@@ -550,7 +555,7 @@ const CollectionModalContent = ({
                     className={`w-10 h-10 p-2 rounded-xl flex items-center justify-center transition-[color,background-color,border-color,box-shadow] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 ${selectedIcon === IconData.name ? "bg-blue-50 dark:bg-blue-900/20 text-blue-500 border border-blue-200 dark:border-blue-800" : "text-gray-400 hover:text-gray-600 dark:hover:text-foreground/85 hover:bg-gray-100 dark:hover:bg-muted border border-transparent"}`}
                   >
                     <IconData.icon size={20} aria-hidden="true" />
-                  </button>
+                  </Button>
                 ))}
               </div>
             </div>
@@ -568,7 +573,8 @@ const CollectionModalContent = ({
                 }
                 position="right"
               >
-                <button
+                <Button
+                  variant="bare"
                   type="button"
                   aria-label={
                     isDeleteConfirming
@@ -593,7 +599,7 @@ const CollectionModalContent = ({
                     <Trash2 size={16} aria-hidden="true" />
                   )}
                   {isDeleteConfirming ? t("confirmDelete") : t("delete")}
-                </button>
+                </Button>
               </Tooltip>
             )}
             {deleteError && (
@@ -607,21 +613,23 @@ const CollectionModalContent = ({
           </div>
 
           <div className="flex gap-3">
-            <button
+            <Button
+              variant="bare"
               type="button"
               onClick={handleClose}
               className="px-4 py-2 text-sm text-gray-600 dark:text-muted-foreground hover:bg-gray-100 dark:hover:bg-muted rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
             >
               {t("cancel")}
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="bare"
               type="button"
               onClick={handleSubmit}
               disabled={!trimmedName}
               className="px-6 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-lg shadow-blue-500/20 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-background"
             >
               <Save size={16} aria-hidden="true" /> {t("save")}
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -728,7 +736,8 @@ const CreateCollectionCard = ({
 }) => {
   const t = useTranslations("Knowledge");
   return (
-    <button
+    <Button
+      variant="bare"
       type="button"
       aria-label={t("createNewCollectionAria")}
       onClick={onClick}
@@ -744,7 +753,7 @@ const CreateCollectionCard = ({
       <p className="text-xs text-gray-400 text-center max-w-37.5">
         {t("createFolderHint")}
       </p>
-    </button>
+    </Button>
   );
 };
 
@@ -766,7 +775,8 @@ const CollectionCard: React.FC<{
 
   return (
     <div className="group relative bg-white dark:bg-muted/40 p-5 rounded-3xl border border-gray-200 dark:border-border hover:border-gray-300 dark:hover:border-border transition-[border-color,background-color,box-shadow] duration-300 flex flex-col h-full min-h-45 shadow-sm hover:shadow-xl dark:shadow-none overflow-hidden">
-      <button
+      <Button
+        variant="bare"
         type="button"
         aria-label={t("openCollectionAria", { name: collection.name })}
         onClick={onClick}
@@ -775,7 +785,7 @@ const CollectionCard: React.FC<{
         <span className="sr-only">
           {t("openCollectionAria", { name: collection.name })}
         </span>
-      </button>
+      </Button>
 
       {/* Header: Icon + Title + Settings */}
       <div className="relative pointer-events-none mb-3 flex items-start justify-between gap-3">
@@ -809,7 +819,8 @@ const CollectionCard: React.FC<{
         {/* Updated At Removed as per request */}
       </div>
 
-      <button
+      <Button
+        variant="bare"
         type="button"
         aria-label={t("editCollectionAria", { name: collection.name })}
         onClick={onEdit}
@@ -817,7 +828,7 @@ const CollectionCard: React.FC<{
         className="absolute right-5 top-5 z-10 p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-foreground hover:bg-gray-100 dark:hover:bg-accent rounded-lg transition-colors opacity-0 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
       >
         <Settings size={16} aria-hidden="true" />
-      </button>
+      </Button>
     </div>
   );
 };
@@ -1030,7 +1041,8 @@ const FileRow: React.FC<{
           className="h-4 w-4 shrink-0 rounded border-gray-300 text-blue-600 focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:cursor-not-allowed disabled:opacity-50 dark:border-border dark:bg-muted"
         />
       ) : null}
-      <button
+      <Button
+        variant="bare"
         type="button"
         onClick={onClick}
         aria-label={t("openFileAria", { name: file.name })}
@@ -1057,7 +1069,7 @@ const FileRow: React.FC<{
             </span>
           </div>
         </div>
-      </button>
+      </Button>
 
       <div className="ml-auto flex max-w-full flex-wrap items-center justify-end gap-1.5 sm:gap-2">
         <div className="flex max-w-44 items-center gap-1.5 rounded-md border border-gray-100 bg-gray-50 px-2 py-1 dark:border-border dark:bg-muted">
@@ -1127,7 +1139,8 @@ const FileRow: React.FC<{
 
         {onDownloadOriginal && (
           <Tooltip content={t("downloadOriginal")} position="left">
-            <button
+            <Button
+              variant="bare"
               type="button"
               aria-label={t("downloadOriginalAria", { name: file.name })}
               disabled={isBusy}
@@ -1138,13 +1151,14 @@ const FileRow: React.FC<{
               className="shrink-0 rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-blue-50 hover:text-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-blue-900/20"
             >
               <Download size={16} aria-hidden="true" />
-            </button>
+            </Button>
           </Tooltip>
         )}
 
         {onReparse && (
           <Tooltip content={t("reparseFile")} position="left">
-            <button
+            <Button
+              variant="bare"
               type="button"
               aria-label={t("reparseFileAria", { name: file.name })}
               disabled={isBusy || readOnly}
@@ -1159,7 +1173,7 @@ const FileRow: React.FC<{
                 className={isBusy ? "animate-spin" : ""}
                 aria-hidden="true"
               />
-            </button>
+            </Button>
           </Tooltip>
         )}
 
@@ -1179,7 +1193,8 @@ const FileRow: React.FC<{
               }}
             />
             <Tooltip content={t("selectOriginal")} position="left">
-              <button
+              <Button
+                variant="bare"
                 type="button"
                 aria-label={t("selectOriginalAria", { name: file.name })}
                 disabled={isBusy || readOnly}
@@ -1190,14 +1205,15 @@ const FileRow: React.FC<{
                 className="shrink-0 rounded-lg p-1.5 text-amber-500 transition-colors hover:bg-amber-50 hover:text-amber-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60 disabled:opacity-50 dark:hover:bg-amber-900/20"
               >
                 <FileUp size={16} aria-hidden="true" />
-              </button>
+              </Button>
             </Tooltip>
           </>
         )}
 
         {onRetry && (
           <Tooltip content={t("retryFile")} position="left">
-            <button
+            <Button
+              variant="bare"
               type="button"
               aria-label={t("retryFileAria", { name: file.name })}
               disabled={isBusy || readOnly}
@@ -1212,13 +1228,14 @@ const FileRow: React.FC<{
                 className={isBusy ? "animate-spin" : ""}
                 aria-hidden="true"
               />
-            </button>
+            </Button>
           </Tooltip>
         )}
 
         {onCancel && (
           <Tooltip content={t("cancelProcessing")} position="left">
-            <button
+            <Button
+              variant="bare"
               type="button"
               aria-label={t("cancelProcessingAria", { name: file.name })}
               disabled={readOnly}
@@ -1229,7 +1246,7 @@ const FileRow: React.FC<{
               className="shrink-0 rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60 dark:hover:bg-red-900/20"
             >
               <Ban size={16} aria-hidden="true" />
-            </button>
+            </Button>
           </Tooltip>
         )}
 
@@ -1238,7 +1255,8 @@ const FileRow: React.FC<{
             content={isReindexing ? t("reindexing") : t("reindexFile")}
             position="left"
           >
-            <button
+            <Button
+              variant="bare"
               type="button"
               aria-label={t("reindexFileAria", { name: file.name })}
               aria-busy={isReindexing || undefined}
@@ -1254,11 +1272,12 @@ const FileRow: React.FC<{
                 className={isReindexing ? "animate-spin" : ""}
                 aria-hidden="true"
               />
-            </button>
+            </Button>
           </Tooltip>
         )}
 
-        <button
+        <Button
+          variant="bare"
           type="button"
           aria-label={
             isDeleteConfirming
@@ -1281,7 +1300,7 @@ const FileRow: React.FC<{
           ) : (
             <Trash2 size={16} aria-hidden="true" />
           )}
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -2015,7 +2034,8 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
                 </h2>
                 <div className="flex items-center gap-2">
                   {isDirty && (
-                    <button
+                    <Button
+                      variant="bare"
                       type="button"
                       aria-label={t("saveChangesAria", {
                         name: viewingFile.name,
@@ -2025,10 +2045,11 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
                     >
                       <Save size={16} aria-hidden="true" />
                       <span className="text-xs font-medium">{t("save")}</span>
-                    </button>
+                    </Button>
                   )}
 
-                  <button
+                  <Button
+                    variant="bare"
                     type="button"
                     aria-label={
                       isCopied
@@ -2062,8 +2083,9 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
                           ? t("copyFailed")
                           : t("copyContent")}
                     </span>
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    variant="bare"
                     ref={fileViewerCloseButtonRef}
                     type="button"
                     aria-label={t("closeFileViewer")}
@@ -2071,7 +2093,7 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
                     className="rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:text-muted-foreground dark:hover:bg-muted dark:hover:text-foreground"
                   >
                     <X size={20} aria-hidden="true" />
-                  </button>
+                  </Button>
                 </div>
               </div>
 
@@ -2121,14 +2143,15 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
             <h1 className="flex min-w-0 items-center gap-2 text-lg font-bold text-gray-800 dark:text-foreground">
               {activeCollection ? (
                 <>
-                  <button
+                  <Button
+                    variant="bare"
                     type="button"
                     aria-label={t("backToCollectionsAria")}
                     className="shrink-0 rounded opacity-50 transition-opacity hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                     onClick={() => setActiveCollectionId(null)}
                   >
                     {t("title")}
-                  </button>
+                  </Button>
                   <ChevronRight
                     size={16}
                     className="shrink-0 text-gray-400"
@@ -2150,14 +2173,15 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
           </div>
         </div>
         {onClose && (
-          <button
+          <Button
+            variant="bare"
             type="button"
             aria-label={t("closeKnowledgeBase")}
             onClick={onClose}
             className="shrink-0 rounded-full p-2 text-gray-500 transition-colors hover:bg-gray-200/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/60 dark:text-muted-foreground dark:hover:bg-accent/50"
           >
             <X size={20} aria-hidden="true" />
-          </button>
+          </Button>
         )}
       </div>
 
@@ -2254,7 +2278,8 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
                         {t("chunking.pendingDescription")}
                       </p>
                     </div>
-                    <button
+                    <Button
+                      variant="bare"
                       type="button"
                       onClick={() => void handleReindexCollection()}
                       disabled={
@@ -2268,7 +2293,7 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
                         className={isReindexingCollection ? "animate-spin" : ""}
                       />
                       {t("chunking.reindexAll")}
-                    </button>
+                    </Button>
                   </div>
                 ) : null}
                 {/* Upload Zone */}
@@ -2304,7 +2329,8 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
                     aria-describedby={`${uploadDescriptionId} ${uploadLimitsId}`}
                     onChange={(e) => void handleFileUpload(e.target.files)}
                   />
-                  <button
+                  <Button
+                    variant="bare"
                     type="button"
                     disabled={!isOnline}
                     onClick={() => fileInputRef.current?.click()}
@@ -2323,7 +2349,7 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
                     <span className="text-xs text-gray-500 dark:text-muted-foreground">
                       {t("chooseFilesHint")}
                     </span>
-                  </button>
+                  </Button>
                   <p
                     id={uploadDescriptionId}
                     className="mt-3 max-w-sm text-xs leading-relaxed text-gray-500 dark:text-muted-foreground"
@@ -2469,7 +2495,8 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
                                 {t("batchRunning")}
                               </span>
                             )}
-                            <button
+                            <Button
+                              variant="bare"
                               type="button"
                               disabled={isBatchRunning}
                               onClick={() => setSelectedFileIds(new Set())}
@@ -2477,8 +2504,9 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
                             >
                               <X size={13} aria-hidden="true" />
                               {t("clearSelection")}
-                            </button>
-                            <button
+                            </Button>
+                            <Button
+                              variant="bare"
                               type="button"
                               disabled={
                                 !isOnline || isBatchRunning || !canRetrySelected
@@ -2488,8 +2516,9 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
                             >
                               <RotateCcw size={14} aria-hidden="true" />
                               {t("batchRetry")}
-                            </button>
-                            <button
+                            </Button>
+                            <Button
+                              variant="bare"
                               type="button"
                               disabled={
                                 !isOnline ||
@@ -2501,8 +2530,9 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
                             >
                               <RefreshCw size={14} aria-hidden="true" />
                               {t("batchReindex")}
-                            </button>
-                            <button
+                            </Button>
+                            <Button
+                              variant="bare"
                               type="button"
                               disabled={isBatchRunning || !canDownloadSelected}
                               onClick={() => void handleBatchAction("download")}
@@ -2510,8 +2540,9 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
                             >
                               <Download size={14} aria-hidden="true" />
                               {t("batchDownload")}
-                            </button>
-                            <button
+                            </Button>
+                            <Button
+                              variant="bare"
                               type="button"
                               disabled={!isOnline || isBatchRunning}
                               onClick={() => setIsBatchDeleteConfirming(true)}
@@ -2519,7 +2550,7 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
                             >
                               <Trash2 size={14} aria-hidden="true" />
                               {t("batchDelete")}
-                            </button>
+                            </Button>
                           </>
                         )}
                       </div>
@@ -2541,21 +2572,23 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
                           </p>
                         </div>
                         <div className="flex shrink-0 items-center gap-2">
-                          <button
+                          <Button
+                            variant="bare"
                             type="button"
                             onClick={() => setIsBatchDeleteConfirming(false)}
                             className="min-h-8 rounded-lg px-3 text-xs font-medium text-red-700 hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50 dark:text-red-200 dark:hover:bg-red-900/40"
                           >
                             {t("cancel")}
-                          </button>
-                          <button
+                          </Button>
+                          <Button
+                            variant="bare"
                             ref={batchDeleteConfirmRef}
                             type="button"
                             onClick={() => void handleBatchAction("delete")}
                             className="min-h-8 rounded-lg bg-red-600 px-3 text-xs font-semibold text-white hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60 focus-visible:ring-offset-2 focus-visible:ring-offset-red-50 dark:focus-visible:ring-offset-red-950"
                           >
                             {t("confirmBatchDeleteAction")}
-                          </button>
+                          </Button>
                         </div>
                       </div>
                     )}
@@ -2577,14 +2610,15 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
                               ).length,
                             })}
                           </p>
-                          <button
+                          <Button
+                            variant="bare"
                             type="button"
                             aria-label={t("dismissBatchResults")}
                             onClick={() => setBatchResults([])}
                             className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 dark:hover:bg-muted dark:hover:text-foreground"
                           >
                             <X size={14} aria-hidden="true" />
-                          </button>
+                          </Button>
                         </div>
                         <ul className="mt-2 max-h-36 space-y-1 overflow-y-auto custom-scrollbar">
                           {batchResults.map((result) => (

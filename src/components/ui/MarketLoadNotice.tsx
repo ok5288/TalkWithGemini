@@ -2,6 +2,7 @@
 
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import type { MarketLoadStatus } from "@/lib/market/loadResult";
+import { Button } from "@/components/ui/primitives";
 
 interface MarketLoadNoticeProps {
   status?: MarketLoadStatus;
@@ -42,7 +43,8 @@ export default function MarketLoadNotice({
         />
         <span>{message}</span>
       </span>
-      <button
+      <Button
+        variant="bare"
         type="button"
         onClick={onRetry}
         disabled={isRetrying}
@@ -54,7 +56,7 @@ export default function MarketLoadNotice({
           aria-hidden="true"
         />
         {retryLabel}
-      </button>
+      </Button>
     </div>
   );
 }

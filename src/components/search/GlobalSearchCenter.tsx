@@ -49,6 +49,7 @@ import { useChatStore } from "@/store/core/chatStore";
 import { useKnowledgeStore } from "@/store/core/knowledgeStore";
 import { useMemoryStore } from "@/store/core/memoryStore";
 import { GlobalSearchModalFrame } from "./GlobalSearchModalFrame";
+import { Button } from "@/components/ui/primitives";
 
 export interface GlobalSearchCenterProps {
   onClose: () => void;
@@ -423,14 +424,15 @@ const GlobalSearchCenter = ({
               {t("subtitle")}
             </p>
           </div>
-          <button
+          <Button
+            variant="bare"
             type="button"
             onClick={onClose}
             aria-label={t("close")}
             className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <X size={18} aria-hidden="true" />
-          </button>
+          </Button>
         </div>
       </header>
 
@@ -481,7 +483,8 @@ const GlobalSearchCenter = ({
                 </span>
               )}
               {query && (
-                <button
+                <Button
+                  variant="bare"
                   type="button"
                   aria-label={t("clearQuery")}
                   onClick={() => {
@@ -492,7 +495,7 @@ const GlobalSearchCenter = ({
                   className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/45"
                 >
                   <X size={16} aria-hidden="true" />
-                </button>
+                </Button>
               )}
             </div>
           </div>
@@ -507,7 +510,8 @@ const GlobalSearchCenter = ({
                 {SOURCE_FILTER_OPTIONS.map((sourceOption) => {
                   const selected = source === sourceOption;
                   return (
-                    <button
+                    <Button
+                      variant="bare"
                       key={sourceOption}
                       type="button"
                       aria-pressed={selected}
@@ -527,13 +531,14 @@ const GlobalSearchCenter = ({
                         <SourceIcon source={sourceOption} />
                       )}
                       <span>{t(SOURCE_FILTER_LABEL_KEYS[sourceOption])}</span>
-                    </button>
+                    </Button>
                   );
                 })}
               </div>
             </div>
 
-            <button
+            <Button
+              variant="bare"
               type="button"
               aria-label={
                 advancedOptionCount > 0
@@ -570,7 +575,7 @@ const GlobalSearchCenter = ({
                 aria-hidden="true"
                 className={`transition-transform duration-150 motion-reduce:transition-none ${filtersOpen ? "rotate-180" : ""}`}
               />
-            </button>
+            </Button>
           </div>
 
           {filtersOpen && (
@@ -583,7 +588,8 @@ const GlobalSearchCenter = ({
                   {t("filtersAndSort")}
                 </p>
                 {advancedOptionCount > 0 && (
-                  <button
+                  <Button
+                    variant="bare"
                     type="button"
                     onClick={() => {
                       updateViewState(DEFAULT_GLOBAL_SEARCH_ADVANCED_OPTIONS);
@@ -592,7 +598,7 @@ const GlobalSearchCenter = ({
                     className="rounded-md px-2 py-1 text-xs font-medium text-brand transition-colors hover:bg-brand-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/45"
                   >
                     {t("restoreDefaults")}
-                  </button>
+                  </Button>
                 )}
               </div>
 
@@ -707,7 +713,8 @@ const GlobalSearchCenter = ({
               className="flex items-center justify-between gap-3 rounded-lg border border-red-300/60 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-900/70 dark:bg-red-950/30 dark:text-red-100"
             >
               <span>{indexError}</span>
-              <button
+              <Button
+                variant="bare"
                 type="button"
                 onClick={() => {
                   clearGlobalSearchIndexCache();
@@ -717,7 +724,7 @@ const GlobalSearchCenter = ({
               >
                 <RefreshCw size={14} aria-hidden="true" />
                 {t("retry")}
-              </button>
+              </Button>
             </div>
           )}
 
@@ -728,7 +735,8 @@ const GlobalSearchCenter = ({
                 : t("searchHint")}
             </span>
             {indexing && (
-              <button
+              <Button
+                variant="bare"
                 type="button"
                 onClick={() => {
                   abortRef.current?.abort();
@@ -738,7 +746,7 @@ const GlobalSearchCenter = ({
                 className="rounded-md px-2 py-1 font-medium hover:bg-accent hover:text-accent-foreground"
               >
                 {t("cancel")}
-              </button>
+              </Button>
             )}
           </div>
 
@@ -800,7 +808,8 @@ const GlobalSearchCenter = ({
                 {results.map((result, resultIndex) => {
                   const selected = selectedIndex === resultIndex;
                   return (
-                    <button
+                    <Button
+                      variant="bare"
                       key={result.document.id}
                       ref={(node) => {
                         resultRefs.current[resultIndex] = node;
@@ -873,7 +882,7 @@ const GlobalSearchCenter = ({
                           </span>
                         </span>
                       </span>
-                    </button>
+                    </Button>
                   );
                 })}
               </div>

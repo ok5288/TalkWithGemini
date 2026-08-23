@@ -7,6 +7,7 @@ import type {
   TaskPlanSnapshot,
   TaskPlanStepStatus,
 } from "@/lib/agent/taskPlan";
+import { Button } from "@/components/ui/primitives";
 
 const TaskPlanBlock: React.FC<TaskPlanSnapshot> = ({ steps, note }) => {
   const t = useTranslations("Content");
@@ -36,7 +37,8 @@ const TaskPlanBlock: React.FC<TaskPlanSnapshot> = ({ steps, note }) => {
 
   return (
     <div className="mb-3 overflow-hidden rounded-lg border border-gray-200 bg-gray-50/40 dark:border-border dark:bg-muted/20">
-      <button
+      <Button
+        variant="bare"
         type="button"
         aria-expanded={isExpanded}
         aria-controls={panelId}
@@ -65,7 +67,7 @@ const TaskPlanBlock: React.FC<TaskPlanSnapshot> = ({ steps, note }) => {
           }`}
           aria-hidden="true"
         />
-      </button>
+      </Button>
 
       <div
         id={panelId}

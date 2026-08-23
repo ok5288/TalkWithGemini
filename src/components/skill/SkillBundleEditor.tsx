@@ -12,6 +12,7 @@ import type {
 } from "@/types";
 import { normalizeSkillBundles } from "@/lib/skills";
 import SkillParameterEditor from "./SkillParameterEditor";
+import { Button } from "@/components/ui/primitives";
 
 const slugify = (value: string) =>
   value
@@ -146,7 +147,8 @@ export default function SkillBundleEditor({
               {t("bundles.description")}
             </p>
           </div>
-          <button
+          <Button
+            variant="bare"
             ref={closeRef}
             type="button"
             aria-label={t("closeEditor")}
@@ -154,7 +156,7 @@ export default function SkillBundleEditor({
             className="rounded-full p-1.5 text-gray-500 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 dark:hover:bg-muted"
           >
             <X size={20} aria-hidden="true" />
-          </button>
+          </Button>
         </header>
 
         <div className="grid flex-1 gap-4 overflow-y-auto p-5 custom-scrollbar md:grid-cols-2">
@@ -231,7 +233,8 @@ export default function SkillBundleEditor({
                     </option>
                   ))}
                 </select>
-                <button
+                <Button
+                  variant="bare"
                   type="button"
                   disabled={!selectedSkillId || draft.steps.length >= 4}
                   onClick={() => {
@@ -261,7 +264,7 @@ export default function SkillBundleEditor({
                 >
                   <Plus size={13} aria-hidden="true" />
                   {t("bundles.addStep")}
-                </button>
+                </Button>
               </div>
             </div>
 
@@ -290,7 +293,8 @@ export default function SkillBundleEditor({
                           ) : null}
                         </div>
                         <div className="flex items-center gap-1">
-                          <button
+                          <Button
+                            variant="bare"
                             type="button"
                             disabled={index === 0}
                             aria-label={t("bundles.moveUp")}
@@ -307,8 +311,9 @@ export default function SkillBundleEditor({
                             className="rounded p-1.5 text-gray-500 hover:bg-white disabled:opacity-30 dark:hover:bg-card"
                           >
                             <ArrowUp size={14} aria-hidden="true" />
-                          </button>
-                          <button
+                          </Button>
+                          <Button
+                            variant="bare"
                             type="button"
                             disabled={index === draft.steps.length - 1}
                             aria-label={t("bundles.moveDown")}
@@ -325,8 +330,9 @@ export default function SkillBundleEditor({
                             className="rounded p-1.5 text-gray-500 hover:bg-white disabled:opacity-30 dark:hover:bg-card"
                           >
                             <ArrowDown size={14} aria-hidden="true" />
-                          </button>
-                          <button
+                          </Button>
+                          <Button
+                            variant="bare"
                             type="button"
                             aria-label={t("bundles.removeStep")}
                             onClick={() =>
@@ -341,7 +347,7 @@ export default function SkillBundleEditor({
                             className="rounded p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30"
                           >
                             <Trash2 size={14} aria-hidden="true" />
-                          </button>
+                          </Button>
                         </div>
                       </div>
 
@@ -441,7 +447,8 @@ export default function SkillBundleEditor({
         ) : null}
         <footer className="flex items-center justify-between gap-3 border-t border-gray-100 px-5 py-4 dark:border-border">
           {bundle && onDelete ? (
-            <button
+            <Button
+              variant="bare"
               type="button"
               onClick={() => {
                 onDelete(bundle.id);
@@ -451,26 +458,28 @@ export default function SkillBundleEditor({
             >
               <Trash2 size={14} aria-hidden="true" />
               {t("delete")}
-            </button>
+            </Button>
           ) : (
             <span />
           )}
           <div className="flex gap-2">
-            <button
+            <Button
+              variant="bare"
               type="button"
               onClick={onClose}
               className="rounded-lg px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 dark:text-foreground/85 dark:hover:bg-muted"
             >
               {t("cancel")}
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="bare"
               type="button"
               onClick={handleSave}
               className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
             >
               <Save size={14} aria-hidden="true" />
               {t("save")}
-            </button>
+            </Button>
           </div>
         </footer>
       </div>

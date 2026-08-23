@@ -8,6 +8,7 @@ import { getTaskModel } from "@/store/core/settingsStore";
 import { streamGenerateContent } from "@/services/api/chatService";
 import { polishTextContent } from "@/services/artifactService";
 import { logDevError } from "@/lib/utils/devLogger";
+import { Button } from "@/components/ui/primitives";
 
 interface UserMessageEditorProps {
   initialContent: string;
@@ -139,7 +140,8 @@ const UserMessageEditor = ({
           }
           position="top"
         >
-          <button
+          <Button
+            variant="bare"
             type="button"
             aria-label={t("polishUserMessageAria")}
             aria-busy={isPolishing || undefined}
@@ -153,19 +155,21 @@ const UserMessageEditor = ({
               <PencilSparkles size={14} aria-hidden="true" />
             )}
             <span>{t("polishUserMessageShort")}</span>
-          </button>
+          </Button>
         </Tooltip>
 
         <div className="flex items-center gap-2">
-          <button
+          <Button
+            variant="bare"
             type="button"
             onClick={onCancel}
             disabled={isSubmitting}
             className={`rounded-lg px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50 ${actionButtonFocusClass}`}
           >
             {t("cancelEdit")}
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="bare"
             type="button"
             onClick={handleSubmit}
             disabled={!draft.trim() || isSubmitting || isPolishing}
@@ -175,7 +179,7 @@ const UserMessageEditor = ({
               <Loader2 size={13} className="animate-spin" aria-hidden="true" />
             ) : null}
             {t("sendEdit")}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

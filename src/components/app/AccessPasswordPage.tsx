@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { ArrowRight, LockKeyhole } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { Button } from "@/components/ui/primitives";
 
 const ACCESS_ERROR_CODES = {
   invalid: "ACCESS_PASSWORD_INVALID",
@@ -150,14 +151,15 @@ export default function AccessPasswordPage({
               aria-describedby="access-password-status"
               className="min-w-0 flex-1 rounded-lg border border-input bg-muted px-3 py-2 font-mono text-sm text-foreground transition-[background-color,border-color,box-shadow,color] placeholder:text-muted-foreground focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:opacity-60 dark:focus:border-blue-400"
             />
-            <button
+            <Button
+              variant="bare"
               type="submit"
               disabled={!trimmedPassword || isSubmitting || isLocked}
               className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-blue-500 text-white transition-colors hover:bg-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:cursor-not-allowed disabled:opacity-50"
               aria-label={isSubmitting ? t("verifying") : t("submit")}
             >
               <ArrowRight size={16} aria-hidden="true" />
-            </button>
+            </Button>
           </div>
 
           <div

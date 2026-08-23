@@ -21,14 +21,9 @@ describe("settings form accessibility", () => {
     expect(source).toContain('type="submit"');
   });
 
-  it("connects access-password errors and status to the input", () => {
-    const source = readSource("src/components/app/AccessPasswordPage.tsx");
-
-    expect(source).toContain('aria-describedby="access-password-status"');
-    expect(source).toContain("aria-invalid={isLocked || !!errorKey}");
-    expect(source).toContain('id="access-password-status"');
-    expect(source).toContain('aria-live="polite"');
-  });
+  // Access-password error wiring is covered behaviourally in
+  // componentA11y.test.tsx: it renders the page, submits a rejected password,
+  // and asserts the alert/aria-invalid transition plus an axe pass.
 
   it("uses the shared modal lifecycle for remote files", () => {
     const source = readSource("src/components/modals/RemoteFileModal.tsx");

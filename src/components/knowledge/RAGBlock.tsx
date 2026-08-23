@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import type { Source } from "@/types";
 import { Library, ChevronDown, BookText } from "lucide-react";
 import { requestKnowledgeSourceNavigation } from "@/lib/knowledge/navigation";
+import { Button } from "@/components/ui/primitives";
 
 interface RAGBlockProps {
   sources: Source[];
@@ -43,7 +44,8 @@ const RAGBlock: React.FC<RAGBlockProps> = ({ sources, error }) => {
 
   return (
     <div className="mb-3 overflow-hidden rounded-lg border border-purple-200 bg-purple-50/50 transition-colors duration-300 dark:border-purple-800/60 dark:bg-purple-900/10">
-      <button
+      <Button
+        variant="bare"
         id={buttonId}
         type="button"
         aria-expanded={isExpanded}
@@ -64,7 +66,7 @@ const RAGBlock: React.FC<RAGBlockProps> = ({ sources, error }) => {
           aria-hidden="true"
           className={`transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`}
         />
-      </button>
+      </Button>
 
       <div
         id={contentId}
@@ -136,7 +138,8 @@ const RAGBlock: React.FC<RAGBlockProps> = ({ sources, error }) => {
                       );
 
                       return collectionId ? (
-                        <button
+                        <Button
+                          variant="bare"
                           key={`${source.title}-${index}`}
                           type="button"
                           className="block w-full rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/60"
@@ -150,7 +153,7 @@ const RAGBlock: React.FC<RAGBlockProps> = ({ sources, error }) => {
                           }
                         >
                           {card}
-                        </button>
+                        </Button>
                       ) : (
                         <React.Fragment key={`${source.title}-${index}`}>
                           {card}

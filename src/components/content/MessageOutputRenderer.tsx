@@ -23,6 +23,7 @@ import ToolCallBlock from "./ToolCallBlock";
 import MemorySearchBlock from "./MemorySearchBlock";
 import TaskPlanBlock from "./TaskPlanBlock";
 import SafeImage from "../ui/SafeImage";
+import { Button } from "@/components/ui/primitives";
 
 interface MessageOutputRendererProps {
   message: Message;
@@ -101,7 +102,8 @@ const GeneratedImageBlock: React.FC<{
   }
 
   return (
-    <button
+    <Button
+      variant="bare"
       type="button"
       disabled={!canPreview}
       onClick={() => {
@@ -130,7 +132,7 @@ const GeneratedImageBlock: React.FC<{
           </div>
         }
       />
-    </button>
+    </Button>
   );
 };
 

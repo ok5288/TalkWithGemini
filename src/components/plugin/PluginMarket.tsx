@@ -49,13 +49,14 @@ import { localizePluginMeta } from "@/lib/plugin/localizedMeta";
 import { isPluginAuthRequired } from "@/lib/plugin/config";
 import { PLUGIN_CONFIG_LIMITS } from "@/config/limits";
 import { hasPluginAuthValue } from "@/lib/security/localSecretResolvers";
-import { SecretInput } from "@/components/settings/SettingsUI";
+import { SecretInput } from "@/components/ui/controls";
 import {
   encryptLocalSecret,
   LOCAL_SECRET_CONTEXTS,
 } from "@/lib/security/localSecrets";
 import type { MarketLoadResult } from "@/lib/market/loadResult";
 import MarketLoadNotice from "@/components/ui/MarketLoadNotice";
+import { Button } from "@/components/ui/primitives";
 
 interface PluginMarketProps {
   onClose: () => void;
@@ -291,7 +292,8 @@ const CustomPluginModal = ({
             <Blocks size={20} className="text-blue-500" aria-hidden="true" />
             {t("addCustomPlugin")}
           </h2>
-          <button
+          <Button
+            variant="bare"
             ref={closeButtonRef}
             type="button"
             aria-label={t("closeCustomInstaller")}
@@ -300,7 +302,7 @@ const CustomPluginModal = ({
             disabled={isLoading}
           >
             <X size={20} aria-hidden="true" />
-          </button>
+          </Button>
         </div>
 
         <div className="space-y-2">
@@ -339,15 +341,17 @@ const CustomPluginModal = ({
         )}
 
         <div className="flex justify-end gap-2 pt-2">
-          <button
+          <Button
+            variant="bare"
             type="button"
             onClick={handleClose}
             disabled={isLoading}
             className="rounded-lg px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:cursor-not-allowed disabled:opacity-60 dark:text-muted-foreground dark:hover:bg-muted"
           >
             {t("cancel")}
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="bare"
             type="button"
             aria-label={t("installCustomAria")}
             aria-busy={isLoading || undefined}
@@ -361,7 +365,7 @@ const CustomPluginModal = ({
               <Download size={16} aria-hidden="true" />
             )}
             {t("install")}
-          </button>
+          </Button>
         </div>
       </div>
     </div>,
@@ -475,7 +479,8 @@ const McpInstallAuthModal = ({
             />
             <span className="truncate">{t("mcpInstallAuthTitle")}</span>
           </h2>
-          <button
+          <Button
+            variant="bare"
             ref={closeButtonRef}
             type="button"
             aria-label={t("closeMcpAuthInstaller")}
@@ -484,7 +489,7 @@ const McpInstallAuthModal = ({
             className="rounded-full p-1 text-gray-500 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-muted"
           >
             <X size={20} aria-hidden="true" />
-          </button>
+          </Button>
         </div>
 
         <p
@@ -528,15 +533,17 @@ const McpInstallAuthModal = ({
         )}
 
         <div className="flex justify-end gap-2 pt-2">
-          <button
+          <Button
+            variant="bare"
             type="button"
             onClick={handleClose}
             disabled={isLoading}
             className="rounded-lg px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:cursor-not-allowed disabled:opacity-60 dark:text-muted-foreground dark:hover:bg-muted"
           >
             {t("cancel")}
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="bare"
             type="button"
             aria-label={t("installPluginAria", { title: plugin.title })}
             aria-busy={isLoading || undefined}
@@ -550,7 +557,7 @@ const McpInstallAuthModal = ({
               <Download size={16} aria-hidden="true" />
             )}
             {t("install")}
-          </button>
+          </Button>
         </div>
       </div>
     </div>,
@@ -768,7 +775,8 @@ const CustomMcpServerModal = ({
             <Blocks size={20} className="text-blue-500" aria-hidden="true" />
             {t("addCustomMcpServer")}
           </h2>
-          <button
+          <Button
+            variant="bare"
             ref={closeButtonRef}
             type="button"
             aria-label={t("closeCustomMcpInstaller")}
@@ -777,7 +785,7 @@ const CustomMcpServerModal = ({
             disabled={isLoading || isDiscovering}
           >
             <X size={20} aria-hidden="true" />
-          </button>
+          </Button>
         </div>
 
         {!isOnline && (
@@ -857,7 +865,8 @@ const CustomMcpServerModal = ({
                 />
               </div>
 
-              <button
+              <Button
+                variant="bare"
                 type="button"
                 onClick={handleBridgeDiscovery}
                 disabled={
@@ -876,7 +885,7 @@ const CustomMcpServerModal = ({
                   aria-hidden="true"
                 />
                 {isDiscovering ? t("bridgeDiscovering") : t("bridgeDiscover")}
-              </button>
+              </Button>
 
               {bridgeServers.length > 0 && (
                 <ul
@@ -898,7 +907,8 @@ const CustomMcpServerModal = ({
                             {server.id}
                           </p>
                         </div>
-                        <button
+                        <Button
+                          variant="bare"
                           type="button"
                           onClick={() => handleBridgeImport(server)}
                           disabled={
@@ -915,7 +925,7 @@ const CustomMcpServerModal = ({
                             <Download size={13} aria-hidden="true" />
                           )}
                           {imported ? t("bridgeImported") : t("bridgeImport")}
-                        </button>
+                        </Button>
                       </li>
                     );
                   })}
@@ -1006,15 +1016,17 @@ const CustomMcpServerModal = ({
         )}
 
         <div className="flex justify-end gap-2 pt-2">
-          <button
+          <Button
+            variant="bare"
             type="button"
             onClick={handleClose}
             disabled={isLoading || isDiscovering}
             className="rounded-lg px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:cursor-not-allowed disabled:opacity-60 dark:text-muted-foreground dark:hover:bg-muted"
           >
             {t("cancel")}
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="bare"
             type="button"
             aria-label={t("installCustomMcpAria")}
             aria-busy={isLoading || undefined}
@@ -1034,7 +1046,7 @@ const CustomMcpServerModal = ({
               <Download size={16} aria-hidden="true" />
             )}
             {t("install")}
-          </button>
+          </Button>
         </div>
       </div>
     </div>,
@@ -1331,7 +1343,8 @@ const PluginDetailsModal = ({
               </div>
             </div>
           </div>
-          <button
+          <Button
+            variant="bare"
             ref={closeButtonRef}
             type="button"
             aria-label={t("closeDetails")}
@@ -1339,7 +1352,7 @@ const PluginDetailsModal = ({
             className="shrink-0 rounded-full p-1.5 text-gray-500 transition-colors hover:bg-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:hover:bg-muted"
           >
             <X size={20} aria-hidden="true" />
-          </button>
+          </Button>
         </div>
 
         <div className="px-6 py-4 border-b border-gray-100 dark:border-border">
@@ -1387,7 +1400,8 @@ const PluginDetailsModal = ({
           onKeyDown={handleTabListKeyDown}
           className="flex border-b border-gray-100 px-6 dark:border-border"
         >
-          <button
+          <Button
+            variant="bare"
             id={toolsTabId}
             type="button"
             role="tab"
@@ -1398,8 +1412,9 @@ const PluginDetailsModal = ({
             className={`mr-6 border-b-2 px-1 py-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 ${activeTab === "tools" ? "border-blue-500 text-blue-600 dark:text-blue-400" : "border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-foreground/85"}`}
           >
             {t("toolsTab", { count: plugin.functions?.length || 0 })}
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="bare"
             id={authTabId}
             type="button"
             role="tab"
@@ -1410,7 +1425,7 @@ const PluginDetailsModal = ({
             className={`border-b-2 px-1 py-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 ${activeTab === "auth" ? "border-blue-500 text-blue-600 dark:text-blue-400" : "border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-foreground/85"}`}
           >
             {t("authTab")}
-          </button>
+          </Button>
         </div>
 
         {/* Content */}
@@ -1559,14 +1574,15 @@ const PluginDetailsModal = ({
                       onBlur={handleSaveEndpoint}
                       className="min-w-0 flex-1 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm transition-[border-color,box-shadow] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-border dark:bg-muted"
                     />
-                    <button
+                    <Button
+                      variant="bare"
                       type="button"
                       onClick={handleClearEndpoint}
                       disabled={!endpointValue && !config.baseUrl}
                       className="rounded-xl border border-gray-200 px-3 py-2 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:cursor-not-allowed disabled:opacity-50 dark:border-border dark:text-muted-foreground dark:hover:bg-muted"
                     >
                       {t("clearEndpoint")}
-                    </button>
+                    </Button>
                   </div>
                   <p className="text-xs text-gray-500">{t("endpointHint")}</p>
                 </div>
@@ -1594,14 +1610,15 @@ const PluginDetailsModal = ({
                       onBlur={handleSaveModel}
                       className="min-w-0 flex-1 rounded-xl border border-gray-200 bg-white px-4 py-2.5 font-mono text-sm transition-[border-color,box-shadow] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-border dark:bg-muted"
                     />
-                    <button
+                    <Button
+                      variant="bare"
                       type="button"
                       onClick={handleClearModel}
                       disabled={!modelValue && !config.model}
                       className="rounded-xl border border-gray-200 px-3 py-2 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:cursor-not-allowed disabled:opacity-50 dark:border-border dark:text-muted-foreground dark:hover:bg-muted"
                     >
                       {t("clearModel")}
-                    </button>
+                    </Button>
                   </div>
                   <p className="text-xs text-gray-500">{t("modelHint")}</p>
                 </div>
@@ -1611,7 +1628,8 @@ const PluginDetailsModal = ({
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 bg-gray-50/50 p-4 dark:border-border dark:bg-card/50">
-          <button
+          <Button
+            variant="bare"
             type="button"
             onClick={handleUninstall}
             disabled={!!plugin.builtIn}
@@ -1640,16 +1658,17 @@ const PluginDetailsModal = ({
               : isUninstallConfirming
                 ? t("confirmUninstall")
                 : t("uninstall")}
-          </button>
+          </Button>
 
-          <button
+          <Button
+            variant="bare"
             type="button"
             aria-label={t("saveSettingsAria", { title: plugin.title })}
             onClick={handleSave}
             className="flex shrink-0 items-center gap-2 rounded-lg bg-blue-600 px-6 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
           >
             <Save size={16} aria-hidden="true" /> {t("save")}
-          </button>
+          </Button>
         </div>
       </div>
     </div>,
@@ -2196,7 +2215,8 @@ const PluginMarket: React.FC<PluginMarketProps> = ({ onClose }) => {
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <button
+          <Button
+            variant="bare"
             type="button"
             aria-label={t("refreshAria")}
             aria-busy={isRefreshing || undefined}
@@ -2209,15 +2229,16 @@ const PluginMarket: React.FC<PluginMarketProps> = ({ onClose }) => {
               className={isRefreshing ? "animate-spin" : ""}
               aria-hidden="true"
             />
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="bare"
             type="button"
             aria-label={t("closeMarket")}
             onClick={onClose}
             className="rounded-full p-2 text-gray-500 transition-colors hover:bg-gray-200/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:text-muted-foreground dark:hover:bg-accent/50"
           >
             <X size={20} aria-hidden="true" />
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -2269,7 +2290,8 @@ const PluginMarket: React.FC<PluginMarketProps> = ({ onClose }) => {
           aria-label={t("sourceTabsAria")}
         >
           {sourceTabs.map((tab) => (
-            <button
+            <Button
+              variant="bare"
               key={tab.value}
               type="button"
               role="tab"
@@ -2285,7 +2307,7 @@ const PluginMarket: React.FC<PluginMarketProps> = ({ onClose }) => {
               }`}
             >
               {tab.label}
-            </button>
+            </Button>
           ))}
         </div>
       </div>
@@ -2329,7 +2351,8 @@ const PluginMarket: React.FC<PluginMarketProps> = ({ onClose }) => {
                   ? t("installedMcpServers")
                   : t("installedPlugins")}
               </h2>
-              <button
+              <Button
+                variant="bare"
                 type="button"
                 aria-label={
                   activeSource === "mcp"
@@ -2346,7 +2369,7 @@ const PluginMarket: React.FC<PluginMarketProps> = ({ onClose }) => {
               >
                 <Plus size={14} aria-hidden="true" />{" "}
                 {activeSource === "mcp" ? t("customMcp") : t("custom")}
-              </button>
+              </Button>
             </div>
             {filteredInstalledPlugins.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -2442,7 +2465,8 @@ const PluginMarket: React.FC<PluginMarketProps> = ({ onClose }) => {
                             )}
                           </span>
                         </div>
-                        <button
+                        <Button
+                          variant="bare"
                           type="button"
                           aria-label={t("configureAria", {
                             title: plugin.title,
@@ -2451,7 +2475,7 @@ const PluginMarket: React.FC<PluginMarketProps> = ({ onClose }) => {
                           className={`rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:hover:bg-accent dark:hover:text-foreground/85 ${showWarning ? "bg-amber-50 text-amber-500 dark:bg-amber-900/10 dark:text-amber-400" : ""}`}
                         >
                           <Settings size={16} aria-hidden="true" />
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   );
@@ -2480,7 +2504,8 @@ const PluginMarket: React.FC<PluginMarketProps> = ({ onClose }) => {
                   onOpenChange={setShowCategoryFilter}
                 >
                   <DropdownMenuTrigger asChild>
-                    <button
+                    <Button
+                      variant="bare"
                       type="button"
                       aria-label={
                         selectedCategories.length > 0
@@ -2503,7 +2528,7 @@ const PluginMarket: React.FC<PluginMarketProps> = ({ onClose }) => {
                             })
                           : t("filter")}
                       </span>
-                    </button>
+                    </Button>
                   </DropdownMenuTrigger>
 
                   <DropdownMenuContent
@@ -2603,7 +2628,8 @@ const PluginMarket: React.FC<PluginMarketProps> = ({ onClose }) => {
                           {plugin.description}
                         </p>
 
-                        <button
+                        <Button
+                          variant="bare"
                           type="button"
                           aria-label={
                             installingIds.includes(plugin.id)
@@ -2635,7 +2661,7 @@ const PluginMarket: React.FC<PluginMarketProps> = ({ onClose }) => {
                               {t("install")}
                             </>
                           )}
-                        </button>
+                        </Button>
                       </div>
                     );
                   })}
@@ -2657,7 +2683,8 @@ const PluginMarket: React.FC<PluginMarketProps> = ({ onClose }) => {
                 {/* Pagination Controls */}
                 {showPagination && (
                   <div className="py-6 flex items-center justify-center gap-4 mt-auto">
-                    <button
+                    <Button
+                      variant="bare"
                       type="button"
                       aria-label={t("prevPageAria")}
                       onClick={handlePreviousPage}
@@ -2665,13 +2692,14 @@ const PluginMarket: React.FC<PluginMarketProps> = ({ onClose }) => {
                       className="rounded-lg border border-gray-200 bg-white p-2 text-gray-600 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:cursor-not-allowed disabled:opacity-50 dark:border-border dark:bg-muted dark:text-foreground/85 dark:hover:bg-accent"
                     >
                       <ChevronLeft size={16} aria-hidden="true" />
-                    </button>
+                    </Button>
                     <span className="text-sm font-medium tabular-nums text-gray-600 dark:text-foreground/85">
                       {activeSource === "mcp"
                         ? t("pageCurrent", { currentPage })
                         : t("pageOf", { currentPage, totalPages })}
                     </span>
-                    <button
+                    <Button
+                      variant="bare"
                       type="button"
                       aria-label={t("nextPageAria")}
                       onClick={handleNextPage}
@@ -2679,7 +2707,7 @@ const PluginMarket: React.FC<PluginMarketProps> = ({ onClose }) => {
                       className="rounded-lg border border-gray-200 bg-white p-2 text-gray-600 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:cursor-not-allowed disabled:opacity-50 dark:border-border dark:bg-muted dark:text-foreground/85 dark:hover:bg-accent"
                     >
                       <ChevronRight size={16} aria-hidden="true" />
-                    </button>
+                    </Button>
                   </div>
                 )}
               </>

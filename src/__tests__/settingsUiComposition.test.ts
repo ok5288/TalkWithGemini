@@ -7,36 +7,65 @@ import zh from "../i18n/locales/zh";
 
 describe("settings UI primitives", () => {
   it("uses shadcn-style semantic tokens for select and switch controls", () => {
-    const settingsUi = readFileSync(
-      resolve(process.cwd(), "src/components/settings/SettingsUI.tsx"),
+    const controls = readFileSync(
+      resolve(process.cwd(), "src/components/ui/controls.tsx"),
       "utf8",
     );
 
-    expect(settingsUi).toContain("bg-background");
-    expect(settingsUi).toContain("border-input");
-    expect(settingsUi).toContain("focus-visible:ring-ring");
-    expect(settingsUi).toContain("data-[state=checked]");
-    expect(settingsUi).toContain("handleListboxKeyDown");
-    expect(settingsUi).toContain('event.key === "ArrowDown"');
-    expect(settingsUi).toContain('event.key === "Home"');
-    expect(settingsUi).toContain('event.key === "End"');
-    expect(settingsUi).toContain('event.key === "Escape"');
-    expect(settingsUi).toContain('event.key === " "');
-    expect(settingsUi).toContain("onMouseEnter={() => setHighlightedValue");
-    expect(settingsUi).toContain('role="combobox"');
-    expect(settingsUi).toContain("aria-activedescendant");
-    const anchoredPortalSection = settingsUi.slice(
-      settingsUi.indexOf("<AnchoredPortal"),
-      settingsUi.indexOf("</AnchoredPortal>"),
+    expect(controls).toContain("bg-background");
+    expect(controls).toContain("border-input");
+    expect(controls).toContain("focus-visible:ring-ring");
+    expect(controls).toContain("data-[state=checked]");
+    expect(controls).toContain("handleListboxKeyDown");
+    expect(controls).toContain('event.key === "ArrowDown"');
+    expect(controls).toContain('event.key === "Home"');
+    expect(controls).toContain('event.key === "End"');
+    expect(controls).toContain('event.key === "Escape"');
+    expect(controls).toContain('event.key === " "');
+    expect(controls).toContain("onMouseEnter={() => setHighlightedValue");
+    expect(controls).toContain('role="combobox"');
+    expect(controls).toContain("aria-activedescendant");
+    const anchoredPortalSection = controls.slice(
+      controls.indexOf("<AnchoredPortal"),
+      controls.indexOf("</AnchoredPortal>"),
     );
     expect(anchoredPortalSection).not.toContain("aria-activedescendant");
-    expect(settingsUi).not.toContain(
+    expect(controls).not.toContain(
       'type="button"\n                      role="option"',
     );
-    expect(settingsUi).toContain(
+  });
+
+  // Controls shared beyond the settings pages live in `ui/`; anything that
+  // only search settings can use stays feature-local.
+  it("keeps shared controls out of the search-specific provider item", () => {
+    const controls = readFileSync(
+      resolve(process.cwd(), "src/components/ui/controls.tsx"),
+      "utf8",
+    );
+    const providerItem = readFileSync(
+      resolve(process.cwd(), "src/components/settings/SearchProviderItem.tsx"),
+      "utf8",
+    );
+
+    for (const control of [
+      "CustomSelect",
+      "SegmentedControl",
+      "SimpleSwitch",
+      "SecretInput",
+    ]) {
+      expect(controls).toContain(`export const ${control}`);
+      expect(providerItem).not.toContain(`export const ${control}`);
+    }
+
+    expect(providerItem).toContain("export const SearchProviderItem");
+    expect(controls).not.toContain("SearchProviderItem");
+    expect(providerItem).toContain(
+      'import { SecretInput } from "@/components/ui/controls"',
+    );
+    expect(providerItem).toContain(
       "focus-visible:ring-2 focus-visible:ring-blue-500/60",
     );
-    expect(settingsUi).toContain(
+    expect(providerItem).toContain(
       'aria-label={`${name}: ${isActive ? t("active") : t("enable")}`}',
     );
   });

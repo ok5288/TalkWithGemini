@@ -26,6 +26,7 @@ import { useChatStore } from "@/store/core/chatStore";
 import { useCoreSettingsStore } from "@/store/core/coreSettingsStore";
 import { useSettingsStore } from "@/store/core/settingsStore";
 import type { ServiceHealthServiceKey, ServiceHealthStatus } from "@/types";
+import { Button } from "@/components/ui/primitives";
 
 interface HealthItem {
   key: string;
@@ -342,14 +343,15 @@ const DeploymentHealth: React.FC = () => {
         >
           <CircleDashed className="shrink-0" size={17} aria-hidden="true" />
           <p className="min-w-0 flex-1 text-sm">{t("runtimeUnknown")}</p>
-          <button
+          <Button
+            variant="bare"
             type="button"
             onClick={() => setRetryKey((value) => value + 1)}
             className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-current/20 px-2.5 py-1.5 text-xs font-medium hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:hover:bg-white/5"
           >
             <RefreshCw size={13} aria-hidden="true" />
             {t("retry")}
-          </button>
+          </Button>
         </div>
       ) : null}
 

@@ -14,6 +14,7 @@ interface TooltipProps {
   content: React.ReactNode;
   className?: string;
   children: React.ReactNode;
+  disabled?: boolean;
   trigger?: "hover" | "click";
   position?: "top" | "bottom" | "left" | "right";
   autoDismissMs?: number;
@@ -38,6 +39,7 @@ const Tooltip: React.FC<TooltipProps> = ({
   content,
   className = "",
   children,
+  disabled = false,
   trigger = "hover",
   position = "top",
   autoDismissMs = DEFAULT_AUTO_DISMISS_MS,
@@ -122,10 +124,10 @@ const Tooltip: React.FC<TooltipProps> = ({
   }, [autoDismissMs, clearDismissTimer]);
 
   const showTooltip = useCallback(() => {
-    if (dismissedUntilNextTriggerRef.current) return;
+    if (disabled || dismissedUntilNextTriggerRef.current) return;
     setIsVisible(true);
     startDismissTimer();
-  }, [startDismissTimer]);
+  }, [disabled, startDismissTimer]);
 
   const hideTooltip = useCallback(
     (lockUntilNextTrigger = false) => {
@@ -142,6 +144,10 @@ const Tooltip: React.FC<TooltipProps> = ({
   }, [hideTooltip]);
 
   useEffect(() => clearDismissTimer, [clearDismissTimer]);
+
+  useEffect(() => {
+    if (disabled) hideTooltip(false);
+  }, [disabled, hideTooltip]);
 
   useEffect(() => {
     if (!portal) return;
@@ -164,6 +170,8 @@ const Tooltip: React.FC<TooltipProps> = ({
   }, [isVisible, portal, updatePortalPosition]);
 
   const describedChildren = useMemo(() => {
+    if (disabled) return children;
+
     const childArray = React.Children.toArray(children);
     if (childArray.length !== 1 || !React.isValidElement(childArray[0])) {
       return children;
@@ -179,7 +187,7 @@ const Tooltip: React.FC<TooltipProps> = ({
     return React.cloneElement(child, {
       "aria-describedby": describedBy,
     });
-  }, [children, tooltipId]);
+  }, [children, disabled, tooltipId]);
 
   const tooltipClassName = `glass-popover ${
     portal ? "fixed z-9999" : "absolute z-101"
@@ -228,7 +236,11 @@ const Tooltip: React.FC<TooltipProps> = ({
       }}
     >
       {describedChildren}
-      {canUsePortal ? createPortal(tooltipNode, document.body) : tooltipNode}
+      {disabled
+        ? null
+        : canUsePortal
+          ? createPortal(tooltipNode, document.body)
+          : tooltipNode}
     </div>
   );
 };

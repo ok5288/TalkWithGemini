@@ -118,6 +118,7 @@ import {
   ShortcutTooltipContent,
   useShortcutPresentation,
 } from "@/components/shortcuts/ShortcutHint";
+import { Button } from "@/components/ui/primitives";
 
 type MessageInputVariant = "default" | "hero";
 type AttachmentProcessingStage =
@@ -1381,14 +1382,15 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
             className="absolute -top-10 left-0 right-0 flex justify-center z-50 animate-in fade-in slide-in-from-bottom-2"
           >
             <div className="bg-red-600 text-white text-xs px-3 py-1.5 rounded-full shadow-lg font-medium flex items-center gap-2 dark:bg-red-500">
-              <button
+              <Button
+                variant="bare"
                 type="button"
                 aria-label={t("dismissError")}
                 className={`rounded-full p-0.5 hover:bg-white/15 transition-colors ${iconButtonFocusClass}`}
                 onClick={() => setErrorMsg(null)}
               >
                 <X size={12} aria-hidden="true" />
-              </button>
+              </Button>
               <span>{errorMsg}</span>
             </div>
           </div>
@@ -1425,7 +1427,8 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
         {/* Attachments Preview Area */}
         {replyTo ? (
           <div className="mx-3 mt-3 flex items-start gap-2 rounded-lg border border-border/70 bg-muted/35 px-3 py-2 text-xs text-muted-foreground">
-            <button
+            <Button
+              variant="bare"
               type="button"
               onClick={() => onNavigateReply?.(replyTo.messageId)}
               className={`flex min-w-0 flex-1 items-start gap-2 rounded text-left transition-colors hover:text-foreground ${iconButtonFocusClass}`}
@@ -1435,15 +1438,16 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
               <span className="line-clamp-2 wrap-break-word">
                 {replyTo.excerpt || t("replySourceUnavailable")}
               </span>
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="bare"
               type="button"
               onClick={onCancelReply}
               className={`shrink-0 rounded p-0.5 transition-colors hover:bg-accent hover:text-foreground ${iconButtonFocusClass}`}
               aria-label={t("cancelReply")}
             >
               <X size={13} aria-hidden="true" />
-            </button>
+            </Button>
           </div>
         ) : null}
 
@@ -1541,7 +1545,8 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
               >
                 <Tooltip content={t("attach")} position="top">
                   <DropdownMenuTrigger asChild>
-                    <button
+                    <Button
+                      variant="bare"
                       type="button"
                       aria-label={t("attachFiles")}
                       aria-pressed={hasKnowledgeAttachments}
@@ -1553,7 +1558,7 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
                       disabled={attachmentActionsDisabled}
                     >
                       <Paperclip size={16} aria-hidden="true" />
-                    </button>
+                    </Button>
                   </DropdownMenuTrigger>
                 </Tooltip>
 
@@ -1653,7 +1658,8 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
                   position="top"
                 >
                   <DropdownMenuTrigger asChild>
-                    <button
+                    <Button
+                      variant="bare"
                       type="button"
                       aria-label={
                         activeSkillIds.length > 0
@@ -1670,7 +1676,7 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
                       disabled={isInputBusy}
                     >
                       <Sparkles size={16} aria-hidden="true" />
-                    </button>
+                    </Button>
                   </DropdownMenuTrigger>
                 </Tooltip>
 
@@ -1741,7 +1747,8 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
                   position="top"
                 >
                   <DropdownMenuTrigger asChild>
-                    <button
+                    <Button
+                      variant="bare"
                       type="button"
                       aria-label={
                         activePlugins.length > 0
@@ -1754,7 +1761,7 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
                       disabled={isInputBusy || !modelCapabilities.toolCall}
                     >
                       <Blocks size={16} aria-hidden="true" />
-                    </button>
+                    </Button>
                   </DropdownMenuTrigger>
                 </Tooltip>
 
@@ -1902,7 +1909,8 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
                     position="top"
                   >
                     <DropdownMenuTrigger asChild>
-                      <button
+                      <Button
+                        variant="bare"
                         type="button"
                         aria-label={t("reasoningModeAria", {
                           mode: currentReasoningOption.label,
@@ -1916,7 +1924,7 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
                         disabled={isInputBusy}
                       >
                         <Lightbulb size={16} aria-hidden="true" />
-                      </button>
+                      </Button>
                     </DropdownMenuTrigger>
                   </Tooltip>
 
@@ -1967,7 +1975,8 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
             {onToggleSearch && (
               <div>
                 <Tooltip content={searchToggleTooltip} position="top">
-                  <button
+                  <Button
+                    variant="bare"
                     type="button"
                     aria-label={searchToggleAriaLabel}
                     aria-pressed={
@@ -1984,7 +1993,7 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
                     disabled={isInputBusy}
                   >
                     <Globe size={16} aria-hidden="true" />
-                  </button>
+                  </Button>
                 </Tooltip>
               </div>
             )}
@@ -1992,7 +2001,8 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
             {/* Agent Mode Button */}
             <div>
               <Tooltip content={agentModeTooltip} position="top">
-                <button
+                <Button
+                  variant="bare"
                   type="button"
                   aria-label={agentModeTooltip}
                   aria-pressed={
@@ -2010,7 +2020,7 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
                   disabled={isInputBusy}
                 >
                   <Bot size={16} aria-hidden="true" />
-                </button>
+                </Button>
               </Tooltip>
             </div>
           </div>
@@ -2030,7 +2040,8 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
               >
                 <Tooltip content={currentModelName} position="top" portal>
                   <DropdownMenuTrigger asChild>
-                    <button
+                    <Button
+                      variant="bare"
                       type="button"
                       aria-label={t("selectModelAria", {
                         model: currentModelName,
@@ -2052,7 +2063,7 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
                           className={`opacity-50 transition-[opacity,transform] duration-200 group-hover:opacity-100 ${showModelSelect ? "rotate-180" : ""}`}
                         />
                       </div>
-                    </button>
+                    </Button>
                   </DropdownMenuTrigger>
                 </Tooltip>
 
@@ -2107,7 +2118,8 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
                 }
                 position="top"
               >
-                <button
+                <Button
+                  variant="bare"
                   type="button"
                   aria-label={t("polishTextAria")}
                   aria-busy={isPolishingInput || undefined}
@@ -2130,7 +2142,7 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
                   ) : (
                     <PencilSparkles size={16} aria-hidden="true" />
                   )}
-                </button>
+                </Button>
               </Tooltip>
             </div>
 
@@ -2147,7 +2159,8 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
                     }
                     position="top"
                   >
-                    <button
+                    <Button
+                      variant="bare"
                       type="button"
                       aria-label={t("stopGenerationAria")}
                       aria-keyshortcuts={
@@ -2170,10 +2183,11 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
                           className="absolute inset-0 opacity-0 scale-75 transition-[opacity,transform] duration-300 group-hover:opacity-100 group-hover:scale-100"
                         />
                       </div>
-                    </button>
+                    </Button>
                   </Tooltip>
                 ) : (
-                  <button
+                  <Button
+                    variant="bare"
                     type="button"
                     aria-label={t("working")}
                     aria-busy="true"
@@ -2184,11 +2198,12 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
                       className="animate-spin"
                       aria-hidden="true"
                     />
-                  </button>
+                  </Button>
                 )
               ) : input || attachments.length > 0 ? (
                 <Tooltip content={t("sendMessage")} position="top">
-                  <button
+                  <Button
+                    variant="bare"
                     type="button"
                     aria-label={t("sendMessageAria")}
                     disabled={offline || !selectedModel || isParsingAttachments}
@@ -2196,7 +2211,7 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
                     onClick={() => void handleSend()}
                   >
                     <SendHorizontal size={16} aria-hidden="true" />
-                  </button>
+                  </Button>
                 </Tooltip>
               ) : (
                 <div className="relative">
@@ -2219,7 +2234,8 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
                     }
                     position="top"
                   >
-                    <button
+                    <Button
+                      variant="bare"
                       type="button"
                       aria-label={
                         isRecording
@@ -2240,7 +2256,7 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
                       ) : (
                         <Mic size={16} aria-hidden="true" />
                       )}
-                    </button>
+                    </Button>
                   </Tooltip>
                 </div>
               )}

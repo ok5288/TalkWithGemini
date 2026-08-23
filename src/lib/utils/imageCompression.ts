@@ -18,7 +18,7 @@ const SUPPORTED_IMAGE_MIME_TYPES = new Set([
 ]);
 
 const BYTES_PER_MEGABYTE = 1024 * 1024;
-const HEIC_CONVERTER_MODULE_URL = "/vendor/heic-to-csp.mjs";
+const HEIC_CONVERTER_SCRIPT_URL = "/heic-to.min.js";
 
 export interface ImageCompressionConfig {
   enabled: boolean;
@@ -44,19 +44,45 @@ export type HeicConverter = (options: {
   quality: number;
 }) => Promise<Blob>;
 
-type HeicConverterModule = {
-  heicTo: HeicConverter;
-};
+let heicConverterPromise: Promise<HeicConverter> | undefined;
+
+function getLoadedHeicConverter(): HeicConverter | undefined {
+  const heicTo = Reflect.get(globalThis, "HeicTo");
+  return typeof heicTo === "function" ? (heicTo as HeicConverter) : undefined;
+}
 
 async function loadHeicConverter(): Promise<HeicConverter> {
-  const moduleUrl = new URL(HEIC_CONVERTER_MODULE_URL, window.location.origin)
-    .href;
-  const vendorModule = (await import(
-    /* webpackIgnore: true */
-    /* turbopackIgnore: true */
-    moduleUrl
-  )) as HeicConverterModule;
-  return vendorModule.heicTo;
+  const loadedConverter = getLoadedHeicConverter();
+  if (loadedConverter) return loadedConverter;
+
+  if (typeof document === "undefined") {
+    throw new Error("HEIC conversion is only available in the browser.");
+  }
+
+  heicConverterPromise ??= new Promise<HeicConverter>((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = HEIC_CONVERTER_SCRIPT_URL;
+    script.async = true;
+    script.onload = () => {
+      const converter = getLoadedHeicConverter();
+      if (converter) {
+        resolve(converter);
+        return;
+      }
+      script.remove();
+      reject(new Error("HEIC converter did not initialize."));
+    };
+    script.onerror = () => {
+      script.remove();
+      reject(new Error("Failed to load the HEIC converter."));
+    };
+    document.head.append(script);
+  }).catch((error) => {
+    heicConverterPromise = undefined;
+    throw error;
+  });
+
+  return heicConverterPromise;
 }
 
 export interface ImageCompressionRuntimeOptions {

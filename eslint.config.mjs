@@ -15,7 +15,7 @@ const eslintConfig = defineConfig([
     ".open-next/**",
     ".wrangler/**",
     "cloudflare-env.d.ts",
-    "public/vendor/**",
+    "public/heic-to.min.js",
     "tmp/**",
   ]),
   {

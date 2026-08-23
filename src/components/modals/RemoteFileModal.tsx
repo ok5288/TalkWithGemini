@@ -17,6 +17,7 @@ import {
   trapModalFocus,
   useModalLifecycle,
 } from "@/components/ui/useModalLifecycle";
+import { Button } from "@/components/ui/primitives";
 
 interface RemoteFileModalProps {
   onClose: () => void;
@@ -242,14 +243,15 @@ const RemoteFileModal: React.FC<RemoteFileModalProps> = ({
             <Link size={20} className="text-blue-500" aria-hidden="true" />{" "}
             {t("title")}
           </h3>
-          <button
+          <Button
+            variant="bare"
             type="button"
             aria-label={t("close")}
             onClick={onClose}
             className="p-1.5 hover:bg-gray-200/50 dark:hover:bg-accent/50 rounded-full transition-colors text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
           >
             <X size={18} aria-hidden="true" />
-          </button>
+          </Button>
         </div>
 
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
@@ -273,7 +275,8 @@ const RemoteFileModal: React.FC<RemoteFileModalProps> = ({
                     }
                   >
                     <DropdownMenuTrigger asChild>
-                      <button
+                      <Button
+                        variant="bare"
                         type="button"
                         aria-label={t("fileTypeAria", {
                           type: typeLabel(selectedType),
@@ -291,7 +294,7 @@ const RemoteFileModal: React.FC<RemoteFileModalProps> = ({
                             className={`text-gray-400 transition-transform ${showTypeDropdown ? "rotate-180" : ""}`}
                           />
                         )}
-                      </button>
+                      </Button>
                     </DropdownMenuTrigger>
 
                     <DropdownMenuContent
@@ -363,20 +366,22 @@ const RemoteFileModal: React.FC<RemoteFileModalProps> = ({
           </div>
 
           <div className="p-5 border-t border-gray-200/50 dark:border-border bg-gray-50/50 dark:bg-card/50 flex justify-end gap-3 rounded-b-2xl">
-            <button
+            <Button
+              variant="bare"
               type="button"
               onClick={onClose}
               className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-muted-foreground hover:bg-white dark:hover:bg-muted rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
             >
               {t("cancel")}
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="bare"
               type="submit"
               disabled={!url.trim() || !!urlError}
               className="px-6 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-lg shadow-blue-500/20 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
             >
               <Check size={16} aria-hidden="true" /> {t("attach")}
-            </button>
+            </Button>
           </div>
         </form>
       </div>

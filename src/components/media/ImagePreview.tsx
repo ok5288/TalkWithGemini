@@ -17,6 +17,7 @@ import {
   trapModalFocus,
   useModalLifecycle,
 } from "@/components/ui/useModalLifecycle";
+import { Button } from "@/components/ui/primitives";
 
 const ResolvedImage = ({
   image,
@@ -237,7 +238,8 @@ const ImagePreview = () => {
         </div>
 
         <div className="flex items-center gap-2">
-          <button
+          <Button
+            variant="bare"
             ref={closeButtonRef}
             type="button"
             onClick={closeImagePreview}
@@ -245,7 +247,7 @@ const ImagePreview = () => {
             className="p-2 rounded-full bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 text-gray-800 dark:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-background"
           >
             <X size={20} aria-hidden="true" />
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -253,7 +255,8 @@ const ImagePreview = () => {
       <div className="flex-1 relative overflow-hidden flex items-center justify-center p-4">
         {/* Previous Button */}
         {images.length > 1 && (
-          <button
+          <Button
+            variant="bare"
             type="button"
             className="absolute left-4 top-1/2 -translate-y-1/2 z-40 p-3 rounded-full bg-black/50 text-white backdrop-blur-md hover:bg-black/70 transition-[background-color,border-color,box-shadow] border border-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/80"
             aria-label={t("previous")}
@@ -263,12 +266,13 @@ const ImagePreview = () => {
             }}
           >
             <ChevronLeft size={24} aria-hidden="true" />
-          </button>
+          </Button>
         )}
 
         {/* Next Button */}
         {images.length > 1 && (
-          <button
+          <Button
+            variant="bare"
             type="button"
             className="absolute right-4 top-1/2 -translate-y-1/2 z-40 p-3 rounded-full bg-black/50 text-white backdrop-blur-md hover:bg-black/70 transition-[background-color,border-color,box-shadow] border border-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/80"
             aria-label={t("next")}
@@ -278,7 +282,7 @@ const ImagePreview = () => {
             }}
           >
             <ChevronRight size={24} aria-hidden="true" />
-          </button>
+          </Button>
         )}
 
         {/* Image Zoom Container */}
@@ -296,30 +300,33 @@ const ImagePreview = () => {
             {({ zoomIn, zoomOut, resetTransform }) => (
               <>
                 <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 p-1.5 rounded-full bg-black/50 backdrop-blur-md border border-white/10 text-white">
-                  <button
+                  <Button
+                    variant="bare"
                     type="button"
                     onClick={() => zoomOut()}
                     aria-label={t("zoomOut")}
                     className="p-2 hover:bg-white/20 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/80"
                   >
                     <ZoomOut size={16} aria-hidden="true" />
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    variant="bare"
                     type="button"
                     onClick={() => resetTransform()}
                     aria-label={t("resetZoom")}
                     className="p-2 hover:bg-white/20 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/80"
                   >
                     <RotateCcw size={16} aria-hidden="true" />
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    variant="bare"
                     type="button"
                     onClick={() => zoomIn()}
                     aria-label={t("zoomIn")}
                     className="p-2 hover:bg-white/20 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/80"
                   >
                     <ZoomIn size={16} aria-hidden="true" />
-                  </button>
+                  </Button>
                 </div>
 
                 <TransformComponent

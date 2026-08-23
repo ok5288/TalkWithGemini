@@ -31,6 +31,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/primitives";
 
 interface Version {
   id: string;
@@ -306,21 +307,23 @@ const Artifact: React.FC<ArtifactProps> = ({
                 />{" "}
                 {t("versionHistory")}
               </span>
-              <button
+              <Button
+                variant="bare"
                 type="button"
                 aria-label={t("closeVersionHistory")}
                 onClick={() => setShowHistory(false)}
                 className={`p-1 hover:bg-black/5 dark:hover:bg-accent rounded-full transition-colors ${artifactFocusClass}`}
               >
                 <X size={14} className="text-gray-500" aria-hidden="true" />
-              </button>
+              </Button>
             </div>
             <div
               className="flex-1 overflow-y-auto p-2 space-y-2 custom-scrollbar"
               role="list"
             >
               {versions.map((v, i) => (
-                <button
+                <Button
+                  variant="bare"
                   type="button"
                   key={v.id}
                   onClick={() => restoreVersion(v)}
@@ -350,7 +353,7 @@ const Artifact: React.FC<ArtifactProps> = ({
                   <div className="text-xs text-gray-700 dark:text-foreground/85 line-clamp-4 leading-relaxed font-mono opacity-90 break-all">
                     {v.content}
                   </div>
-                </button>
+                </Button>
               ))}
             </div>
           </aside>
@@ -596,7 +599,8 @@ const Artifact: React.FC<ArtifactProps> = ({
         {/* Right Side Actions */}
         <div className="flex items-center gap-2">
           <Tooltip content={t("versionHistory")} position="top">
-            <button
+            <Button
+              variant="bare"
               type="button"
               aria-label={t("toggleVersionHistory")}
               aria-pressed={showHistory}
@@ -610,17 +614,19 @@ const Artifact: React.FC<ArtifactProps> = ({
               }`}
             >
               <History size={16} aria-hidden="true" />
-            </button>
+            </Button>
           </Tooltip>
 
-          <button
+          <Button
+            variant="bare"
             type="button"
             onClick={onCancel}
             className={`px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-muted-foreground hover:bg-white/50 dark:hover:bg-accent/50 rounded-lg transition-colors ${artifactFocusClass}`}
           >
             {t("cancel")}
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="bare"
             type="button"
             onClick={() => onSave(content)}
             disabled={isProcessing}
@@ -628,7 +634,7 @@ const Artifact: React.FC<ArtifactProps> = ({
             className={`px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg transition-colors flex items-center gap-1 shadow-md disabled:opacity-50 disabled:cursor-not-allowed ${artifactFocusClass}`}
           >
             <Check size={14} aria-hidden="true" /> {t("save")}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -659,7 +665,8 @@ const ArtifactButton = React.forwardRef<HTMLButtonElement, ArtifactButtonProps>(
     },
     ref,
   ) => (
-    <button
+    <Button
+      variant="bare"
       {...props}
       ref={ref}
       type="button"
@@ -678,7 +685,7 @@ const ArtifactButton = React.forwardRef<HTMLButtonElement, ArtifactButtonProps>(
     >
       {withHiddenIcon(icon)}
       <span className="hidden sm:inline">{label}</span>
-    </button>
+    </Button>
   ),
 );
 ArtifactButton.displayName = "ArtifactButton";

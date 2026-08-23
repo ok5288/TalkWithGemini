@@ -4,6 +4,7 @@ import { Lightbulb, LoaderCircle, ChevronDown } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import MarkdownRenderer from "./MarkdownRenderer";
 import { extractReasoningTitle } from "@/lib/utils/reasoningDisplay";
+import { Button } from "@/components/ui/primitives";
 
 interface ReasoningBlockProps {
   reasoning: string;
@@ -60,7 +61,8 @@ const ReasoningBlock: React.FC<ReasoningBlockProps> = ({
 
   return (
     <div className="mb-3 overflow-hidden rounded-lg border border-gray-200 bg-gray-50/50 transition-[border-color,background-color,box-shadow] duration-300 dark:border-border dark:bg-muted/30">
-      <button
+      <Button
+        variant="bare"
         type="button"
         aria-expanded={isExpanded}
         aria-controls={panelId}
@@ -97,7 +99,7 @@ const ReasoningBlock: React.FC<ReasoningBlockProps> = ({
           className={`transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`}
           aria-hidden="true"
         />
-      </button>
+      </Button>
 
       <div
         id={panelId}

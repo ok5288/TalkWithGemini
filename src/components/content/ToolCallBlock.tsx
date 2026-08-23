@@ -25,6 +25,7 @@ import { redactSensitiveToolArgs } from "@/lib/plugin/confirmation";
 import { useAttachmentDisplayUrl } from "@/lib/utils/useAttachmentDisplayUrl";
 import { useUIStore } from "@/store/core/uiStore";
 import SafeImage from "../ui/SafeImage";
+import { Button } from "@/components/ui/primitives";
 
 interface ToolCallBlockProps {
   toolCalls: ToolCall[];
@@ -62,7 +63,8 @@ const ToolResultImage: React.FC<{ image: Attachment }> = ({ image }) => {
   const src = useAttachmentDisplayUrl(image);
 
   return (
-    <button
+    <Button
+      variant="bare"
       type="button"
       disabled={!src}
       onClick={() => {
@@ -91,7 +93,7 @@ const ToolResultImage: React.FC<{ image: Attachment }> = ({ image }) => {
           </div>
         }
       />
-    </button>
+    </Button>
   );
 };
 
@@ -184,7 +186,8 @@ const ToolCallBlock: React.FC<ToolCallBlockProps> = ({
 
   return (
     <div className="mb-3 overflow-hidden rounded-lg border border-gray-200 bg-gray-50/50 transition-[border-color,background-color,box-shadow] duration-300 dark:border-border dark:bg-muted/30">
-      <button
+      <Button
+        variant="bare"
         type="button"
         aria-expanded={isExpanded}
         aria-controls={panelId}
@@ -215,7 +218,7 @@ const ToolCallBlock: React.FC<ToolCallBlockProps> = ({
           className={`transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`}
           aria-hidden="true"
         />
-      </button>
+      </Button>
 
       <div
         id={panelId}
@@ -319,7 +322,8 @@ const ToolCallBlock: React.FC<ToolCallBlockProps> = ({
                       })}
                     </p>
                     <div className="mt-2 flex flex-wrap gap-2">
-                      <button
+                      <Button
+                        variant="bare"
                         type="button"
                         onClick={() =>
                           onConfirmationDecision(tc.id, "allow_once")
@@ -327,9 +331,10 @@ const ToolCallBlock: React.FC<ToolCallBlockProps> = ({
                         className="rounded bg-amber-600 px-2.5 py-1 font-medium text-white hover:bg-amber-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
                       >
                         {t("allowOnce")}
-                      </button>
+                      </Button>
                       {tc.risk === "write" || tc.risk === "external" ? (
-                        <button
+                        <Button
+                          variant="bare"
                           type="button"
                           onClick={() =>
                             onConfirmationDecision(tc.id, "allow_session")
@@ -337,28 +342,30 @@ const ToolCallBlock: React.FC<ToolCallBlockProps> = ({
                           className="rounded border border-amber-400 bg-white px-2.5 py-1 font-medium text-amber-900 hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 dark:bg-transparent dark:text-amber-100 dark:hover:bg-amber-950/60"
                         >
                           {t("allowSession")}
-                        </button>
+                        </Button>
                       ) : null}
-                      <button
+                      <Button
+                        variant="bare"
                         type="button"
                         onClick={() => onConfirmationDecision(tc.id, "deny")}
                         className="rounded border border-gray-300 bg-white px-2.5 py-1 font-medium text-gray-700 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 dark:border-border dark:bg-card dark:text-foreground dark:hover:bg-accent"
                       >
                         {t("denyTool")}
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 ) : null}
 
                 {tc.confirmation?.decision === "allow_session" &&
                 onRevokeSessionApproval ? (
-                  <button
+                  <Button
+                    variant="bare"
                     type="button"
                     onClick={() => onRevokeSessionApproval(tc)}
                     className="mb-2 rounded border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 dark:border-border dark:bg-card dark:text-foreground dark:hover:bg-accent"
                   >
                     {t("revokeSessionApproval")}
-                  </button>
+                  </Button>
                 ) : null}
 
                 <div className="mb-1 max-h-72 overflow-auto rounded bg-gray-100 p-2 font-mono text-gray-600 dark:bg-muted dark:text-foreground/85">

@@ -7,6 +7,7 @@ import { RefreshCw, WifiOff } from "lucide-react";
 import { disableNeoChatPwa, registerNeoChatPwa } from "@/lib/pwa/lifecycle";
 import { shouldEnablePwa } from "@/lib/pwa/policy";
 import type { DeploymentMode } from "@/lib/security/deployment";
+import { Button } from "@/components/ui/primitives";
 
 interface PwaLifecycleProps {
   deploymentMode: DeploymentMode;
@@ -177,13 +178,14 @@ export default function PwaLifecycle({ deploymentMode }: PwaLifecycleProps) {
         <>
           <RefreshCw className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
           <span>{t("pwaUpdateReady")}</span>
-          <button
+          <Button
+            variant="bare"
             className="rounded-md bg-zinc-900 px-2.5 py-1.5 text-xs font-medium text-white transition-colors hover:bg-zinc-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-500 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white"
             type="button"
             onClick={activateUpdate}
           >
             {t("pwaReload")}
-          </button>
+          </Button>
         </>
       )}
     </div>

@@ -46,6 +46,7 @@ import type { MarketLoadResult } from "@/lib/market/loadResult";
 import MarketLoadNotice from "@/components/ui/MarketLoadNotice";
 import SkillParameterEditor from "./SkillParameterEditor";
 import SkillBundleEditor from "./SkillBundleEditor";
+import { Button } from "@/components/ui/primitives";
 
 interface SkillMarketProps {
   onClose: () => void;
@@ -287,7 +288,8 @@ const SkillEditorModal = ({
             <Sparkles size={20} className="text-emerald-500" />
             {skill ? t("editSkill") : t("createSkill")}
           </h2>
-          <button
+          <Button
+            variant="bare"
             ref={closeButtonRef}
             type="button"
             aria-label={t("closeEditor")}
@@ -295,7 +297,7 @@ const SkillEditorModal = ({
             className="rounded-full p-1 text-gray-500 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 dark:hover:bg-muted"
           >
             <X size={20} aria-hidden="true" />
-          </button>
+          </Button>
         </div>
 
         <div className="grid flex-1 gap-4 overflow-y-auto pr-1 custom-scrollbar md:grid-cols-2">
@@ -387,18 +389,20 @@ const SkillEditorModal = ({
                 placeholder={t("tagPlaceholder")}
                 className="min-w-0 flex-1 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm outline-none focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/20 dark:border-border dark:bg-muted"
               />
-              <button
+              <Button
+                variant="bare"
                 type="button"
                 aria-label={t("addTagAria")}
                 onClick={addTag}
                 className="rounded-xl bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-600 hover:bg-emerald-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 dark:bg-emerald-900/20 dark:text-emerald-300"
               >
                 <Plus size={16} aria-hidden="true" />
-              </button>
+              </Button>
             </div>
             <div className="flex flex-wrap gap-1.5">
               {draft.tags.map((tag) => (
-                <button
+                <Button
+                  variant="bare"
                   key={tag}
                   type="button"
                   aria-label={t("removeTagAria", { tag })}
@@ -410,7 +414,7 @@ const SkillEditorModal = ({
                   className="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-600 hover:bg-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 dark:bg-muted dark:text-foreground/80"
                 >
                   {tag}
-                </button>
+                </Button>
               ))}
             </div>
           </div>
@@ -427,7 +431,8 @@ const SkillEditorModal = ({
 
         <div className="flex items-center justify-between gap-3 pt-2">
           {skill && onDelete ? (
-            <button
+            <Button
+              variant="bare"
               type="button"
               onClick={() => {
                 if (!isDeleteConfirming) {
@@ -441,26 +446,28 @@ const SkillEditorModal = ({
             >
               <Trash2 size={14} aria-hidden="true" />
               {isDeleteConfirming ? t("confirmDelete") : t("delete")}
-            </button>
+            </Button>
           ) : (
             <span />
           )}
           <div className="flex gap-2">
-            <button
+            <Button
+              variant="bare"
               type="button"
               onClick={onClose}
               className="rounded-lg px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 dark:text-foreground/85 dark:hover:bg-muted"
             >
               {t("cancel")}
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="bare"
               type="button"
               onClick={handleSave}
               className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
             >
               <Save size={14} aria-hidden="true" />
               {t("save")}
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -535,14 +542,16 @@ const SkillCard = ({
         <div className="flex shrink-0 items-center gap-1">
           {isInstalled ? (
             <>
-              <button
+              <Button
+                variant="bare"
                 type="button"
                 onClick={onEdit}
                 className="rounded-lg px-2 py-1 text-xs font-medium text-emerald-600 hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 dark:text-emerald-300 dark:hover:bg-emerald-900/20"
               >
                 {t("edit")}
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="bare"
                 type="button"
                 aria-label={t("uninstallSkillAria", { title: skill.title })}
                 onClick={onUninstall}
@@ -550,10 +559,11 @@ const SkillCard = ({
               >
                 <Trash2 size={13} aria-hidden="true" />
                 {isUninstallConfirming ? t("confirmUninstall") : t("uninstall")}
-              </button>
+              </Button>
             </>
           ) : (
-            <button
+            <Button
+              variant="bare"
               type="button"
               aria-label={t("installSkillAria", { title: skill.title })}
               aria-busy={isBusy || undefined}
@@ -571,7 +581,7 @@ const SkillCard = ({
                 <Download size={13} aria-hidden="true" />
               )}
               {t("install")}
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -789,7 +799,8 @@ const SkillMarket: React.FC<SkillMarketProps> = ({ onClose }) => {
         onOpenChange={setShowCategoryFilter}
       >
         <DropdownMenuTrigger asChild>
-          <button
+          <Button
+            variant="bare"
             type="button"
             aria-label={
               selectedCategories.length > 0
@@ -812,7 +823,7 @@ const SkillMarket: React.FC<SkillMarketProps> = ({ onClose }) => {
                   })
                 : t("filter")}
             </span>
-          </button>
+          </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent
           side="bottom"
@@ -904,7 +915,8 @@ const SkillMarket: React.FC<SkillMarketProps> = ({ onClose }) => {
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <button
+          <Button
+            variant="bare"
             type="button"
             aria-label={t("refreshAria")}
             aria-busy={isRefreshing || undefined}
@@ -917,15 +929,16 @@ const SkillMarket: React.FC<SkillMarketProps> = ({ onClose }) => {
             ) : (
               <RefreshCw size={18} aria-hidden="true" />
             )}
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="bare"
             type="button"
             aria-label={t("closeMarket")}
             onClick={onClose}
             className="rounded-full p-2 text-gray-500 transition-colors hover:bg-gray-200/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 dark:text-muted-foreground dark:hover:bg-accent/50"
           >
             <X size={20} aria-hidden="true" />
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -987,7 +1000,8 @@ const SkillMarket: React.FC<SkillMarketProps> = ({ onClose }) => {
                   {t("bundles.headingDescription")}
                 </p>
               </div>
-              <button
+              <Button
+                variant="bare"
                 type="button"
                 onClick={() => {
                   setEditingBundle(undefined);
@@ -998,7 +1012,7 @@ const SkillMarket: React.FC<SkillMarketProps> = ({ onClose }) => {
               >
                 <Plus size={14} aria-hidden="true" />
                 {t("bundles.new")}
-              </button>
+              </Button>
             </div>
             {skillBundles.length > 0 ? (
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -1024,7 +1038,8 @@ const SkillMarket: React.FC<SkillMarketProps> = ({ onClose }) => {
                               })}
                           </p>
                         </div>
-                        <button
+                        <Button
+                          variant="bare"
                           type="button"
                           role="switch"
                           aria-checked={isActive}
@@ -1035,7 +1050,7 @@ const SkillMarket: React.FC<SkillMarketProps> = ({ onClose }) => {
                           {isActive
                             ? t("bundles.active")
                             : t("bundles.inactive")}
-                        </button>
+                        </Button>
                       </div>
                       <div className="mt-3 flex flex-wrap gap-1">
                         {bundle.steps.map((step, index) => (
@@ -1052,7 +1067,8 @@ const SkillMarket: React.FC<SkillMarketProps> = ({ onClose }) => {
                           {t("bundles.invalidMissing")}
                         </p>
                       ) : null}
-                      <button
+                      <Button
+                        variant="bare"
                         type="button"
                         onClick={() => {
                           setEditingBundle(bundle);
@@ -1061,7 +1077,7 @@ const SkillMarket: React.FC<SkillMarketProps> = ({ onClose }) => {
                         className="mt-4 self-end rounded-lg px-2 py-1 text-xs font-medium text-cyan-700 hover:bg-cyan-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/60 dark:text-cyan-300 dark:hover:bg-cyan-950/30"
                       >
                         {t("edit")}
-                      </button>
+                      </Button>
                     </div>
                   );
                 })}
@@ -1079,7 +1095,8 @@ const SkillMarket: React.FC<SkillMarketProps> = ({ onClose }) => {
                 <Sparkles size={16} className="text-emerald-500" />
                 <span className="truncate">{t("installedSkills")}</span>
               </h2>
-              <button
+              <Button
+                variant="bare"
                 type="button"
                 aria-label={t("createCustomAria")}
                 onClick={() => {
@@ -1089,7 +1106,7 @@ const SkillMarket: React.FC<SkillMarketProps> = ({ onClose }) => {
                 className="flex shrink-0 items-center gap-1 rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-600 transition-colors hover:bg-emerald-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 dark:bg-emerald-900/20 dark:text-emerald-300"
               >
                 <Plus size={14} aria-hidden="true" /> {t("custom")}
-              </button>
+              </Button>
             </div>
             {filteredInstalledSkills.length > 0 ? (
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -1164,7 +1181,8 @@ const SkillMarket: React.FC<SkillMarketProps> = ({ onClose }) => {
                   )}
                 {totalPages > 1 && (
                   <div className="mt-auto flex items-center justify-center gap-4 py-6">
-                    <button
+                    <Button
+                      variant="bare"
                       type="button"
                       aria-label={t("prevPageAria")}
                       onClick={() =>
@@ -1174,11 +1192,12 @@ const SkillMarket: React.FC<SkillMarketProps> = ({ onClose }) => {
                       className="rounded-lg border border-gray-200 bg-white p-2 text-gray-600 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 disabled:cursor-not-allowed disabled:opacity-50 dark:border-border dark:bg-muted dark:text-foreground/85 dark:hover:bg-accent"
                     >
                       <ChevronLeft size={16} aria-hidden="true" />
-                    </button>
+                    </Button>
                     <span className="text-sm font-medium tabular-nums text-gray-600 dark:text-foreground/85">
                       {t("pageOf", { currentPage, totalPages })}
                     </span>
-                    <button
+                    <Button
+                      variant="bare"
                       type="button"
                       aria-label={t("nextPageAria")}
                       onClick={() =>
@@ -1188,7 +1207,7 @@ const SkillMarket: React.FC<SkillMarketProps> = ({ onClose }) => {
                       className="rounded-lg border border-gray-200 bg-white p-2 text-gray-600 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 disabled:cursor-not-allowed disabled:opacity-50 dark:border-border dark:bg-muted dark:text-foreground/85 dark:hover:bg-accent"
                     >
                       <ChevronRight size={16} aria-hidden="true" />
-                    </button>
+                    </Button>
                   </div>
                 )}
               </>

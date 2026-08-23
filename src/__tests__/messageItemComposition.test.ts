@@ -5,6 +5,22 @@ import en from "../i18n/locales/en";
 import zh from "../i18n/locales/zh";
 
 describe("MessageItem composition", () => {
+  it("keeps the active model loading indicator below the latest output", () => {
+    const messageItem = readFileSync(
+      resolve(process.cwd(), "src/components/chat/MessageItem.tsx"),
+      "utf8",
+    );
+
+    expect(messageItem).toContain("const isModelResponseLoading =");
+    expect(messageItem).toContain("isLast &&");
+    expect(messageItem).toContain('message.role === "model"');
+    expect(messageItem).toContain("isTyping &&");
+    expect(messageItem.lastIndexOf("<MessageOutputRenderer")).toBeLessThan(
+      messageItem.lastIndexOf("<BubblesLoading"),
+    );
+    expect(messageItem).toContain('aria-label={t("generatingResponse")}');
+  });
+
   it("keeps attachment/media rendering in a dedicated component", () => {
     const messageItem = readFileSync(
       resolve(process.cwd(), "src/components/chat/MessageItem.tsx"),

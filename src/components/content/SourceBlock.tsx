@@ -10,6 +10,7 @@ import {
   getSafeWebHref,
 } from "@/lib/security/clientUrl";
 import { getSourceBlockPresentation } from "@/lib/search/sourceBlock";
+import { Button } from "@/components/ui/primitives";
 
 interface SourceBlockProps {
   sources: Source[];
@@ -72,7 +73,8 @@ const SourceBlock: React.FC<SourceBlockProps> = ({
 
   return (
     <div className="mb-3 overflow-hidden rounded-lg border border-gray-200 bg-gray-50/50 transition-[border-color,background-color,box-shadow] duration-300 dark:border-border dark:bg-muted/30">
-      <button
+      <Button
+        variant="bare"
         type="button"
         disabled={isSearching}
         aria-expanded={isExpanded && !isSearching}
@@ -102,7 +104,7 @@ const SourceBlock: React.FC<SourceBlockProps> = ({
             aria-hidden="true"
           />
         )}
-      </button>
+      </Button>
 
       {/* Animated Expansion Container */}
       <div
@@ -210,7 +212,8 @@ const SourceBlock: React.FC<SourceBlockProps> = ({
                         isLast && presentation.remainingImagesCount > 0;
 
                       return (
-                        <button
+                        <Button
+                          variant="bare"
                           type="button"
                           key={idx}
                           aria-label={
@@ -249,7 +252,7 @@ const SourceBlock: React.FC<SourceBlockProps> = ({
                               })}
                             </div>
                           )}
-                        </button>
+                        </Button>
                       );
                     })}
                   </div>
