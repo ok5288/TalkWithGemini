@@ -36,7 +36,7 @@ type TimeoutHandle = ReturnType<typeof setTimeout>;
 
 const getSafeReactId = (id: string) => id.replace(/[^a-zA-Z0-9_-]/g, "");
 
-function clearTimeoutRef(ref: React.MutableRefObject<TimeoutHandle | null>) {
+function clearTimeoutRef(ref: React.RefObject<TimeoutHandle | null>) {
   if (!ref.current) return;
   clearTimeout(ref.current);
   ref.current = null;
@@ -63,34 +63,37 @@ function useResolvedDiagramTheme(): DiagramTheme {
 
 function buildMermaidThemeVariables(theme: DiagramTheme, enhanced: boolean) {
   const dark = theme === "dark";
+
+  // 关闭 Enhance：低调极简黑白灰风格
   if (!enhanced) {
     return {
       background: "transparent",
-      primaryColor: dark ? "#27272a" : "#f8fafc",
-      primaryTextColor: dark ? "#f4f4f5" : "#18181b",
-      primaryBorderColor: dark ? "#52525b" : "#d4d4d8",
-      lineColor: dark ? "#a1a1aa" : "#71717a",
+      primaryColor: dark ? "#18181b" : "#f1f5f9",
+      primaryTextColor: dark ? "#e2e8f0" : "#0f172a",
+      primaryBorderColor: dark ? "#3f3f46" : "#cbd5e1",
+      lineColor: dark ? "#71717a" : "#94a3b8",
       secondaryColor: dark ? "#18181b" : "#ffffff",
       tertiaryColor: "transparent",
-      textColor: dark ? "#f4f4f5" : "#18181b",
-      fontFamily: "ui-sans-serif, system-ui, sans-serif",
+      textColor: dark ? "#e2e8f0" : "#0f172a",
+      fontFamily: 'Inter, -apple-system, sans-serif',
     };
   }
 
+  // 开启 Enhance：Gemini 质感色彩风格
   return {
     background: "transparent",
-    primaryColor: dark ? "#0f2a37" : "#ecfeff",
-    primaryTextColor: dark ? "#cffafe" : "#155e75",
-    primaryBorderColor: dark ? "#22d3ee" : "#67e8f9",
-    lineColor: dark ? "#34d399" : "#10b981",
-    secondaryColor: dark ? "#102b24" : "#ecfdf5",
-    tertiaryColor: dark ? "#221a3a" : "#f5f3ff",
-    textColor: dark ? "#f4f8ff" : "#0b1324",
-    nodeBorder: dark ? "#22d3ee" : "#06b6d4",
-    mainBkg: dark ? "#0f2a37" : "#ecfeff",
-    clusterBkg: dark ? "#0b1220" : "#f8fbff",
-    clusterBorder: dark ? "#2a4763" : "#a5f3fc",
-    fontFamily: "ui-sans-serif, system-ui, sans-serif",
+    primaryColor: dark ? "#1e1e24" : "#f8fafc",
+    primaryTextColor: dark ? "#e2e8f0" : "#0f172a",
+    primaryBorderColor: dark ? "#3f3f46" : "#cbd5e1",
+    lineColor: dark ? "#818cf8" : "#6366f1",
+    secondaryColor: dark ? "#18181b" : "#ffffff",
+    tertiaryColor: dark ? "#09090b" : "#f1f5f9",
+    textColor: dark ? "#f4f4f5" : "#0f172a",
+    nodeBorder: dark ? "#52525b" : "#94a3b8",
+    mainBkg: dark ? "#18181b" : "#ffffff",
+    clusterBkg: dark ? "rgba(24, 24, 27, 0.5)" : "rgba(248, 250, 252, 0.8)",
+    clusterBorder: dark ? "#27272a" : "#e2e8f0",
+    fontFamily: 'Inter, -apple-system, sans-serif',
   };
 }
 
@@ -243,7 +246,15 @@ const MermaidDiagram = ({
     error: string;
   }>({ status: "idle", svg: "", error: "" });
   const mermaidRenderHostRef = useRef<HTMLDivElement | null>(null);
-  const trimmedSource = source.trim();
+  const trimmedSource = React.useMemo(() => {
+    let src = source.trim();
+    src = src.replace(/^```(?:mermaid)?\n?/i, "").replace(/\n?```$/, "");
+    return src
+      .replace(/&gt;/g, ">")
+      .replace(/&lt;/g, "<")
+      .replace(/&amp;/g, "&");
+  }, [source]);
+  
   const cacheKey = React.useMemo(
     () =>
       JSON.stringify({
@@ -289,11 +300,11 @@ const MermaidDiagram = ({
           const mermaid = module.default;
           mermaid.initialize({
             startOnLoad: false,
-            securityLevel: "strict",
+            securityLevel: "loose",
             suppressErrorRendering: true,
             theme: "base",
-            flowchart: { htmlLabels: false },
-            sequence: { useMaxWidth: true },
+            flowchart: { htmlLabels: true, curve: "basis", padding: 15 },
+            sequence: { useMaxWidth: true, showSequenceNumbers: false },
             themeVariables: buildMermaidThemeVariables(theme, enhanced),
           });
           const result = await mermaid.render(
