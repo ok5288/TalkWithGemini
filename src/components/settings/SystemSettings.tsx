@@ -827,7 +827,7 @@ const SystemSettings = () => {
           checked={system.enableDiagramPrompt ?? false}
           onChange={() =>
             updateSystemSettings({
-              enableDiagramPrompt: !system.enableDiagramPrompt,
+              enableDiagramPrompt: !(system.enableDiagramPrompt ?? false),
             })
           }
         />
