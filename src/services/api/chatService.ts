@@ -632,7 +632,7 @@ export const streamChatResponse = async (
   const agentModeEnabled = config?.useAgentMode === true && toolCallsSupported;
 
   let effectiveNewMessage = newMessage;
-  const { search } = useSettingsStore.getState();
+  const { search, system } = useSettingsStore.getState(); // 👈【修改】提取 system
   const searchConfig =
     search.provider === "google" ? undefined : search.configs[search.provider];
   const searchCompatibility = resolveEffectiveSearchCapability({
@@ -864,6 +864,7 @@ export const streamChatResponse = async (
         effectiveSystemInstruction,
       ),
       effectiveSystemInstruction,
+      system, // 👈【增加】使用 system
     );
     const compressedRequestAttachments = await compressImageAttachments(
       attachments,
