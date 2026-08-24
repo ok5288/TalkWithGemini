@@ -74,6 +74,7 @@ export const DEFAULT_SYSTEM_SETTINGS = {
   imageCompressionMaxWidthOrHeight: 1024,
   enableCodeCollapse: false,
   enableHtmlVisualPrompt: true,
+  enableDiagramPrompt: false,
   enableDestructiveToolConfirmation: true,
   fontSize: "medium",
 } as const satisfies SystemSettings;
