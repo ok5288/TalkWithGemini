@@ -157,6 +157,7 @@ const htmlSanitizeSchema = {
     new Set([...(defaultSchema.strip || []), ...UNSAFE_HTML_TAGS]),
   ),
   attributes: {
+    "*": ["className", "id", "style"], // 👈 仅增加这一行：允许卡片及任意 HTML 元素保留 class 和 id
     ...Object.fromEntries(HTML_STYLE_TAGS.map((tag) => [tag, ["style"]])),
     a: ["href", "title"],
     blockquote: ["cite", "style"],
