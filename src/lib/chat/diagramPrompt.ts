@@ -65,16 +65,30 @@ export function appendDiagramRequestInstructions(
   settings?: SystemSettings,
   maxChars: number = API_INPUT_LIMITS.maxChatTextChars,
 ): string {
-  if (settings && !settings.enableDiagramPrompt) {
-    return message;
-  }
+  // 1. 如果系统指令中本来就没有配置图表渲染指令，直接原样返回，不追加任何东西
   if (!isDiagramPromptInstructionEnabled(systemInstruction)) {
     return message;
   }
+
+  // 2. 如果消息中已经包含注入标记，避免重复追加
   if (message.includes('data-diagram-rendering="true"')) {
     return message;
   }
 
+  // 3. 在确定该系统支持图表的前提下，如果用户显式关闭了开关，追加“禁用图表”指令
+  if (settings && !settings.enableDiagramPrompt) {
+    const disableInstruction =
+      "(Note: Do not output any ```mermaid or ```mindmap diagram blocks for this response.)";
+    const separator = "\n\n";
+    const maxMessageChars = Math.max(
+      0,
+      maxChars - separator.length - disableInstruction.length,
+    );
+    const boundedMessage = clampChatInputText(message, maxMessageChars);
+    return `${boundedMessage}${separator}${disableInstruction}`;
+  }
+
+  // 4. 用户开启了开关，追加正常图表引导指令
   const instructions = isEnhancedDiagramPromptInstructionEnabled(
     systemInstruction,
   )
