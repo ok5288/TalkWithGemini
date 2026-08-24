@@ -1,4 +1,5 @@
 import { API_INPUT_LIMITS } from "@/config/limits";
+import { SystemSettings } from "@/lib/settings/types";
 import { clampChatInputText } from "../utils/chatInput";
 
 export const DIAGRAM_PROMPT_MARKER = "<diagram-rendering>";
@@ -61,8 +62,12 @@ export function isEnhancedDiagramPromptInstructionEnabled(
 export function appendDiagramRequestInstructions(
   message: string,
   systemInstruction?: string,
+  settings?: SystemSettings,
   maxChars: number = API_INPUT_LIMITS.maxChatTextChars,
 ): string {
+  if (settings && !settings.enableDiagramPrompt) {
+    return message;
+  }
   if (!isDiagramPromptInstructionEnabled(systemInstruction)) {
     return message;
   }
