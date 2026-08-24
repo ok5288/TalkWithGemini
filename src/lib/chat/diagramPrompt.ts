@@ -79,6 +79,12 @@ export function appendDiagramRequestInstructions(
   if (settings && !settings.enableDiagramPrompt) {
     const disableInstruction =
       "(Note: Do not output any ```mermaid or ```mindmap diagram blocks for this response.)";
+    
+    // 👇【新增防重校验】如果消息中已经追加过禁用指令，直接返回
+    if (message.includes(disableInstruction)) {
+      return message;
+    }
+
     const separator = "\n\n";
     const maxMessageChars = Math.max(
       0,
