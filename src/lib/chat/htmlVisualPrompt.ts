@@ -96,8 +96,8 @@ export function appendDiagramRequestInstructions(
   maxChars: number = API_INPUT_LIMITS.maxChatTextChars,
 ): string {
   // 核心判断：如果全局开关未开启，直接原样返回，不增加提示词
-  if (!settings?.enableDiagramPrompt) {
-    return message;
+  if (settings && !settings.enableDiagramPrompt) {
+  return message;
   }
 
   // 防止重复追加
