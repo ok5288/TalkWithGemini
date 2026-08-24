@@ -1,3 +1,4 @@
+import { defaults } from "@/config/defaults";
 import { describe, expect, it } from "vitest";
 import {
   appendDiagramRequestInstructions,
@@ -5,6 +6,9 @@ import {
   isDiagramPromptInstructionEnabled,
   isEnhancedDiagramPromptInstructionEnabled,
 } from "../lib/chat/diagramPrompt";
+
+// 如果 system 配置存在于 defaults.system 中
+const systemDefaults = defaults.system; 
 
 describe("diagram prompt helpers", () => {
   it("builds base diagram guidance with separated Mermaid and mindmap formats", () => {
@@ -47,6 +51,7 @@ describe("diagram prompt helpers", () => {
     const message = appendDiagramRequestInstructions(
       "Explain this architecture.",
       systemInstruction,
+      systemDefaults, // 👈【调整】用 systemDefaults 代替 defaults
     );
 
     expect(message).toContain("Explain this architecture.");
@@ -60,14 +65,24 @@ describe("diagram prompt helpers", () => {
     expect(message).toContain("Do not output Mermaid mindmap syntax");
     expect(message).toContain("enhanced visual style");
 
-    expect(appendDiagramRequestInstructions(message, systemInstruction)).toBe(
+    expect(appendDiagramRequestInstructions(message, systemInstruction, systemDefaults)).toBe(
       message,
     );
   });
 
   it("leaves request text unchanged when diagram guidance is absent", () => {
     expect(
-      appendDiagramRequestInstructions("Use normal Markdown.", "plain prompt"),
+      appendDiagramRequestInstructions("Use normal Markdown.", "plain prompt", systemDefaults), // 👈【调整】
     ).toBe("Use normal Markdown.");
+  });
+
+  it("should append disable instruction when enableDiagramPrompt is false", () => {
+    const systemInstruction = buildDiagramPromptInstruction();
+    const result = appendDiagramRequestInstructions(
+      "Explain this",
+      systemInstruction,
+      { ...systemDefaults, enableDiagramPrompt: false } // 👈【调整】对 systemDefaults 进行覆盖
+    );
+    expect(result).toContain("Do not output any ```mermaid or ```mindmap");
   });
 });
