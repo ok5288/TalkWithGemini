@@ -159,6 +159,10 @@ export function normalizeSystemSettings(
       typeof raw.enableHtmlVisualPrompt === "boolean"
         ? raw.enableHtmlVisualPrompt
         : defaults.enableHtmlVisualPrompt,
+    enableDiagramPrompt:
+      typeof raw.enableDiagramPrompt === "boolean"
+        ? raw.enableDiagramPrompt
+        : defaults.enableDiagramPrompt,
     enableDestructiveToolConfirmation:
       typeof raw.enableDestructiveToolConfirmation === "boolean"
         ? raw.enableDestructiveToolConfirmation
