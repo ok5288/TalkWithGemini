@@ -1,5 +1,10 @@
 import { API_INPUT_LIMITS } from "@/config/limits";
+import { SystemSettings } from "@/lib/settings/types"; // 👈 引入 SystemSettings 类型
 import { clampChatInputText } from "../utils/chatInput";
+
+// ==========================================
+// 1. HTML Visual Prompt 逻辑
+// ==========================================
 
 export const HTML_VISUAL_PROMPT_MARKER = "<html-visual>";
 
@@ -53,8 +58,14 @@ export function isHtmlVisualPromptInstructionEnabled(
 export function appendHtmlVisualRequestInstructions(
   message: string,
   systemInstruction?: string,
+  settings?: SystemSettings, // 👈 增加 settings 参数以获取 UI 开关状态
   maxChars: number = API_INPUT_LIMITS.maxChatTextChars,
 ): string {
+  // 检查开关：如果设置里关闭了 enableHtmlVisualPrompt，直接跳过
+  if (settings && !settings.enableHtmlVisualPrompt) {
+    return message;
+  }
+
   if (!isHtmlVisualPromptInstructionEnabled(systemInstruction)) {
     return message;
   }
@@ -69,4 +80,36 @@ export function appendHtmlVisualRequestInstructions(
   );
   const boundedMessage = clampChatInputText(message, maxMessageChars);
   return `${boundedMessage}${separator}${HTML_VISUAL_REQUEST_INSTRUCTIONS}`;
+}
+
+// ==========================================
+// 2. 👇【新增】Diagram & Mindmap Prompt 逻辑
+// ==========================================
+
+const DIAGRAM_REQUEST_INSTRUCTIONS = `<format_instructions data-diagram-rendering="true">
+When explaining complex relationships, architectures, processes, workflows, or hierarchies, proactively provide a visual representation using standard Markdown code blocks with 'mermaid' syntax (e.g. graph TD, sequenceDiagram, mindmap, classDiagram). Ensure syntax validity so the client can render it natively.
+</format_instructions>`;
+
+export function appendDiagramRequestInstructions(
+  message: string,
+  settings?: SystemSettings, // 👈 获取系统设置
+  maxChars: number = API_INPUT_LIMITS.maxChatTextChars,
+): string {
+  // 核心判断：如果全局开关未开启，直接原样返回，不增加提示词
+  if (!settings?.enableDiagramPrompt) {
+    return message;
+  }
+
+  // 防止重复追加
+  if (message.includes('data-diagram-rendering="true"')) {
+    return message;
+  }
+
+  const separator = "\n\n";
+  const maxMessageChars = Math.max(
+    0,
+    maxChars - separator.length - DIAGRAM_REQUEST_INSTRUCTIONS.length,
+  );
+  const boundedMessage = clampChatInputText(message, maxMessageChars);
+  return `${boundedMessage}${separator}${DIAGRAM_REQUEST_INSTRUCTIONS}`;
 }
