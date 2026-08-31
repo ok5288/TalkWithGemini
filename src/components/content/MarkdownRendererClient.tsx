@@ -206,10 +206,10 @@ const markdownRehypePlugins = [
   rehypeHighlight,
 ] as any;
 
+// 【修改这里】流式传输时（isStreaming 为 true），暂时不启用 rehypeRaw
 const streamingMarkdownRehypePlugins = [
-  rehypeRaw,
-  [rehypeSanitize, htmlSanitizeSchema],
   rehypeSanitizeInlineStyles,
+  rehypeKatex,
 ] as any;
 
 const COLLAPSED_CODE_MAX_HEIGHT = "40vh";
@@ -1543,17 +1543,18 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
 
             return (
               <ReactMarkdown
-                key={`md-chunk-${index}-${segmentIndex}`}
+                key={`md-chunk-${index}-${segmentIndex}`} 
                 remarkPlugins={[remarkGfm, remarkMath]}
+                // 【修改这里】直接在这里判断 isStreaming
                 rehypePlugins={
-                  shouldUseHeavyMarkdown
-                    ? markdownRehypePlugins
-                    : streamingMarkdownRehypePlugins
+                isStreaming 
+                    ? streamingMarkdownRehypePlugins 
+                    : (shouldUseHeavyMarkdown ? markdownRehypePlugins : streamingMarkdownRehypePlugins)
                 }
                 components={markdownComponents}
               >
                 {diagramSegment.content}
-              </ReactMarkdown>
+              </ReactMarkdown>              
             );
           },
         );
