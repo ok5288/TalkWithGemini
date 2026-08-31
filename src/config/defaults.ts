@@ -13,13 +13,13 @@ import type { ChatConfig, SystemSettings } from "@/types";
  * 默认模型配置
  */
 export const DEFAULT_MODELS = {
-  chat: "gemini-2.0-flash-exp",
-  titleGeneration: "gemini-2.0-flash-exp",
-  relatedQuestions: "gemini-2.0-flash-exp",
-  contextCompression: "gemini-2.0-flash-exp",
-  promptOptimization: "gemini-2.0-flash-exp",
-  ragQuery: "gemini-2.0-flash-exp",
-  memory: "gemini-2.0-flash-exp",
+  chat: "gemini-2.5-flash-lite",
+  titleGeneration: "gemini-2.5-flash-lite",
+  relatedQuestions: "gemini-2.5-flash-lite",
+  contextCompression: "gemini-2.5-flash-lite",
+  promptOptimization: "gemini-2.5-flash-lite",
+  ragQuery: "gemini-2.5-flash-lite",
+  memory: "gemini-2.5-flash-lite",
 } as const;
 
 /**
@@ -74,7 +74,7 @@ export const DEFAULT_SYSTEM_SETTINGS = {
   imageCompressionMaxWidthOrHeight: 1024,
   enableCodeCollapse: false,
   enableHtmlVisualPrompt: true,
-  enableDiagramPrompt: false,
+  enableDiagramPrompt: true,
   enableDestructiveToolConfirmation: true,
   fontSize: "medium",
 } as const satisfies SystemSettings;
