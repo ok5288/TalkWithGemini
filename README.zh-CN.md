@@ -17,7 +17,9 @@
   <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue" /></a>
 </p>
 
-Neo Chat 将多模型对话、Agent 和深度研究整合到一个可自托管的工作空间。连接自己的模型供应商，围绕文件开展工作，对话记录默认保存在浏览器中。
+Neo Chat 是一个可自托管、本地优先的 AI 对话应用，基于 Next.js、React、TypeScript 和 Zustand 构建。它把多供应商模型、助理预设、纯文本技能、OpenAPI 风格插件工具、远程 MCP 与可选本地 stdio 桥接、联网与本地全局搜索、知识库 RAG、显式启用的加密跨设备同步、版本化备份恢复、本地记忆、离线 PWA、语音、生成媒体、富消息渲染、引用和可编辑产物整合到一个干净的工作台中。
+
+它适合想使用现代 AI 工作台、同时保持本地数据所有权的用户。默认情况下，对话历史、工作区元数据、技能、插件配置、记忆、搜索索引和文件都保存在浏览器内；服务端路由作为受控代理，连接模型供应商、联网搜索、RAG、文档解析、语音、插件与 MCP 执行和部署健康检查。
 
 ![Neo Chat 桌面界面](public/desktop.png)
 
@@ -240,7 +242,7 @@ ghcr.io/u14app/neo-chat:latest
 
 One-click deployment of the project to Vercel, with pre-filled environment variables:
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fu14app%2Fneo-chat&project-name=neo-chat&repository-name=neo-chat&env=DEPLOYMENT_MODE=hosted&env=RATE_LIMIT_STORE=upstash&env=DOCUMENT_PARSE_JOB_STORE=upstash&env=PLUGIN_REGISTRY_STORE=upstash&env=BYOK_ALLOW_EPHEMERAL_KEY=false&env=NEXT_PUBLIC_SITE_URL&env-description=NEXT_PUBLIC_SITE_URL=The%20public%20URL%20for%20your%20deployed%20application%20(e.g.,%20https%3A%2F%2Fyour-domain.com).&env=ACCESS_PASSWORD&env-description=ACCESS_PASSWORD=Optional%3A%20A%20password%20to%20protect%20your%20deployment.&env=OPENAI_API_KEY&env-description=OPENAI_API_KEY=Your%20OpenAI%20API%20key%20(if%20using%20OpenAI%20models).&env=ANTHROPIC_API_KEY&env-description=ANTHROPIC_API_KEY=Your%20Anthropic%20API%20key%20(if%20using%20Anthropic%20models).&env=GOOGLE_API_KEY&env-description=GOOGLE_API_KEY=Your%20Google%20API%20key%20(if%20using%20Google%20Gemini%20models).&env=UPSTASH_REDIS_URL&env-description=UPSTASH_REDIS_URL=The%20URL%20for%20your%20Upstash%20Redis%20database%20(required%20for%20shared%20stores).&env=UPSTASH_REDIS_TOKEN&env-description=UPSTASH_REDIS_TOKEN=The%20API%20token%20for%20your%20Upstash%20Redis%20database%20(required%20for%20shared%20stores).)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fok5288%2FTalkWithGemini.git&project-name=TalkWithGemini&repository-name=TalkWithGemini&env=DEPLOYMENT_MODE,RATE_LIMIT_STORE,DOCUMENT_PARSE_JOB_STORE,PLUGIN_REGISTRY_STORE,BYOK_ALLOW_EPHEMERAL_KEY,TRUST_PROXY_HEADERS,NEXT_PUBLIC_SITE_URL,ACCESS_PASSWORD,UPSTASH_REDIS_REST_URL,UPSTASH_REDIS_REST_TOKEN,DEFAULT_PROVIDER_TYPE,DEFAULT_PROVIDER_BASE_URL,DEFAULT_PROVIDER_API_KEY,DEFAULT_PROVIDER_MODELS&envDescription=DEPLOYMENT_MODE%3Dhosted%20%7C%20RATE_LIMIT_STORE%3Dupstash%20%7C%20BYOK_ALLOW_EPHEMERAL_KEY%3Dtrue%20%7C%20TRUST_PROXY_HEADERS%3Dtrue)
 
 Recommended project settings (Vercel usually auto-detects these for Next.js with pnpm):
 
