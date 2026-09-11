@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="public/logo.png" width="80" alt="Neo Chat logo" />
+  <img src="public/logo.png" width="80" alt="Ed iChat logo" />
 </p>
 
-<h1 align="center">Neo Chat</h1>
+<h1 align="center">Ed iChat</h1>
 
 <p align="center">
   <strong>Your models. Your knowledge. Your workspace.</strong>
@@ -81,6 +81,449 @@ Open [localhost:3000](http://localhost:3000) and enter your access password. Thi
 
 Before production deployment, follow the [deployment guide](docs/deployment-hardening.md) to configure stable BYOK keys, access protection, and shared runtime stores. A single hosted process has temporary-key and in-memory rate-limit fallbacks; public multi-instance deployments should use stable keys and shared stores.
 
+
+### Docker Compose
+
+```bash
+docker compose up --build
+```
+
+The compose file publishes Neo Chat on `http://localhost:3000` and uses local/self-hosted safety defaults. For production Docker deployments, set stable BYOK values, use shared stores for hosted or multi-instance deployments, and enable `TRUST_PROXY_HEADERS` only behind a proxy that strips spoofed forwarded headers.
+
+### Docker Image
+
+```bash
+docker build -t neo-chat:local .
+docker run --rm -p 3000:3000 -e BYOK_ALLOW_EPHEMERAL_KEY=true neo-chat:local
+```
+
+The Docker workflow builds pull requests and publishes `main` / `v*` tags to GitHub Container Registry:
+
+```text
+ghcr.io/u14app/neo-chat:latest
+```
+
+### Vercel
+
+Import the repository as a Next.js project. Vercel can use the framework preset
+and package manager detection from `pnpm-lock.yaml` and the `packageManager`
+field, so the project does not need a custom output directory.
+
+One-click deployment of the project to Vercel, with pre-filled environment variables:
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fok5288%2FTalkWithGemini.git&project-name=TalkWithGemini&repository-name=TalkWithGemini&env=DEPLOYMENT_MODE,RATE_LIMIT_STORE,DOCUMENT_PARSE_JOB_STORE,PLUGIN_REGISTRY_STORE,BYOK_ALLOW_EPHEMERAL_KEY,TRUST_PROXY_HEADERS,NEXT_PUBLIC_SITE_URL,ACCESS_PASSWORD,UPSTASH_REDIS_REST_URL,UPSTASH_REDIS_REST_TOKEN,DEFAULT_PROVIDER_TYPE,DEFAULT_PROVIDER_BASE_URL,DEFAULT_PROVIDER_API_KEY,DEFAULT_PROVIDER_MODELS&envDescription=DEPLOYMENT_MODE%3Dhosted%20%7C%20RATE_LIMIT_STORE%3Dupstash%20%7C%20BYOK_ALLOW_EPHEMERAL_KEY%3Dtrue%20%7C%20TRUST_PROXY_HEADERS%3Dtrue)
+
+Recommended project settings (Vercel usually auto-detects these for Next.js with pnpm):
+
+```text
+Framework Preset: Next.js
+Install Command: default, or corepack pnpm install --frozen-lockfile
+Build Command: pnpm build
+Output Directory: default
+```
+
+For public Vercel deployments, configure production environment variables in
+the Vercel project settings:
+
+```bash
+DEPLOYMENT_MODE=hosted
+RATE_LIMIT_STORE=upstash
+DOCUMENT_PARSE_JOB_STORE=upstash
+PLUGIN_REGISTRY_STORE=upstash
+BYOK_ALLOW_EPHEMERAL_KEY=false
+NEXT_PUBLIC_SITE_URL=https://your-domain.com
+```
+
+Store deployment passwords, provider keys, BYOK material, and shared store
+credentials as Vercel environment variables with the appropriate Production,
+Preview, or Development scope. Do not commit these values to the repository.
+When a `NEXT_PUBLIC_*` value affects metadata or generated public links, set it
+for the environments that build those deployments.
+
+### Cloudflare Workers
+
+```bash
+pnpm build:worker
+pnpm worker:size
+pnpm worker:dry-run
+pnpm preview:worker
+pnpm deploy:worker
+```
+
+Workers should run in hosted mode and use public HTTPS upstreams. When using
+Cloudflare Workers Builds, use separate build and deploy commands so the
+OpenNext build output exists before deployment:
+
+```bash
+# Build command
+pnpm build:worker
+
+# Deploy command
+pnpm exec opennextjs-cloudflare deploy -- --keep-vars
+```
+
+`--keep-vars` preserves runtime variables and secrets configured in the
+Cloudflare dashboard instead of replacing them with only the values committed in
+`wrangler.jsonc`.
+
+Production Workers should configure runtime variables in the Cloudflare
+dashboard under **Settings -> Variables and Secrets**. Use plain variables for
+non-sensitive deployment defaults:
+
+```bash
+DEPLOYMENT_MODE=hosted
+RATE_LIMIT_STORE=upstash
+DOCUMENT_PARSE_JOB_STORE=upstash
+PLUGIN_REGISTRY_STORE=upstash
+BYOK_ALLOW_EPHEMERAL_KEY=false
+NEXT_PUBLIC_SITE_URL=https://your-domain.com
+```
+
+Use secrets for deployment passwords, provider keys, BYOK material, and shared
+store credentials:
+
+```bash
+wrangler secret put BYOK_PRIVATE_KEY_PEM
+wrangler secret put BYOK_KEY_ID
+wrangler secret put UPSTASH_REDIS_REST_URL
+wrangler secret put UPSTASH_REDIS_REST_TOKEN
+wrangler secret put ACCESS_PASSWORD
+```
+
+For Cloudflare Workers Builds, also add build-time variables under
+**Settings -> Builds -> Variables and Secrets** when a value must be available
+during `next build`, especially `NEXT_PUBLIC_*` values. Runtime variables are
+not available to the build step unless they are also configured there.
+
+Do not commit personal API keys or deployment secrets to `wrangler.jsonc`.
+Deployment-level provider keys such as `DEFAULT_PROVIDER_API_KEY` are shared by
+everyone using that Worker instance; leave them unset if users should provide
+their own keys in the browser.
+
+See [Deployment Hardening](docs/deployment-hardening.md) for production configuration guidance.
+
+## Configuration
+
+Neo Chat is local-first by default:
+
+- Core settings, provider records, selected models, keyboard shortcut bindings,
+  per-chat composer drafts, and locally encrypted provider credential envelopes
+  are stored in browser `localStorage`.
+- Chat metadata, messages, app settings, installed plugins, installed/custom
+  skills, skill catalog caches, assistants, knowledge metadata, local memories,
+  encrypted sync configuration, and CRDT baselines are stored in IndexedDB
+  through `localforage`.
+- Uploaded chat and workspace files, knowledge originals and extracted text, and image display-cache copies are stored in browser OPFS. Runtime `blob:` URLs remain temporary; version 3 ZIP backups bundle referenced app-owned OPFS files while excluding credentials and remote service data.
+- User-entered secrets are encrypted in the browser as BYOK envelopes before being sent to API routes.
+
+Important server-side settings:
+
+```bash
+# Access gate (separate multiple accepted passwords with commas)
+ACCESS_PASSWORD="first-password,second-password"
+
+# Stable BYOK server key for production
+BYOK_PRIVATE_KEY_PEM="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
+BYOK_KEY_ID="prod-2026-07"
+BYOK_ALLOW_EPHEMERAL_KEY="false"
+
+# Deployment safety
+DEPLOYMENT_MODE="local" # or hosted
+ALLOW_LOCAL_NETWORK_PROXY=""
+
+# Shared short-lived state for hosted or multi-instance deployments
+RATE_LIMIT_STORE="upstash"
+DOCUMENT_PARSE_JOB_STORE="upstash"
+PLUGIN_REGISTRY_STORE="upstash"
+UPSTASH_REDIS_REST_URL="https://..."
+UPSTASH_REDIS_REST_TOKEN="..."
+```
+
+Default model provider:
+
+```bash
+DEFAULT_PROVIDER_TYPE="Google"
+DEFAULT_PROVIDER_NAME="Google"
+DEFAULT_PROVIDER_BASE_URL=""
+DEFAULT_PROVIDER_API_KEY="provider-key"
+DEFAULT_PROVIDER_MODELS="model-a,model-b"
+```
+
+A server-default provider is exposed only when the deployment supplies related
+`DEFAULT_PROVIDER_*` or `DEFAULT_MODEL_*` configuration. The deployment API key
+may remain empty so each browser can save its own encrypted credential; that
+credential is reused only while its provider type matches the active server
+default. Missing or mismatched server defaults fail closed. Custom Base URLs are
+validated before they are saved while trusted self-hosted HTTP/private targets
+remain supported.
+
+`DEFAULT_PROVIDER_MODELS` supports multiple formats:
+
+```bash
+# Comma-separated model IDs
+DEFAULT_PROVIDER_MODELS="gpt-5.5,gpt-5.4-mini"
+
+# JSON string array
+DEFAULT_PROVIDER_MODELS='["gpt-5.5","gpt-5.4-mini"]'
+
+# JSON object array with optional display names, capability aliases, and modalities
+DEFAULT_PROVIDER_MODELS='[{"id":"gpt-image-2","name":"GPT Image 2","capabilities":["image_generation"]},{"id":"gemini-3.1-flash-image","modalities":{"input":["text","image"],"output":["text","image"]}},"gpt-5.4-mini"]'
+```
+
+For JSON object entries, `name` is optional and falls back to `id`.
+`capabilities` accepts aliases such as `vision`, `attachment`, `reasoning`,
+`tool_call`, `image_generation`, `image_output`, and `image_editing`.
+Explicit `modalities.input` / `modalities.output` are preferred when present.
+
+Default task models:
+
+```bash
+DEFAULT_MODEL_TITLE_GENERATION="model-a"
+DEFAULT_MODEL_RELATED_QUESTIONS="model-a"
+DEFAULT_MODEL_CONTEXT_COMPRESSION="model-a"
+DEFAULT_MODEL_PROMPT_OPTIMIZATION="model-a"
+DEFAULT_MODEL_RAG_QUERY="model-a"
+DEFAULT_MODEL_MEMORY="model-a"
+```
+
+Search, RAG, document parsing, and voice defaults:
+
+```bash
+DEFAULT_SEARCH_PROVIDER="firecrawl"
+# Firecrawl search works without an API key; set one for higher rate limits.
+DEFAULT_SEARCH_API_KEY=""
+DEFAULT_SEARCH_BASE_URL="https://search.example"
+
+DEFAULT_RAG_BASE_URL="https://rag.example"
+DEFAULT_RAG_TOKEN="rag-token"
+DEFAULT_RAG_TOP_K="10"
+DEFAULT_RAG_CHUNK_SIZE="512"
+DEFAULT_RAG_NAMESPACE="default"
+DEFAULT_DOCUMENT_PARSE_PROVIDER="mineru"
+DEFAULT_MINERU_API_TOKEN=""
+DEFAULT_LLAMA_PARSE_API_KEY="llama-parse-key"
+
+DEFAULT_VOICE_PROVIDER="elevenlabs"
+DEFAULT_ELEVENLABS_API_KEY="elevenlabs-key"
+DEFAULT_ELEVENLABS_STT_MODEL="scribe_v2"
+DEFAULT_ELEVENLABS_TTS_MODEL="eleven_flash_v2_5"
+DEFAULT_ELEVENLABS_TTS_VOICE_ID="bIHbv24MWmeRgasZH58o"
+
+DEFAULT_MIMO_API_KEY="mimo-key"
+DEFAULT_MIMO_STT_MODEL="mimo-v2.5-asr"
+DEFAULT_MIMO_TTS_MODEL="mimo-v2.5-tts"
+DEFAULT_MIMO_TTS_VOICE_ID="mimo_default"
+```
+
+Default system behavior:
+
+```bash
+DEFAULT_SYSTEM_PROMPT=""
+DEFAULT_ENABLE_AUTO_TITLE="true"
+DEFAULT_ENABLE_RELATED_QUESTIONS="true"
+DEFAULT_ENABLE_AUTO_COMPRESSION="true"
+DEFAULT_ENABLE_CODE_COLLAPSE="true"
+DEFAULT_ENABLE_HTML_VISUAL_PROMPT="true"
+```
+
+Public site URL:
+
+```bash
+NEXT_PUBLIC_SITE_URL="https://your-domain.com"
+```
+
+For the full template, see [.env.example](.env.example).
+
+## Architecture
+
+```mermaid
+flowchart LR
+  Browser["Browser app\nReact + Zustand"] --> LocalStorage["localStorage\nproviders + encrypted secrets + drafts"]
+  Browser --> IndexedDB["IndexedDB\nsessions + plugins + skills + knowledge + memories + sync"]
+  Browser --> OPFS["OPFS\nuploads + originals + image cache"]
+  Browser --> ApiRoutes["Next.js API routes"]
+  ApiRoutes --> Providers["Model providers\nGoogle / Anthropic / OpenAI / compatible"]
+  ApiRoutes --> Search["Search providers"]
+  ApiRoutes --> Rag["RAG + document services"]
+  ApiRoutes --> Plugins["Plugin + MCP endpoints"]
+  ApiRoutes --> Sync["WebDAV / S3"]
+  ApiRoutes --> Voice["Voice providers"]
+  ApiRoutes --> Health["Deployment health"]
+  Browser -. encrypted BYOK envelopes .-> ApiRoutes
+  Browser -. encrypted sync objects .-> ApiRoutes
+```
+
+The app keeps durable user data in browser storage whenever possible. API routes provide:
+
+- provider request normalization and streaming;
+- BYOK decryption on the server side;
+- URL safety gates for proxied upstreams;
+- plugin and MCP execution through registered plugin IDs and function names;
+- encrypted WebDAV/S3 sync proxying without server-side key persistence;
+- deployment health reporting through `/api/health`;
+- hosted-mode checks for shared stores and fixed-service network boundaries.
+
+## Skills, Plugins, Search, RAG, and Voice
+
+Skills are text-only prompt-context modules. The app loads localized metadata catalogs from `public/data/skills`, fetches full skill definitions only when needed, and stores installed, edited, and custom skills locally. Active skills can be selected manually, inherited from workspace presets, or auto-selected for a message.
+
+Agent mode is an opt-in, per-chat client-side orchestration mode for models that
+support tool calls. Its five built-ins (`web_search`, `search_knowledge`,
+`load_skill`, `run_javascript`, and `update_task_plan`) are read-only and
+auto-approved. JavaScript runs synchronously in a bounded browser sandbox
+without network or DOM access, and loaded Skills remain text-only. Agent web
+search requires an external search provider; native Google Search and OpenAI
+Web Search are not combined with Agent function calling.
+
+Plugins are executable tools installed from OpenAPI manifests, built-in
+definitions, or remote MCP servers discovered from the official MCP Registry.
+Enabled functions are exposed to compatible models as tools, then executed by
+the server-side plugin route. Remote MCP supports Streamable HTTP and legacy
+SSE, preferring Streamable HTTP and falling back to SSE only when connection
+setup returns 404 or 405; authentication and other failures are not retried
+across transports. The negotiated transport is saved for later tool calls.
+Registry entries that require header credentials prompt before discovery and
+store the value as a local encrypted secret. Local Docker users may expose
+preconfigured stdio servers through the separate authenticated
+[MCP stdio bridge](docs/mcp-stdio-bridge.md). User-configured MCP URLs may use
+HTTP or HTTPS and may target localhost or private networks in either deployment
+mode; the official Registry remains HTTPS-only.
+
+Built-in image processing plugin results stay in the tool details and compact
+conversation history, so the model can decide whether and how to reference
+generated or edited images in its follow-up message. OpenAI-compatible Images
+API and OpenAI Responses image processing are separate plugins so their
+credentials and activation can be managed independently. Supported built-in
+media plugins expose plugin-level API Base URL and Model ID fields, optional
+image count parameters, Agnes image-to-image editing, and Agnes video generation
+from a public HTTPS image URL while keeping Agnes video as the explicit
+`create_video` / `get_video_result` two-step flow. Tool-call orchestration uses a
+high but bounded loop limit to avoid runaway recursive calls while still
+allowing multi-step tasks.
+
+Search can run through Google native Google Search, OpenAI Web Search, or
+external providers for other model families including Anthropic. When Agent
+mode is active, select an external provider to expose `web_search`; native
+search configurations are not combined with Agent function calling.
+Firecrawl's public service works without an API key, honors the selected time
+range, and uses a key only to raise its request rate. The separate global search
+modal indexes active chat branches, attachments, workspaces, knowledge, and
+memories in browser memory while excluding reasoning, tool payloads, and
+credentials. Settings provides its own localized keyboard-navigable search.
+
+Knowledge-base RAG preserves uploaded originals separately from editable or
+indexable extracted text, supports Markdown-aware or recursive chunking with
+hybrid lexical/vector retrieval, optionally parses documents with Mineru or
+LlamaParse, and can index chunks into an external vector service. Files can be
+filtered by name or status and processed through serial retry, reindex,
+download, or confirmed-delete batches with per-file results. Failed operations
+can still be retried, reparsed, cancelled, or reconciled without discarding a
+usable original.
+
+Voice workflows support browser speech APIs and configured external providers. Set `DEFAULT_VOICE_PROVIDER` to `elevenlabs` or `mimo` to enable a server default; leaving it empty keeps browser-native speech as the default. Empty default model values disable the matching STT or TTS capability, and the UI can store user-specific secrets locally.
+
+Deployment health is available from Settings and `/api/health`. It reports non-secret readiness for BYOK, access password, hosted mode, shared stores, default model, search, RAG, and voice configuration.
+
+## Security Model
+
+Neo Chat is self-hosting friendly, not a turnkey public SaaS security boundary.
+
+- User-configured provider, search, RAG, plugin, and MCP targets may use HTTP and private-network addresses in either deployment mode.
+- Fixed registries and built-in service targets retain their HTTPS and host allowlists; HTTP media proxying remains controlled by `ALLOW_LOCAL_NETWORK_PROXY`.
+- Sync objects are encrypted in the browser with opaque remote names; recovery
+  material, credentials, local baselines, and device identity are excluded from
+  remote objects and ZIP exports.
+- BYOK envelopes prevent plain user-entered secrets from being sent in request bodies.
+- Server-default provider credentials are locally encrypted, provider-bound,
+  and rejected when the deployment default is unavailable or has changed type.
+- API schemas reject unknown high-risk fields and oversized payloads.
+- Plugin execution remains server-proxied and validated. Tool calls run automatically by default; an optional System setting pauses only destructive calls for one-time approval or denial. Destructive approval is never persisted for the chat.
+- `ACCESS_PASSWORD` accepts comma-separated passwords (surrounding whitespace
+  and empty entries are ignored), but it remains a deployment gate rather than
+  an account system. Commas cannot be part of a password, and changing the list
+  invalidates existing access sessions.
+
+Before exposing Neo Chat as a public multi-user service, add account authentication, tenant isolation, server-side secret storage, quotas, audit logs, abuse controls, and provider spend limits.
+
+See [Reliability and Safety Model](docs/reliability-and-safety.md) for runtime behavior and recovery notes.
+
+## Development
+
+Quality checks:
+
+```bash
+pnpm check:imports
+pnpm format:check
+pnpm hygiene:artifacts
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm test:e2e
+pnpm build
+pnpm audit --audit-level low
+```
+
+Useful scripts:
+
+```bash
+pnpm dev              # Start Next.js dev server
+pnpm build            # Production build
+pnpm start            # Start production server
+pnpm format           # Format the repository with Prettier
+pnpm format:check     # Check repository formatting
+pnpm check:imports    # Reject disallowed long relative imports
+pnpm hygiene:artifacts # Check generated artifact hygiene
+pnpm test:e2e         # Run isolated Playwright smoke tests on port 3100
+pnpm build:worker     # Build for Cloudflare Workers
+pnpm worker:size      # Check Worker gzip size budget
+pnpm worker:dry-run   # Validate Worker deploy without publishing
+pnpm preview:worker   # Preview Worker build
+pnpm deploy:worker    # Deploy Worker build while preserving dashboard vars
+pnpm byok:generate    # Generate copyable BYOK key values
+```
+
+Project layout:
+
+```text
+src/app/              Next.js routes and API routes
+src/components/       Chat UI, settings, plugin market, knowledge base
+src/lib/              Server/client domain helpers and safety gates
+src/services/         Provider, search, voice, RAG, and plugin service clients
+src/store/            Zustand stores and persistence migrations
+src/__tests__/        Vitest coverage for utilities, routes, and workflows
+e2e/                  Playwright browser smoke tests
+docs/                 Deployment and reliability notes
+```
+
+Project documentation:
+
+- [Environment Variables](docs/environment-variables.md)
+- [Plugin Development](docs/plugin-development.md)
+- [Privacy and Local Data](docs/privacy-and-local-data.md)
+- [Deployment Hardening](docs/deployment-hardening.md)
+- [Reliability and Safety Model](docs/reliability-and-safety.md)
+- [Roadmap](ROADMAP.md)
+- [Changelog](CHANGELOG.md)
+
+### Fork Synchronization
+
+Fork maintainers can enable the `Sync upstream` workflow to fast-forward their fork from the upstream `u14app/neo-chat` `main` branch.
+
+1. In the fork, open **Settings > Actions > General** and allow GitHub Actions to run.
+2. In **Workflow permissions**, select **Read and write permissions** so `GITHUB_TOKEN` can push to the fork.
+3. Open **Actions > Sync upstream > Run workflow** to trigger the first sync manually.
+4. Keep the scheduled workflow enabled if you want the fork to sync daily.
+
+The workflow is skipped in the upstream repository and only runs when GitHub marks the repository as a fork. It uses fast-forward-only merging, so it fails safely when the fork branch has diverged from upstream or a branch protection rule blocks the push.
+
+Optional repository variables can override the defaults:
+
+```text
+UPSTREAM_REPOSITORY=u14app/neo-chat
+UPSTREAM_BRANCH=main
+TARGET_BRANCH=<fork default branch>
+```
+
 ## Your data
 
 Conversations and workspace files stay in browser storage by default. Requests send the necessary content to the model providers and services you use, usually through the app's API routes. Local-first storage does not mean inference runs offline.
@@ -120,6 +563,36 @@ corepack pnpm typecheck  # Check TypeScript
 corepack pnpm test       # Run Vitest
 corepack pnpm build      # Create a production build
 ```
+## FAQ
+
+### Does Neo Chat store my data on a server?
+
+By default, durable chat and configuration data live in browser storage. API routes proxy external services, and production deployments should still treat server logs, upstream services, and configured stores according to their own privacy requirements.
+
+### Can I use OpenAI-compatible providers?
+
+Yes. Add an OpenAI-compatible provider in Settings or configure deployment defaults with `DEFAULT_PROVIDER_TYPE="OpenAI Compatible"` and a compatible `/v1` base URL.
+
+### Can I use Anthropic's native Messages API?
+
+Yes. Add an Anthropic provider in Settings or configure `DEFAULT_PROVIDER_TYPE="Anthropic"`. The official base URL is `https://api.anthropic.com`; the app uses Anthropic's native `/v1/messages` API through the official TypeScript SDK.
+
+### Why do I need a stable BYOK private key in production?
+
+Browser secrets are encrypted to the server public key. If the server private key changes, existing local envelopes cannot be decrypted until users re-enter their secrets.
+
+### Can I deploy this as a public SaaS?
+
+Not as-is. Hosted mode tightens URL policy and shared-state requirements, but public SaaS still needs accounts, tenancy, quotas, auditing, and server-side secret management.
+
+### Why did a tool stop after many calls?
+
+Neo Chat keeps tool calls high but bounded. The model can run multi-step tool workflows, but recursive tool loops stop after the configured tool-round limit.
+
+### How do I retrieve previous versions?
+
+Previous versions of the project were developed solely based on the Gemini ecosystem. If you need previous versions, you can obtain them from the `gemini-next-chat` branch, **which has its code archived**.
+
 
 ## Community
 
