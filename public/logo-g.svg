@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="100%" height="auto" viewBox="0 0 200 60" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      <![CDATA[
+        .cls-1 {
+          fill: #FA8072;
+          font-size: 28px;
+          font-weight: bold;
+          font-family: 'Helvetica Neue Condensed',Arial, Century Gothic Narrow, Franklin Gothic Book Narrow;
+          
+        }
+        
+        .cls-2 {
+          fill: #964B00;
+          font-size: 15px;
+          font-weight: bold;
+          font-family: 'Helvetica Neue Condensed',Arial, Century Gothic Narrow, Franklin Gothic Book Narrow;
+          
+        }
+
+        .cls-3 {
+          stroke: green;
+          stroke-width: 2px;
+        }
+
+        .cls-4 {
+          fill: #964B00;
+          font-size: 12px;
+          font-weight: bold;
+          font-family: 'Helvetica Neue Condensed',Arial, Century Gothic Narrow, Franklin Gothic Book Narrow;
+        }
+
+        .cls-5 {
+          fill: #FA8072;
+          font-size: 24px;
+          font-weight: bold;
+          font-family: 'Helvetica Neue Condensed',Arial, Century Gothic Narrow, Franklin Gothic Book Narrow;
+          
+        }
+      ]]>
+    </style>
+  </defs>
+  <title>Edward Web World-Logo</title>
+  <g id="Edward_WEB_WORLD" transform="translate(-103.000000, -123.000000)">
+    <text id="Edward" class="cls-1" x="105" y="152" textLength="100" lengthAdjust="spacingAndGlyphs">Edward</text>
+    <text id="WEB_WORLD" class="cls-2" x="210" y="143" textLength="90" lengthAdjust="spacingAndGlyphs">Talk Gemini</text>
+    <line id="Line" class="cls-3" x1="105" y1="160" x2="205" y2="160"/>
+    <text id="www.ok5266.com" class="cls-4" x="105" y="176" textLength="100" lengthAdjust="spacingAndGlyphs">gtalk.ok5266.com</text>
+    <text id="網絡世界" class="cls-5" x="210" y="174" textLength="90" lengthAdjust="spacingAndGlyphs">借 米 来</text>
+  </g>
+</svg>
