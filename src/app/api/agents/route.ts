@@ -6,7 +6,7 @@ import { normalizeAgentMarketLocale } from "@/lib/market/agentLocale";
 import { safeServerLogWarn } from "@/lib/utils/safeServerLog";
 
 const API_URL =
-  "https://registry.npmmirror.com/@lobehub/agents-index/v1/files/public";
+  "https://agents.ok5266.com";
 const INDEX_FILES = {
   en: "index.json",
   zh: "index.zh-CN.json",
@@ -30,7 +30,7 @@ export async function GET(request?: NextRequest | Request) {
         policy: {
           ...getSafeUrlPolicy("agent"),
           allowedProtocols: ["https:"],
-          allowedHosts: ["registry.npmmirror.com"],
+          allowedHosts: ["registry.npmmirror.com", "agents.ok5266.com"],
         },
         timeoutMs: 20_000,
         maxResponseBytes: 5 * 1024 * 1024,
