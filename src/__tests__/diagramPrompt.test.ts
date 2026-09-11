@@ -1,3 +1,4 @@
+import { defaults } from "@/config/defaults";
 import { describe, expect, it } from "vitest";
 import { allPlugins, parseMarkdownWithFrontMatter } from "@xiangfa/mindmap";
 import {
@@ -10,6 +11,8 @@ import {
 } from "../lib/chat/diagramPrompt";
 import { parseMarkdownDiagramBlocks } from "../lib/utils/markdownDiagrams";
 
+// 如果 system 配置存在于 defaults.system 中
+const systemDefaults = defaults.system;
 describe("diagram prompt helpers", () => {
   it("builds base diagram guidance with separated Mermaid and mindmap formats", () => {
     const instruction = buildDiagramPromptInstruction();
@@ -64,6 +67,7 @@ describe("diagram prompt helpers", () => {
     const message = appendDiagramRequestInstructions(
       "Explain this architecture.",
       systemInstruction,
+      systemDefaults, // 👈 保留你的 systemDefaults
     );
 
     expect(message).toContain("Explain this architecture.");
@@ -83,15 +87,25 @@ describe("diagram prompt helpers", () => {
     expect(message).toContain("Never put a Mermaid `mindmap` declaration");
     expect(message).toContain("enhanced visual style");
 
-    expect(appendDiagramRequestInstructions(message, systemInstruction)).toBe(
+    expect(appendDiagramRequestInstructions(message, systemInstruction, systemDefaults)).toBe(
       message,
     );
   });
 
   it("leaves request text unchanged when diagram guidance is absent", () => {
     expect(
-      appendDiagramRequestInstructions("Use normal Markdown.", "plain prompt"),
+      appendDiagramRequestInstructions("Use normal Markdown.", "plain prompt", systemDefaults), // 👈 保留你的 systemDefaults
     ).toBe("Use normal Markdown.");
+  });
+
+  it("should append disable instruction when enableDiagramPrompt is false", () => {
+    const systemInstruction = buildDiagramPromptInstruction();
+    const result = appendDiagramRequestInstructions(
+      "Explain this",
+      systemInstruction,
+      { ...systemDefaults, enableDiagramPrompt: false } // 👈 保留你的自定义开关测试
+    );
+    expect(result).toContain("Do not output any ```mermaid or ```mindmap");
   });
 
   it("ships a canonical example accepted by the installed mindmap parser", () => {
