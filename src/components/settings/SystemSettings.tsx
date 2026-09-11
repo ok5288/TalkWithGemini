@@ -819,6 +819,18 @@ const SystemSettings = () => {
           }
         />
 
+        <ToggleRow
+          title={t("diagramPrompt")}
+          description={t("diagramPromptDesc")}
+          ariaLabel={t("diagramPromptAria")}
+          name="enableDiagramPrompt"
+          checked={system.enableDiagramPrompt ?? false}
+          onChange={() =>
+            updateSystemSettings({
+              enableDiagramPrompt: !(system.enableDiagramPrompt ?? false),
+            })
+          }
+        />
         <div className="px-4 py-4 sm:px-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
