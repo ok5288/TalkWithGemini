@@ -690,7 +690,7 @@ export const streamChatResponse = async (
   }
 
   let effectiveNewMessage = newMessage;
-  const { search } = useSettingsStore.getState();
+  const { search, system } = useSettingsStore.getState();
   const { language } = useCoreSettingsStore.getState();
   let projectionLocale: string = language;
   if (language === "auto") {
@@ -1283,9 +1283,10 @@ export const streamChatResponse = async (
       : appendDiagramRequestInstructions(
           appendHtmlVisualRequestInstructions(
             messageWithSkills,
-            effectiveSystemInstruction,
+            effectiveSystemInstruction,            
           ),
           effectiveSystemInstruction,
+          system,
         );
     let requestAttachments: Attachment[] = [];
     if (researchPhase !== "start" && researchPhase !== "plan") {
