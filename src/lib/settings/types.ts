@@ -71,6 +71,7 @@ export interface SystemSettings {
   imageCompressionMaxWidthOrHeight: number;
   enableCodeCollapse: boolean;
   enableHtmlVisualPrompt: boolean;
+  enableDiagramPrompt?: boolean;
   enableIntelligentUi: boolean;
   enableMcpApps: boolean;
   enableDestructiveToolConfirmation: boolean;
