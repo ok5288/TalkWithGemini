@@ -17,7 +17,9 @@
   <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue" /></a>
 </p>
 
-Neo Chat brings multi-model chat, agents, and deep research into a self-hostable workspace. Connect your own model providers, work with your files, and keep your conversation history in your browser by default.
+Neo Chat is a self-hostable, local-first AI chat application built with Next.js, React, TypeScript, and Zustand. It brings multi-provider chat, assistant presets, text-only Skills, OpenAPI-style plugin tools, remote MCP servers and an optional local stdio bridge, web and local global search, knowledge-base RAG, opt-in encrypted cross-device sync, versioned backup and restore, local memory, an offline PWA, voice, generated media, rich message rendering, citations, and editable artifacts into one clean workspace.
+
+It is designed for people who want the power of modern AI workspaces without giving up local data ownership. Chat history, workspace metadata, skills, plugin configuration, memories, search indexes, and files stay in the browser by default; server routes act as controlled proxies for model providers, web search, RAG, document parsing, voice, plugin and MCP execution, and deployment health.
 
 ![Neo Chat desktop interface](public/desktop.png)
 
@@ -27,6 +29,171 @@ Neo Chat brings multi-model chat, agents, and deep research into a self-hostable
 ![Neo Chat mobile interface](public/mobile.png)
 
 </details>
+
+## v2.5.0 Highlights
+
+- Expanded Deep Research with model-knowledge-first planning, bounded
+  knowledge/public lookup, reviewable adaptive plans, durable checkpoints and
+  research rounds, claim-to-evidence audits, partial and versioned reports,
+  manual resume, and a responsive Research workbench. Recovery preserves the
+  selected model, and approved workspace failures pause visibly.
+- Added four built-in research templates for competitive analysis, literature
+  review, due diligence, and technical evaluation, plus local custom template
+  management with revisioned Profile snapshots, explicit inheritance or
+  no-template states, and immutable per-task snapshots. Research also adds
+  read-only arXiv, PubMed, EPO OPS, and SEC EDGAR sources, safe-wave frontier
+  steering, and report-version-bound evidence Q&A with frozen-snapshot citation
+  validation.
+- Added the browser-local `neo-chat-research-extensions` v1 sidecar for
+  templates, source contracts, steering, evidence snapshots, and Q&A threads.
+  Research searches preserve partial batches, respect cooldowns, and run with
+  two-second spacing; evidence recovery keeps committed excerpts and source
+  identity, while localized reports and downloads retain their selected
+  language. These extension records remain outside ZIP backup and encrypted
+  sync.
+- Added an opt-in encrypted WebDAV or S3/MinIO personal vault, including
+  per-domain Automerge documents, opaque remote names, recovery codes, encrypted
+  OPFS chunks, conflict visibility, transactional apply, and bounded remerge
+  protection for edits made during synchronization.
+- Expanded the foreground Agent runtime with dynamic Tool and Skill discovery,
+  task plans, structured questions, scoped Memory, revisioned workspaces,
+  immutable Artifacts, MCP resources/prompts, persistent execution records,
+  resumable runs, host-authorized later rounds, and effect-aware confirmation.
+- Added safer stop, switch, and continue-generation behavior that preserves
+  prior blocks, plus reload and sync rehydration that keep durable conversations
+  and explicitly selected in-memory messages intact.
+- Added customizable keyboard shortcuts, temporary text chats, unified
+  sidebar/titlebar conversation actions, and Redis-backed read-only sharing with
+  selected branches, configurable expiry, explicit updates, and revocation.
+- Added progressive CommonMark rendering, persistent document blocks, strict
+  ECharts `chart` fences, chart-only/fullscreen views, localized chart states,
+  Markdown table copying, and PNG export for charts, Mermaid diagrams, and mind
+  maps. Mermaid mindmaps now have dedicated node/link styling, while Git graphs,
+  timelines, Kanban boards, radar charts, and treemaps keep readable light/dark
+  palettes in fullscreen and exports.
+- Added direct browser requests for configured custom model providers,
+  multi-password deployment access, HEIC/HEIF conversion, staged image
+  compression, and file-backed multimodal requests for native OpenAI, Google,
+  and Anthropic providers. Web reading can retry Jina failures through a bounded
+  direct read and rejects challenge pages or application errors before evidence
+  creation.
+- Hardened hosted and self-hosted release paths with per-request CSP nonces,
+  explicit Docker access-password setup and API checks, Node 24 alignment,
+  tag/version validation, release-time source, Next.js, Worker, and dependency
+  checks, and refreshed vulnerable root and MCP Bridge dependency resolutions.
+
+See [CHANGELOG.md](CHANGELOG.md) for the complete release notes.
+
+
+## v2.4.0 Highlights
+
+- Added an opt-in, end-to-end encrypted personal vault for convergent WebDAV or
+  S3/MinIO synchronization across devices. Recovery keys, credentials, local
+  baselines, search caches, and vectors never enter remote objects or ZIP files.
+- Added virtualized long-chat timelines, durable streaming checkpoints, bounded
+  retry before visible output, partial-output continuation, reply snapshots, and
+  explicit model selection when regenerating a sibling branch.
+- Added per-chat composer drafts, token and context usage summaries, guarded
+  message-tree mutations during generation, and clearer offline behavior.
+- Added per-chat Agent mode for tool-call-capable models, with five localized,
+  read-only built-ins orchestrated by the browser and auto-approved at runtime.
+- Added parameterized Skills and ordered bundles of up to four Skills, with
+  validated slot values and reproducible invocation metadata.
+- Added collection-level chunking controls, Markdown heading-aware previews,
+  explicit reindexing, hybrid lexical/vector retrieval, graceful lexical
+  fallback, stable source previews, file filtering, and serial batch operations.
+- Added HEIC/HEIF conversion, staged client-side image compression, and
+  file-backed multimodal uploads for native OpenAI, Google, and Anthropic chat.
+- Added legacy SSE compatibility for remote MCP, connection-stage-only fallback,
+  encrypted install-time credentials, and an authenticated Docker stdio bridge
+  whose commands remain fixed by deployment configuration.
+- Added a local-only offline PWA with strict no-API-cache boundaries, an
+  accessible global-search modal, localized settings search and first-run model
+  guidance, plus read-only local storage health diagnostics.
+- Scoped custom model metadata and locally encrypted server-default credentials
+  to the matching provider, with fail-closed handling for invalid or unavailable
+  defaults.
+- Preserved existing version 3 ZIP compatibility while advancing the local
+  schema to version 6 and adding English, Chinese, and Japanese UI coverage.
+
+See [CHANGELOG.md](CHANGELOG.md) for the complete release notes.
+
+## v2.2.0 Highlights
+
+- Added native Anthropic Messages API support through the official SDK.
+- Added remote streamable HTTP MCP server discovery and installation from the
+  official MCP Registry, with plugin-market management, authentication, and
+  server-side tool execution. This release intentionally supports remote MCP
+  servers only.
+- Strengthened provider requests, API route policy, context budgeting,
+  outbound URL safety, plugin registration, and Worker deployment validation.
+- Reconstructed the chat shell, composer, message rendering, and chat service
+  internals into smaller modules while preserving existing workflows.
+- Fixed known issues across chat history, tool calls, provider streams, media
+  and exports, memory/RAG/search/voice flows, settings, and accessibility.
+
+## v2.1.0 Highlights
+
+- Rebuilt System Settings with clearer grouped controls, an About panel, deployment health visibility, and local data export/reset actions.
+- Added native model image generation/editing with ordered mixed text/image output blocks and OPFS-backed image display caching.
+- Expanded built-in plugin media tools with Agnes/Gemini image processing, separate OpenAI-compatible Images API and OpenAI Responses image processing plugins, plugin-level Base URL/Model ID controls, image count parameters where supported, compact image tool results, and Agnes image/video processing upgrades.
+- Added thinking intensity controls for reasoning-capable Google/Gemini and OpenAI-compatible models.
+- Added Japanese localization for the app shell, SEO metadata, assistant locale routing, voice language handling, and the public Skills catalog.
+- Hardened hosted deployments with API request proof, shared-store checks, service health coverage, safer URL/secret handling, and Cloudflare Worker command fixes.
+- Added changelog-driven GitHub Release automation and a fork-only upstream sync workflow.
+
+## Features
+
+- Multi-provider chat with Google, Anthropic, OpenAI, and OpenAI-compatible
+  endpoints, including provider-scoped custom model capabilities.
+- Native image generation and image editing for models whose metadata exposes image output/input, with ordered mixed text/image message blocks and OPFS-backed Blob URL display caching.
+- File-backed multimodal image input without Base64 for native OpenAI, Google,
+  and Anthropic chat; HEIC/HEIF conversion and staged client-side compression
+  enforce the 20 MiB source, 10 MiB force-compression, and 5 MiB result limits.
+- Local-first sessions, branches, pinned chats, per-chat composer drafts, reply
+  navigation, token/context usage summaries, workspaces, workspace files, and
+  assistant instructions.
+- Opt-in, end-to-end encrypted WebDAV or S3/MinIO synchronization with local
+  device identity, recovery code, convergent CRDT documents, and encrypted OPFS
+  chunks.
+- Assistant presets from the LobeHub agent registry plus local custom assistants.
+- Per-chat Agent mode for tool-call-capable models, with browser-orchestrated
+  web search, knowledge search, text-only skill loading, sandboxed JavaScript,
+  and task-plan updates.
+- Parameterized text Skills with localized public catalogs, install/uninstall
+  flows, local edits, custom skills, auto-selection, workspace presets, and
+  ordered non-nested bundles of up to four Skills.
+- OpenAPI-based plugin tools plus remote Streamable HTTP and legacy SSE MCP
+  servers, with encrypted install-time credentials, persisted transport
+  selection, per-plugin authentication, server-side execution,
+  transport-derived risk floors, optional confirmation for destructive calls,
+  and an authenticated Docker bridge for allowlisted local stdio servers.
+- Built-in tools for web reading, weather, Unsplash search, Agnes/Google image processing, OpenAI-compatible image processing, OpenAI Responses image processing, and Agnes video generation. Agnes image processing supports image-to-image edits, and Agnes video generation supports public image URL to video plus plugin-level model IDs. Image processing plugins remain separate from native model image output.
+- Web search through Google native Google Search, OpenAI Web Search, or external providers such as Tavily, Firecrawl, Exa, Bocha, and SearXNG.
+- Local global search in an accessible modal across active chat branches,
+  attachments, workspaces, knowledge, and memories, with source/date/role
+  filters and direct result navigation; Settings has its own localized search.
+- Customizable, page-scoped keyboard shortcuts for search, chat creation,
+  composer focus, sidebar visibility, shortcut settings, and stopping generation.
+- Knowledge-base RAG with preserved original files, editable extracted content,
+  configurable Markdown-aware chunking, hybrid lexical/vector retrieval,
+  Mineru/LlamaParse document parsing, filename/status filters, serial batch
+  actions, and recovery controls for failed parsing or indexing.
+- Versioned ZIP backup and transactional restore for local metadata and
+  referenced OPFS files, excluding credentials and external service data, plus
+  read-only quota and OPFS reference diagnostics.
+- Installable offline PWA for local deployments, with read-only history, local search, knowledge access, and backup export; hosted deployments unregister it.
+- Local memory with optional memory search, background extraction, and dream consolidation.
+- Voice input and output through browser APIs, ElevenLabs, Mimo, or compatible configured providers.
+- Rich message rendering for Markdown, safe inline HTML visual blocks, GFM tables, math, code highlighting, Mermaid diagrams, mind maps, citations, reasoning, tool calls, images, audio, and artifacts.
+- Local BYOK encryption for user-entered provider, plugin, MCP, search, RAG, and
+  voice secrets, with fail-closed server-default provider validation.
+- Deployment health checks for BYOK, access password, shared stores, default model, search, RAG, and voice readiness.
+- Docker and Cloudflare Workers deployment paths.
+
+See [End-to-end encrypted sync](docs/encrypted-sync.md),
+[MCP stdio bridge](docs/mcp-stdio-bridge.md), and
+[Offline PWA](docs/offline-pwa.md) for deployment and trust-boundary details.
 
 ## Why Neo Chat?
 
