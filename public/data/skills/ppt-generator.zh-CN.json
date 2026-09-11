@@ -1,0 +1,36 @@
+{
+  "id": "ppt-generator",
+  "name": "ppt-generator",
+  "category": "productivity",
+  "audience": "user-facing",
+  "outputFormat": "markdown",
+  "risk": {
+    "level": "low",
+    "textOnly": true,
+    "scriptRequired": false,
+    "externalToolRequired": false,
+    "networkRequired": false,
+    "reviewRequiredForHighStakes": false
+  },
+  "builtIn": true,
+  "title": "PPT 演示文稿生成器",
+  "description": "输入任意文本、大纲或主题，一键生成结构清晰、排版优雅、可直接演示的 Marp 格式 PPT 源码。",
+  "tags": ["ppt", "演示文稿", "marp", "幻灯片", "报告", "汇报"],
+  "language": "zh-CN",
+  "activation": {
+    "embeddingText": "PPT 演示文稿生成器 输入任意文本、大纲或主题，一键生成结构清晰、排版优雅、可直接演示的 Marp 格式 PPT 源码。 ppt 演示文稿 marp 幻灯片 报告 汇报 帮我做个PPT 怎么写这个汇报幻灯片 生成关于某个主题的PPT大纲 把这段话改成幻灯片",
+    "useWhen": [
+      "用户要求将一段长文本、文章或大纲转化为 PPT 演示文稿",
+      "用户输入一个主题，要求生成 PPT 结构和单页内容",
+      "用户需要 Marp 格式的幻灯片源码"
+    ],
+    "avoidWhen": ["用户需要直接下载 .pptx 二进制文件", "用户需要复杂的动画设计"],
+    "exampleQueries": [
+      "帮我把这段话做成一个 15 页的 PPT",
+      "生成一个关于人工智能发展的汇报 PPT",
+      "把这个项目总结改成幻灯片大纲和内容"
+    ]
+  },
+  "file": "ppt-generator.zh-CN.json",
+  "content": "# PPT 演示文稿生成器\n\n## 目标\n将用户提供的原始文本、大纲、项目总结或主题，转化为结构逻辑严密、排版优雅的 Marp Markdown 格式演示文稿。产出的源码应当可以直接在 Marp、Slidev 或支持 Markdown 幻灯片渲染的工具中直接运行并演示。\n\n## 触发信号\n- 包含 \"PPT\", \"ppt\", \"幻灯片\", \"Slide\", \"演示文稿\" 等关键词。\n- 要求对文本进行多页面、分页结构化的整理。\n\n## 必要输入\n- 原始材料、文章、草稿或具体的 PPT 主题。\n- 目标页数（如未说明，默认生成 5-8 页）。\n- 演示受众（如汇报对象、分享主题等，以决定语气是严肃、专业还是活泼）。\n\n## 处理视角\n从演讲者的逻辑递进（痛点-方案-执行-价值）和听众的视觉体验（字数精简、视觉焦点、一页一主题）出发，设计每一页 PPT 的内容。\n\n## 技能专属流程\n### 步骤\n1. **逻辑梳理**：先分析输入，提取出一条清晰的叙事主线（如：封面页 -> 背景/痛点 -> 核心方案 -> 细节展开 -> 未来展望/总结）。\n2. **单页提炼**：严格遵守“单页 PPT 只讲一个核心观点”的原则。每页字数控制在 100 字以内，使用短句、清单（Bullet Points）或对比表格。\n3. **Marp 格式构建**：使用 `---` 作为分页符。使用标准的 Marp 配置头。\n\n### 统一的 Marp 代码格式规范\n输出的开头必须是以下标准的 Marp 配置头（放在第一个 `---` 之间）：\n```markdown\n---\nmarp: true\ntheme: gaia\nclass: lead\n_class: lead\npaginate: true\nbackgroundColor: #f5f5f5\ncolor: #333333\nstyle: |\n  section {\n    font-family: 'Helvetica Neue', Arial, sans-serif;\n    padding: 40px;\n    font-size: 24px;\n  }\n  h1 {\n    color: #03b2de;\n  }\n---\n```\n\n## 执行与输出形态要求\n1. **直接输出代码块**：请在一个标准的 `markdown` 代码块中输出完整的 Marp 源码，不要夹杂废话，方便用户一键复制。\n2. **页面排版规范**：\n   - **封面页**（第一页）：使用居中排版（Marp 中用 `_class: lead` 标记）。包含主标题、副标题、汇报人及日期。\n   - **目录/大纲页**：清晰列出后续页面的逻辑板块。\n   - **内容页**：使用 `#` 表示幻灯片标题，使用 `-` 列表展示核心论点，关键指标或对比数据使用 `**加粗**` 突出，或使用简单的 Markdown 表格。\n   - **金句/总结页**（最后一页）：使用 `_class: lead` 居中，给出一句有力的总结或 \"Thank You\"。\n\n## 质量检查\n- 页面之间必须用 `---` 严格分隔。\n- 每一页的文字量适中，绝无大段的粘贴复制，全部提炼为短句清单。\n- 幻灯片逻辑是否递进，没有断层。\n\n## 示例请求\n- 帮我做个关于2024工作计划的 PPT\n- 把这段项目总结做成 6 页的幻灯片\n"
+}
