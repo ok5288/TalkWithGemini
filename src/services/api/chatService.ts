@@ -676,7 +676,7 @@ export const streamChatResponse = async (
   }
 
   let effectiveNewMessage = newMessage;
-  const { search } = useSettingsStore.getState();
+  const { search, system } = useSettingsStore.getState();
   const searchConfig =
     search.provider === "google" ? undefined : search.configs[search.provider];
   const searchCompatibility = resolveEffectiveSearchCapability({
@@ -1155,9 +1155,10 @@ export const streamChatResponse = async (
       : appendDiagramRequestInstructions(
           appendHtmlVisualRequestInstructions(
             messageWithSkills,
-            effectiveSystemInstruction,
+            effectiveSystemInstruction,            
           ),
           effectiveSystemInstruction,
+          system,
         );
     let requestAttachments: Attachment[] = [];
     if (researchPhase !== "start" && researchPhase !== "plan") {
