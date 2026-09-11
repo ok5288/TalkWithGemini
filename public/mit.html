@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en" data-color-mode="light" data-light-theme="light" data-dark-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LICENSE - Edward Web World/Ed-iChat</title>
+    <style>
+        :root, [data-color-mode="light"][data-light-theme="light"] {
+            --bg-color: #ffffff;
+            --card-bg: #f6f8fa;
+            --border-color: #d0d7de;
+            --text-main: #24292f;
+            --text-muted: #57606a;
+            --accent: #0969da;
+            --btn-bg: #f3f4f6;
+            --btn-border: rgba(27, 31, 36, 0.15);
+            --btn-hover: #f3f4f6;
+        }
+
+        [data-color-mode="dark"][data-dark-theme="dark"] {
+            --bg-color: #0d1117;
+            --card-bg: #161b22;
+            --border-color: #30363d;
+            --text-main: #c9d1d9;
+            --text-muted: #8b949e;
+            --accent: #58a6ff;
+            --btn-bg: #21262d;
+            --btn-border: rgba(240, 246, 252, 0.1);
+            --btn-hover: #30363d;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            line-height: 1.5;
+            margin: 0;
+            padding: 40px 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            transition: background-color 0.2s ease, color 0.2s ease;
+        }
+
+        .toolbar {
+            width: 100%;
+            max-width: 780px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            font-size: 0.9rem;
+        }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .repo-link {
+            color: var(--accent);
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .repo-link:hover {
+            text-decoration: underline;
+        }
+
+        .slash {
+            color: var(--text-muted);
+            font-weight: normal;
+        }
+
+        .theme-toggle {
+            background-color: var(--btn-bg);
+            border: 1px solid var(--btn-border);
+            color: var(--text-main);
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 500;
+            transition: background-color 0.2s;
+        }
+        .theme-toggle:hover {
+            background-color: var(--btn-hover);
+        }
+
+        .license-container {
+            background-color: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            max-width: 780px;
+            width: 100%;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+            overflow: hidden;
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background-color: var(--card-bg);
+            border-bottom: 1px solid var(--border-color);
+            padding: 12px 16px;
+        }
+
+        .header svg {
+            width: 16px;
+            height: 16px;
+            fill: var(--text-muted);
+            display: flex; align-items: center;
+        }
+
+        .header h1 {
+            font-size: 1.5rem;
+            margin: 0;
+            font-weight: 600;
+            color: var(--text-main);
+           
+        }
+
+        .license-container {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            max-width: 720px;
+            width: 100%;
+            padding: 32px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+        }
+        .content {
+            padding: 24px 16px;
+            margin: 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
+            font-size: 0.85rem;
+            color: var(--text-main);
+            background-color: var(--bg-color);
+        }
+        p {
+            margin: 0 0 16px 0;
+            white-space: pre-line;
+            font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
+            font-size: 0.9rem;
+            color: var(--text-main);
+        }
+        .footer {
+            margin-top: 24px;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            text-align: right;
+            border-top: 1px solid var(--border-color);
+            padding-top: 12px;
+        }
+    </style>
+    </style>
+</head>
+<body>
+
+    <div class="toolbar">
+        <div class="nav-links">
+            <a class="repo-link" href="https://www.ok5266.com" target="_blank">Edward Web World</a>
+            <span class="slash">/</span>
+            <a class="repo-link" href="https://ic.ok5266.com" target="_blank">Ed-iChat</a>
+        </div>
+        <button class="theme-toggle" onclick="toggleTheme()">☀️ / 🌙 切换模式</button>
+    </div>
+
+    <div class="license-container">
+        <div class="header">
+            <svg viewBox="0 0 16 16" version="1.1" aria-hidden="true">
+                <path d="M0 3.75C0 2.784.784 2 1.75 2h12.5c.966 0 1.75.784 1.75 1.75v8.5A1.75 1.75 0 0 1 14.25 14H1.75A1.75 1.75 0 0 1 0 12.25Zm1.75-.25a.25.25 0 0 0-.25.25v8.5c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25v-8.5a.25.25 0 0 0-.25-.25ZM3.5 6.25a.75.75 0 0 1 1.5 0v3.5a.75.75 0 0 1-1.5 0Zm6 0a.75.75 0 0 1 1.5 0v3.5a.75.75 0 0 1-1.5 0Zm-3.75-2a.75.75 0 0 1 .75.75v7.5a.75.75 0 0 1-1.5 0v-7.5a.75.75 0 0 1 .75-.75Z"></path>
+            </svg>
+            <h1>MIT LICENSE</h1>
+        </div>
+        <p>Copyright (c) 2026 Ed iChat contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.</p>
+        <div class="footer"><a class="repo-link" href="https://ic.ok5266.com" target="_blank">Ed iChat Project</a></div>
+
+    <script>
+        function toggleTheme() {
+            const html = document.documentElement;
+            const currentMode = html.getAttribute('data-color-mode');
+            if (currentMode === 'dark') {
+                html.setAttribute('data-color-mode', 'light');
+            } else {
+                html.setAttribute('data-color-mode', 'dark');
+            }
+        }
+    </script>
+</body>
+</html>
