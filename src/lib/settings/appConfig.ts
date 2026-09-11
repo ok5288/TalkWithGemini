@@ -169,6 +169,10 @@ export function normalizeSystemSettings(
         ? raw.enableIntelligentUi
         : defaults.enableIntelligentUi,
     enableMcpApps: raw.enableMcpApps === true,
+    enableDiagramPrompt:
+      typeof raw.enableDiagramPrompt === "boolean"
+        ? raw.enableDiagramPrompt
+        : defaults.enableDiagramPrompt,
     enableDestructiveToolConfirmation:
       typeof raw.enableDestructiveToolConfirmation === "boolean"
         ? raw.enableDestructiveToolConfirmation
