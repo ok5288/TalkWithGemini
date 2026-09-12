@@ -1155,9 +1155,11 @@ export const streamChatResponse = async (
       : appendDiagramRequestInstructions(
           appendHtmlVisualRequestInstructions(
             messageWithSkills,
-            effectiveSystemInstruction,            
-          ),
-          effectiveSystemInstruction,
+            effectiveSystemInstruction,
+            system, // 👈【正确】把 system 传给 HTML Visual Prompt  -v2.5.0
+      ),
+      effectiveSystemInstruction,
+      system, // 👈【修改】改为使用 system       
         );
     let requestAttachments: Attachment[] = [];
     if (researchPhase !== "start" && researchPhase !== "plan") {
