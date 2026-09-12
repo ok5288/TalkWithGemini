@@ -1,5 +1,5 @@
 {
-  "name": "neo-chat",
+  "name": "ed-ichat",
   "description": "An omni AI chat application with a clean UI and excellent performance.",
   "private": true,
   "version": "2.5.2",
@@ -74,7 +74,7 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
-    "@opennextjs/cloudflare": "^1.20.1",
+    "@opennextjs/cloudflare": "latest",
     "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4.3.3",
     "@testing-library/react": "^16.3.2",
