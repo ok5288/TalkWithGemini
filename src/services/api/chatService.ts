@@ -1286,7 +1286,6 @@ export const streamChatResponse = async (
             effectiveSystemInstruction,            
           ),
           effectiveSystemInstruction,
-          system,
         );
     let requestAttachments: Attachment[] = [];
     if (researchPhase !== "start" && researchPhase !== "plan") {
