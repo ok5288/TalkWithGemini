@@ -1,4 +1,5 @@
 import { API_INPUT_LIMITS } from "@/config/limits";
+import { SystemSettings } from "@/lib/settings/types"; // 👈 L2【新增】引入 SystemSettings
 import { clampChatInputText } from "../utils/chatInput";
 
 export const HTML_VISUAL_PROMPT_MARKER = "<html-visual>";
@@ -56,8 +57,16 @@ export function isHtmlVisualPromptInstructionEnabled(
 export function appendHtmlVisualRequestInstructions(
   message: string,
   systemInstruction?: string,
+  settings?: SystemSettings, // 👈 这里是上面增加的参数
   maxChars: number = API_INPUT_LIMITS.maxChatTextChars,
 ): string {
+  // 1. 【新增逻辑】如果用户在设置里关闭了 HTML Visual Prompt，直接返回原消息，不追加任何指令！
+  // 只有当 settings 存在，且 enableHtmlVisualPrompt 明确为 false 时才拦截
+  if (settings && settings.enableHtmlVisualPrompt === false) {
+    return message;
+  }
+
+  // 2. 以下是原代码逻辑，但现在只有在开关开启时才会执行
   if (!isHtmlVisualPromptInstructionEnabled(systemInstruction)) {
     return message;
   }
