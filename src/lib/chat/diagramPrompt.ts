@@ -1,4 +1,5 @@
 import { API_INPUT_LIMITS } from "@/config/limits";
+import { SystemSettings } from "@/lib/settings/types";
 import { clampChatInputText } from "../utils/chatInput";
 
 export const DIAGRAM_PROMPT_MARKER = "<diagram-rendering>";
@@ -129,15 +130,50 @@ export function isEnhancedDiagramPromptInstructionEnabled(
 export function appendDiagramRequestInstructions(
   message: string,
   systemInstruction?: string,
+  settings?: SystemSettings,
   maxChars: number = API_INPUT_LIMITS.maxChatTextChars,
 ): string {
+  // 1. 如果系统指令中本来就没有配置图表渲染指令，直接原样返回，不追加任何东西
   if (!isDiagramPromptInstructionEnabled(systemInstruction)) {
     return message;
   }
+
+  // 2. 如果消息中已经包含注入标记，避免重复追加
   if (message.includes('data-diagram-rendering="true"')) {
     return message;
   }
 
+  // 3. 【核心优化：用户意图优先】
+  // 检查用户输入的消息里有没有主动要求图表的关键词（中英文均可）
+  const lowerMessage = message.toLowerCase();
+  const userWantsDiagram = 
+    lowerMessage.includes("mermaid") ||
+    lowerMessage.includes("mindmap") ||
+    lowerMessage.includes("思维导图") ||
+    lowerMessage.includes("流程图") ||
+    lowerMessage.includes("架构图") ||
+    lowerMessage.includes("图表");
+
+  // 4. 只有当“设置关闭” 并且 “用户没有主动要求图表” 时，才追加禁用指令
+  // 如果用户主动要求了（userWantsDiagram 为 true），直接跳过禁用，执行第 5 步画图！
+  if (settings && settings.enableDiagramPrompt === false && !userWantsDiagram) {
+    const disableInstruction =
+      "(Note: Do not output any ```mermaid or ```mindmap diagram blocks for this response.)";
+    
+    if (message.includes(disableInstruction)) {
+      return message;
+    }
+
+    const separator = "\n\n";
+    const maxMessageChars = Math.max(
+      0,
+      maxChars - separator.length - disableInstruction.length,
+    );
+    const boundedMessage = clampChatInputText(message, maxMessageChars);
+    return `${boundedMessage}${separator}${disableInstruction}`;
+  }
+
+  // 5. 用户开启了开关，或者用户虽然关了开关但【主动点名要求画图】，追加正常图表引导指令
   const instructions = isEnhancedDiagramPromptInstructionEnabled(
     systemInstruction,
   )
