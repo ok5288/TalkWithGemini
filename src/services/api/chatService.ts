@@ -1079,13 +1079,45 @@ export const streamChatResponse = async (
         forcedToolDirective,
       )
     : workflowSystemInstruction;
-  const effectiveSystemInstruction = automaticModeEnabled
+    // 1. 确保框架原本计算出来的底层系统指令有安全的字符串兜底
+  const rawSystemInstruction = automaticModeEnabled
     ? appendAgentSystemInstruction(
         workflowWithForcedTools,
         AUTO_MODE_SYSTEM_INSTRUCTION,
       )
     : workflowWithForcedTools;
 
+  // 2. 显式声明为 string 类型，彻底根除 TS 任何关于类型的抱怨
+  let finalSystemInstruction: string = rawSystemInstruction || "";
+
+  // 3. 安全地根据开关状态过滤图表和 HTML 提示词
+  if (system?.enableDiagramPrompt !== true) {
+    finalSystemInstruction = finalSystemInstruction
+      .replace(/<format scope="request">\s*<diagram-rendering>[\s\S]*?<\/diagram-rendering>\s*<\/format>/g, "")
+      .replace(/<format scope="request">\s*<diagram-visual-polish>[\s\S]*?<\/diagram-visual-polish>\s*<\/format>/g, "");
+  }
+
+  if (system?.enableHtmlVisualPrompt !== true) {
+    finalSystemInstruction = finalSystemInstruction
+      .replace(/<format scope="request">\s*<html-visual>[\s\S]*?<\/html-visual>\s*<\/format>/g, "");
+  }
+
+  // 4. 【新增】智能按需过滤 <auto-mode> 路由提示词
+  // 如果用户只是发了简单的闲聊（如 "hi", "你是谁", "你好" 等短文本），且没有带附件/工具，
+  // 我们顺手把几百字的 <auto-mode> 也切掉，让发“hi”时的 Token 压到极限！
+  const isSimpleChat = 
+    newMessage.trim().length < 15 && 
+    !newMessage.toLowerCase().includes("search") &&
+    !newMessage.includes("搜索") &&
+    !newMessage.includes("研究") &&
+    !newMessage.includes("文件") &&
+    attachments.length === 0;
+
+  if (isSimpleChat) {
+    finalSystemInstruction = finalSystemInstruction
+      .replace(/<auto-mode>[\s\S]*?<\/auto-mode>/g, "");
+  }
+  // ====================================================================
   if (agentRun) {
     const lease = acquireAgentRunLease({ sessionId, runId: agentRun.id });
     if (!lease.acquired) {
@@ -1152,15 +1184,32 @@ export const streamChatResponse = async (
         : effectiveNewMessage;
     let requestMessage = researchModeEnabled
       ? messageWithSkills
-      : appendDiagramRequestInstructions(
-          appendHtmlVisualRequestInstructions(
-            messageWithSkills,
-            effectiveSystemInstruction,
-            system, // 👈【正确】把 system 传给 HTML Visual Prompt  -v2.5.0
-      ),
-      effectiveSystemInstruction,
-      system, // 👈【修改】改为使用 system       
-        );
+      : (() => {
+          let msg = messageWithSkills;
+
+          // 1. 只有当用户开启了 HTML 视觉开关时，才追加 HTML 提示词
+          if (system?.enableHtmlVisualPrompt === true) {
+            msg = appendHtmlVisualRequestInstructions(
+              msg,
+              finalSystemInstruction,
+              system,
+            );
+          }
+
+          // 2. 只有当用户开启了图表开关时，才追加图表提示词
+          if (system?.enableDiagramPrompt === true) {
+            msg = appendDiagramRequestInstructions(
+              msg,
+              finalSystemInstruction,
+              system,
+            );
+          }
+
+          // 如果两个开关都关闭了，msg 原封不动，零冗余 Token！
+          return msg;
+        })();
+    // ==========================================================
+    
     let requestAttachments: Attachment[] = [];
     if (researchPhase !== "start" && researchPhase !== "plan") {
       const compressedRequestAttachments = await compressImageAttachments(
@@ -1288,7 +1337,7 @@ export const streamChatResponse = async (
       boundHistoryForRequest([], {
         newMessage: requestMessage,
         attachments: requestAttachments,
-        systemInstruction: effectiveSystemInstruction,
+        systemInstruction: finalSystemInstruction,
         tools,
         modelInputTokenLimit: selectedModelMetadata?.limit?.context,
         reservedOutputTokens: selectedModelMetadata?.limit?.output,
@@ -1393,7 +1442,7 @@ export const streamChatResponse = async (
         attachments: requestAttachments,
         modelInputTokenLimit: selectedModelMetadata?.limit?.context,
         reservedOutputTokens: selectedModelMetadata?.limit?.output,
-        systemInstruction: effectiveSystemInstruction,
+        systemInstruction: finalSystemInstruction,
         tools: requestTools,
       });
       const requestPayload = {
@@ -1402,7 +1451,7 @@ export const streamChatResponse = async (
         newMessage: requestMessage,
         attachments: requestAttachments,
         config: requestConfig,
-        systemInstruction: effectiveSystemInstruction,
+        systemInstruction: finalSystemInstruction,
         ...(options?.responseFormat
           ? { responseFormat: options.responseFormat }
           : {}),
