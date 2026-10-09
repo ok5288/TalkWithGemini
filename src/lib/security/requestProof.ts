@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { isApiProofProtectedRoute } from "./apiRoutePolicy";
+import { getSecurityCookieOptions } from "./cookiePolicy";
 import { getDeploymentMode } from "./deployment";
 import { incrementRateLimitBucket } from "./rateLimitStore";
 
@@ -306,11 +307,9 @@ export async function createRequestProofSessionResponse(): Promise<NextResponse>
     windowMs: session.windowMs,
   });
   response.headers.set("Cache-Control", "no-store");
+  const cookieOptions = getSecurityCookieOptions();
   response.cookies.set(API_PROOF_SESSION_COOKIE, session.cookieValue, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
+    ...cookieOptions,
     maxAge: API_PROOF_SESSION_TTL_MS / 1000,
   });
   return response;

@@ -78,6 +78,13 @@ const FONT_SIZE_OPTIONS: Array<
   { value: "large", labelKey: "fontLarge" },
 ];
 
+const CHAT_LAYOUT_OPTIONS: Array<
+  TranslationOption<AppSettings["system"]["chatLayout"]>
+> = [
+  { value: "document", labelKey: "chatLayoutDocument" },
+  { value: "conversation", labelKey: "chatLayoutConversation" },
+];
+
 const PERSONALITY_OPTIONS: Array<TranslationOption<SystemPersonality>> = [
   {
     value: "default",
@@ -633,6 +640,10 @@ const SystemSettings = () => {
     value: option.value,
     label: t(option.labelKey),
   }));
+  const chatLayoutOptions = CHAT_LAYOUT_OPTIONS.map((option) => ({
+    value: option.value,
+    label: t(option.labelKey),
+  }));
   const personalityOptions = PERSONALITY_OPTIONS.map((option) => ({
     value: option.value,
     label: t(option.labelKey),
@@ -668,6 +679,23 @@ const SystemSettings = () => {
             options={languageOptions}
             value={selectedLanguage}
             onChange={(val) => setLocale(val)}
+          />
+        </SettingRow>
+
+        <SettingRow
+          title={t("chatLayout")}
+          description={t("chatLayoutDesc")}
+          controlClassName="sm:w-80"
+        >
+          <SegmentedControl
+            ariaLabel={t("chatLayoutAria")}
+            options={chatLayoutOptions}
+            value={system.chatLayout}
+            onChange={(value) =>
+              updateSystemSettings({
+                chatLayout: value as AppSettings["system"]["chatLayout"],
+              })
+            }
           />
         </SettingRow>
 

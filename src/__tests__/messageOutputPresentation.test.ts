@@ -28,8 +28,10 @@ const toolBlock: MessageOutputBlock = {
 };
 
 describe("message output presentation", () => {
-  it("uses the same bottom-only spacing for every model output block", () => {
-    expect(getMessageOutputBlockSpacingClass()).toBe("mb-3");
+  it("normalizes child margins and hides empty output wrappers", () => {
+    expect(getMessageOutputBlockSpacingClass()).toBe(
+      "flow-root m-0 empty:hidden [&>*]:m-0!",
+    );
 
     const renderer = readFileSync(
       resolve(
@@ -43,7 +45,7 @@ describe("message output presentation", () => {
     expect(renderer).not.toMatch(
       /data-message-output-block[^>]+(?:mt-|p[trblxy]?)-/,
     );
-    expect(renderer).toContain("[&>*]:m-0!");
+    expect(renderer).toContain("flex min-w-0 flex-col gap-3");
     expect(renderer).toContain("node: <AgentRunBar");
     expect(renderer).toContain("node: <TaskPlanBlock");
     expect(renderer).toContain("<ConnectedResearchTaskCard");

@@ -73,6 +73,7 @@ export interface SystemSettings {
   enableHtmlVisualPrompt: boolean;
   enableDestructiveToolConfirmation: boolean;
   fontSize: "small" | "medium" | "large";
+  chatLayout: "document" | "conversation";
 }
 
 export interface AppSettings {

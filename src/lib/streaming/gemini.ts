@@ -6,6 +6,7 @@ import {
   GoogleGenAI,
   Modality,
   ThinkingLevel,
+  type FunctionDeclaration,
   type GenerateContentParameters,
   type GenerateContentConfig,
 } from "@google/genai";
@@ -30,7 +31,7 @@ export interface GeminiStreamOptions {
   systemInstruction?: string;
   temperature?: number;
   responseFormat?: StructuredResponseFormat;
-  tools?: any[];
+  tools?: FunctionDeclaration[];
   enableGoogleSearch?: boolean;
   enableImageGeneration?: boolean;
   imageCount?: number;

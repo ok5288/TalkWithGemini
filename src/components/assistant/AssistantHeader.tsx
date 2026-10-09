@@ -104,7 +104,7 @@ const AssistantHeader: React.FC<AssistantHeaderProps> = ({
         if (!isMountedRef.current || optimizeRunRef.current !== runId) {
           return;
         }
-        setContent(replacement.append(chunk));
+        setContent(replacement.replace(chunk));
       });
       if (!isMountedRef.current || optimizeRunRef.current !== runId) {
         return;

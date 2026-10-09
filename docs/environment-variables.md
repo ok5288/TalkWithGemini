@@ -26,9 +26,10 @@ replace values already baked into a prebuilt image.
 
 ## Access control
 
-| Variable          | Purpose                                                                                                                                                     |
-| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ACCESS_PASSWORD` | Optional deployment password gate. A non-empty value enables it; an empty or unset value disables it. Accepts comma-separated passwords, not user accounts. |
+| Variable                      | Purpose                                                                                                                                                                                              |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ACCESS_PASSWORD`             | Optional deployment password gate. A non-empty value enables it; an empty or unset value disables it. Accepts comma-separated passwords, not user accounts.                                          |
+| `ALLOW_INSECURE_HTTP_COOKIES` | Defaults to `false`, so production access, failed-attempt, and request-proof cookies use `Secure`. Set to `true`, `1`, `yes`, or `on` only when a private deployment must be served over plain HTTP. |
 
 Commas are separators and cannot be part of an access password. Changing the
 configured list invalidates existing access sessions. Whitespace and empty entries
@@ -57,6 +58,7 @@ corepack pnpm byok:generate
 | `DEPLOYMENT_MODE`                 | Selects local or hosted deployment safeguards and shared-store expectations. It does not block user-configured HTTP or private-network targets.                                             |
 | `NEXT_DEPLOYMENT_ID`              | Optional build-time release ID shared by every replica in one rollout; drives Next.js version-skew protection and PWA cache rotation.                                                       |
 | `ALLOW_INSECURE_LOCAL_PRODUCTION` | Explicitly allows production `local` mode without `ACCESS_PASSWORD`. Use only for private deployments that are not exposed to the internet.                                                 |
+| `ALLOW_INSECURE_HTTP_COOKIES`     | Allows the deployment's security cookies to be sent over plain HTTP. Keep `false` and use HTTPS whenever the service is reachable beyond a trusted local network.                           |
 | `ALLOW_LOCAL_NETWORK_PROXY`       | Allows HTTP on deployment-gated media/image proxy surfaces. Private addresses themselves are no longer blocked; provider, search, RAG, plugin, and MCP policies do not depend on this flag. |
 | `TRUST_PROXY_HEADERS`             | Trust forwarded proxy headers only when the hosting platform strips spoofed values.                                                                                                         |
 
@@ -72,6 +74,13 @@ deployment modes. Fixed registries and built-in service endpoints remain
 HTTPS-only. On a public deployment, accept these user-configured URLs only from
 trusted administrators because they expand the server's SSRF surface and HTTP
 does not protect credentials or responses in transit.
+
+`ALLOW_INSECURE_HTTP_COOKIES` only changes the browser's `Secure` cookie flag;
+it does not disable signed session cookies, same-origin checks, request proof,
+or rate limiting. Browser Web Crypto APIs used by BYOK and request proof still
+require a secure context in most browsers. Use HTTPS, or access a loopback
+deployment through an SSH tunnel such as `ssh -N -L 3000:127.0.0.1:3000
+host.example`, instead of relying on this opt-in for an internet-facing site.
 
 ## Shared stores
 

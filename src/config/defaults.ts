@@ -78,6 +78,7 @@ export const DEFAULT_SYSTEM_SETTINGS = {
   enableHtmlVisualPrompt: true,
   enableDestructiveToolConfirmation: true,
   fontSize: "medium",
+  chatLayout: "document",
 } as const satisfies SystemSettings;
 
 // ============================================================================

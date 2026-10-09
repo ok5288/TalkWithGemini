@@ -23,7 +23,7 @@ Neither fix relaxes the hosted CSP. See the
 [Ajv CSP documentation](https://github.com/ajv-validator/ajv/blob/master/docs/security.md)
 and the [interpreter documentation](https://github.com/cfworker/cfworker/tree/master/packages/json-schema).
 
-## Additional findings not changed in this patch
+## Additional findings and follow-up status
 
 ### Explicit MCP schema dialects
 
@@ -41,14 +41,29 @@ validation behavior.
 
 ### Gemini schema conversion
 
-[The Gemini converter](../src/lib/utils/schema.ts) calls `schema.type.toUpperCase()`.
-A valid union such as `type: ["string", "null"]` therefore throws a `TypeError`.
-The converter also omits `$ref`, `anyOf`, and `additionalProperties`, so the
-model's schema can be less restrictive than the executor's schema.
+Fixed on 2026-10-09. The shared chat dispatcher selects the parameter format
+using the same resolved API version as the Google SDK client. Default and
+explicit `v1beta` endpoints receive the original `parametersJsonSchema`,
+including unions, references, and constraints. Other explicitly selected versions
+receive converted `parameters`; the fields are mutually exclusive and tools
+without a parameter schema omit both. No version rewrite or retry downgrade is
+performed.
 
-This needs a provider-specific conversion contract and tests for nullable
-types, unions, references, and unsupported constraints. It is independent of
-the runtime compilation fix.
+[The compatibility converter](../src/lib/utils/schema.ts) supports nullable and
+multi-type unions, `anyOf`, nested properties/items, and the installed SDK's
+supported scalar constraints. Integer-size constraints are represented as the
+SDK's decimal strings. Local JSON Pointer references are expanded without
+network access. Missing, external, cyclic, or conflicting reference siblings
+raise a compatibility error naming the tool and schema path. Unsupported legacy
+keywords (including `additionalProperties` and non-string enums) produce only a
+development log containing the keyword and path, never schema values. The
+executor continues validating against the unchanged original schema.
+
+Tests cover nullable unions, reference failures and escaped pointers, input
+immutability, version selection, absent parameter schemas, and request bodies
+serialized by the real Google SDK against a mocked HTTP transport. These checks
+do not establish acceptance by a live Google endpoint. The old duplicate
+converter in `apiHelpers.ts` was unused and has been removed.
 
 ### JavaScript sandbox CSP: browser verification still needed
 

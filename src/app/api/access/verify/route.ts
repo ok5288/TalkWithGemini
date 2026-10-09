@@ -22,14 +22,8 @@ import {
   incrementRateLimitBucket,
   resetRateLimitBucket,
 } from "@/lib/security/rateLimitStore";
+import { getSecurityCookieOptions } from "@/lib/security/cookiePolicy";
 import { getRateLimitClientIp } from "@/lib/security/requestGuards";
-
-const cookieOptions = {
-  httpOnly: true,
-  sameSite: "lax" as const,
-  secure: process.env.NODE_ENV === "production",
-  path: "/",
-};
 
 function noStore(response: NextResponse): NextResponse {
   response.headers.set("Cache-Control", "no-store");
@@ -93,6 +87,7 @@ export async function POST(request: NextRequest) {
   if (password && (await isValidAccessPassword(password))) {
     if (serverFailureKey) await resetRateLimitBucket(serverFailureKey);
     const response = noStore(NextResponse.json({ ok: true }));
+    const cookieOptions = getSecurityCookieOptions();
     response.cookies.set(
       ACCESS_SESSION_COOKIE,
       await createAccessSessionCookieValue(),
@@ -136,6 +131,7 @@ export async function POST(request: NextRequest) {
     ),
   );
 
+  const cookieOptions = getSecurityCookieOptions();
   response.cookies.set(ACCESS_ATTEMPTS_COOKIE, failure.cookieValue, {
     ...cookieOptions,
     maxAge: ACCESS_LOCKOUT_SECONDS,

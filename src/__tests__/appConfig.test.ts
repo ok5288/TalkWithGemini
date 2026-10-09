@@ -158,6 +158,16 @@ describe("app config normalization", () => {
     });
   });
 
+  it("defaults legacy or invalid chat layouts to document and preserves conversation", () => {
+    expect(normalizeSystemSettings({}).chatLayout).toBe("document");
+    expect(normalizeSystemSettings({ chatLayout: "columns" }).chatLayout).toBe(
+      "document",
+    );
+    expect(
+      normalizeSystemSettings({ chatLayout: "conversation" }).chatLayout,
+    ).toBe("conversation");
+  });
+
   it("normalizes system font size", () => {
     expect(normalizeSystemSettings({ fontSize: "large" }).fontSize).toBe(
       "large",

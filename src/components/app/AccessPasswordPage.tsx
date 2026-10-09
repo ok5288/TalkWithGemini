@@ -18,6 +18,10 @@ type AccessVerifyResponse = {
   lockedUntil?: number;
 };
 
+const ACCESS_DIAGNOSTIC_ERROR_CODES = {
+  csrf: "CSRF_ORIGIN_BLOCKED",
+} as const;
+
 function formatLockTime(totalSeconds: number): string {
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
@@ -80,6 +84,7 @@ export default function AccessPasswordPage({
     try {
       const response = await fetch("/api/access/verify", {
         method: "POST",
+        credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password: trimmedPassword }),
       });
@@ -88,6 +93,29 @@ export default function AccessPasswordPage({
         .catch(() => ({}))) as AccessVerifyResponse;
 
       if (response.ok && data.ok) {
+        let configResponse: Response;
+        try {
+          configResponse = await fetch("/api/config", {
+            method: "GET",
+            credentials: "same-origin",
+            cache: "no-store",
+          });
+        } catch {
+          setErrorKey("networkError");
+          return;
+        }
+
+        if (!configResponse.ok) {
+          setErrorKey(
+            configResponse.status === 401
+              ? "sessionNotEstablished"
+              : configResponse.status === 403
+                ? "proxyConfiguration"
+                : "genericError",
+          );
+          return;
+        }
+
         router.refresh();
         return;
       }
@@ -99,11 +127,16 @@ export default function AccessPasswordPage({
         setErrorKey("locked");
       } else if (data.code === ACCESS_ERROR_CODES.invalid) {
         setErrorKey("invalid");
+      } else if (
+        response.status === 403 ||
+        data.code === ACCESS_DIAGNOSTIC_ERROR_CODES.csrf
+      ) {
+        setErrorKey("proxyConfiguration");
       } else {
         setErrorKey("genericError");
       }
     } catch {
-      setErrorKey("genericError");
+      setErrorKey("networkError");
     } finally {
       setIsSubmitting(false);
     }

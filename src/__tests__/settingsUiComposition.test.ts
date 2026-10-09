@@ -203,6 +203,23 @@ describe("settings UI primitives", () => {
     );
   });
 
+  it("exposes document and conversation layouts with localized labels", () => {
+    const source = readFileSync(
+      resolve(process.cwd(), "src/components/settings/SystemSettings.tsx"),
+      "utf8",
+    );
+    expect(source).toContain("value={system.chatLayout}");
+    expect(source).toMatch(/updateSystemSettings\(\{\s*chatLayout:/);
+    for (const messages of [en, zh, ja]) {
+      expect(messages.System.chatLayoutDocument).toBeTruthy();
+      expect(messages.System.chatLayoutConversation).toBeTruthy();
+      expect(messages.System.chatLayoutAria).toBeTruthy();
+      expect(
+        messages.SettingsPage.searchKeywords_system.toLowerCase(),
+      ).toContain(messages.System.chatLayout.toLowerCase());
+    }
+  });
+
   it("uses a dropdown for interface language instead of a fixed segmented control", () => {
     const systemSettings = readFileSync(
       resolve(process.cwd(), "src/components/settings/SystemSettings.tsx"),
@@ -215,7 +232,7 @@ describe("settings UI primitives", () => {
     );
     const languageSection = systemSettings.slice(
       languageControlIndex,
-      systemSettings.indexOf('title={t("fontSize")}', languageControlIndex),
+      systemSettings.indexOf("</SettingRow>", languageControlIndex),
     );
 
     expect(systemSettings).toContain("INTERFACE_LANGUAGE_OPTIONS");

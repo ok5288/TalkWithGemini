@@ -133,6 +133,26 @@ describe("API request proof middleware", () => {
     expect(result.status).toBe(200);
   });
 
+  it("uses the shared runtime cookie policy for bootstrap sessions", async () => {
+    hostedEnv("");
+    vi.stubEnv("NODE_ENV", "production");
+
+    const secureResponse = await proxy(
+      new NextRequest("https://neo.test/api/request-proof/session"),
+    );
+    expect(secureResponse.cookies.get(API_PROOF_SESSION_COOKIE)?.secure).toBe(
+      true,
+    );
+
+    vi.stubEnv("ALLOW_INSECURE_HTTP_COOKIES", " YeS ");
+    const insecureResponse = await proxy(
+      new NextRequest("http://neo.test/api/request-proof/session"),
+    );
+    expect(insecureResponse.cookies.get(API_PROOF_SESSION_COOKIE)?.secure).toBe(
+      false,
+    );
+  });
+
   it("allows hosted protected API requests with valid request proof", async () => {
     hostedEnv();
     const now = 1_700_000_000_000;

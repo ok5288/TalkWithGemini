@@ -2,17 +2,18 @@ import { describe, expect, it } from "vitest";
 import { createStreamingReplacement } from "../lib/utils/streamingText";
 
 describe("streaming text helpers", () => {
-  it("builds replacement text without appending to the original", () => {
+  it("replaces the displayed value with each cumulative stream snapshot", () => {
     const stream = createStreamingReplacement("old prompt");
 
-    expect(stream.append("new")).toBe("new");
-    expect(stream.append(" prompt")).toBe("new prompt");
-    expect(stream.value()).toBe("new prompt");
+    expect(stream.replace("A")).toBe("A");
+    expect(stream.replace("AB")).toBe("AB");
+    expect(stream.replace("ABC")).toBe("ABC");
+    expect(stream.value()).toBe("ABC");
   });
 
   it("keeps the original available for rollback", () => {
     const stream = createStreamingReplacement("stable prompt");
-    stream.append("partial");
+    stream.replace("partial");
 
     expect(stream.restore()).toBe("stable prompt");
   });

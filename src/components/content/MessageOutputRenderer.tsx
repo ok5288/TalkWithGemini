@@ -304,6 +304,9 @@ const MessageOutputRenderer: React.FC<MessageOutputRendererProps> = ({
           });
           return;
         }
+        // Providers can emit whitespace between tool events. Keep it in the
+        // message, but do not create an invisible Markdown row for it.
+        if (!block.content.trim()) return;
         renderedItems.push({
           key: block.id,
           framed: false,
@@ -449,13 +452,15 @@ const MessageOutputRenderer: React.FC<MessageOutputRendererProps> = ({
   if (renderedItems.length === 0) return null;
 
   return (
-    <div className={isTyping ? "animate-in fade-in duration-500" : ""}>
+    <div
+      className={`flex min-w-0 flex-col gap-3 ${isTyping ? "animate-in fade-in duration-500" : ""}`}
+    >
       {renderedItems.map((item) =>
         item.framed ? (
           <div
             key={item.key}
             data-message-output-block
-            className={`${getMessageOutputBlockSpacingClass()} [&>*]:m-0!`}
+            className={getMessageOutputBlockSpacingClass()}
           >
             {item.node}
           </div>

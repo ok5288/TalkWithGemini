@@ -113,21 +113,3 @@ export function createStreamHandler(
     },
   });
 }
-
-/**
- * 转换 Schema 为 Gemini 格式
- */
-export function convertSchemaToGemini(schema: any): any {
-  if (!schema) return undefined;
-  const newSchema = { ...schema };
-  if (newSchema.type) newSchema.type = newSchema.type.toUpperCase();
-  if (newSchema.properties) {
-    const newProps: any = {};
-    for (const key in newSchema.properties) {
-      newProps[key] = convertSchemaToGemini(newSchema.properties[key]);
-    }
-    newSchema.properties = newProps;
-  }
-  if (newSchema.items) newSchema.items = convertSchemaToGemini(newSchema.items);
-  return newSchema;
-}

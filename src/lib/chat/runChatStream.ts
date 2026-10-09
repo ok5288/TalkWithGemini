@@ -5,11 +5,14 @@
  * 该模块必须保持同构：不得引入 server-only 模块或 Node API。
  */
 
-import type { GoogleGenAI } from "@google/genai";
+import type { FunctionDeclaration, GoogleGenAI } from "@google/genai";
 import type Anthropic from "@anthropic-ai/sdk";
 import type OpenAI from "openai";
 import type { Message, ReasoningMode } from "@/types";
-import type { ProviderRuntimeConfig } from "../security/urlPolicy";
+import {
+  getProviderGoogleSdkOptions,
+  type ProviderRuntimeConfig,
+} from "../security/urlPolicy";
 import {
   convertToolsToAnthropic,
   streamAnthropicMessages,
@@ -289,11 +292,23 @@ export async function runChatStream(
         }
         contents.push({ role: "user", parts });
 
-        const geminiTools = tools?.map((tool: any) => ({
-          name: tool.function.name,
-          description: tool.function.description,
-          parameters: convertSchemaToGemini(tool.function.parameters),
-        }));
+        const { apiVersion } = getProviderGoogleSdkOptions(provider.baseUrl);
+        const geminiTools: FunctionDeclaration[] | undefined = tools?.map(
+          (tool) => ({
+            name: tool.function.name,
+            description: tool.function.description,
+            ...(tool.function.parameters == null
+              ? {}
+              : apiVersion === "v1beta"
+                ? { parametersJsonSchema: tool.function.parameters }
+                : {
+                    parameters: convertSchemaToGemini(
+                      tool.function.parameters,
+                      tool.function.name,
+                    ),
+                  }),
+          }),
+        );
 
         await streamGeminiResponse({
           client,

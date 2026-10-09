@@ -74,6 +74,7 @@ BYOK_ALLOW_EPHEMERAL_KEY=false
 BYOK_PRIVATE_KEY_PEM='-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----'
 BYOK_KEY_ID=replace-with-your-key-id
 ALLOW_INSECURE_LOCAL_PRODUCTION=false
+ALLOW_INSECURE_HTTP_COOKIES=false
 TRUST_PROXY_HEADERS=false
 RATE_LIMIT_STORE=memory
 DOCUMENT_PARSE_JOB_STORE=memory
@@ -103,6 +104,21 @@ Conversations and uploaded files are browser-local by default; a container
 volume does not back them up. Use the app's backup/export or encrypted sync,
 and keep the browser origin (scheme, host, and port) consistent when migrating.
 See [privacy and local data](privacy-and-local-data.md).
+
+Production security cookies use `Secure` by default. Keep
+`ALLOW_INSECURE_HTTP_COOKIES=false` when using HTTPS. For a deliberately local
+plain-HTTP deployment, set it to `true`, `1`, `yes`, or `on`; this only permits
+the access, failed-attempt, and request-proof cookies to return over HTTP. It
+does not disable their signatures, same-origin checks, request proof, or rate
+limits. BYOK and request-proof browser APIs still require a secure context in
+most browsers, so prefer HTTPS or an SSH tunnel:
+
+```bash
+ssh -N -L 3000:127.0.0.1:3000 user@server
+```
+
+Open `http://127.0.0.1:3000` through that tunnel. An internet-facing service
+should use an HTTPS reverse proxy instead of enabling the HTTP cookie switch.
 
 ### Update or roll back
 
@@ -214,9 +230,11 @@ ALLOW_INSECURE_LOCAL_PRODUCTION=true docker compose up --build -d
 ```
 
 This source Compose file loads the optional root `.env` into the `neo-chat`
-container, defaults to ephemeral BYOK keys, and publishes port 3000 on all host
-interfaces. Set stable keys for long-lived use and restrict network access as
-appropriate. The `mcp-bridge` service intentionally keeps an explicit
+container, defaults to ephemeral BYOK keys, and binds port 3000 to the host's
+loopback interface. Set an explicit HTTPS reverse proxy upstream before
+exposing it publicly. Set stable keys for
+long-lived use and restrict network access as appropriate. The
+`mcp-bridge` service intentionally keeps an explicit
 environment allowlist so application credentials are not copied into it.
 Copying `.env.local` alone does not configure container runtime values.
 

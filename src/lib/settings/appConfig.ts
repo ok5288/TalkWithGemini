@@ -169,5 +169,6 @@ export function normalizeSystemSettings(
         ? raw.enableDestructiveToolConfirmation
         : defaults.enableDestructiveToolConfirmation,
     fontSize: normalizeFontSize(raw.fontSize, defaults.fontSize),
+    chatLayout: raw.chatLayout === "conversation" ? "conversation" : "document",
   };
 }

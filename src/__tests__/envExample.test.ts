@@ -10,6 +10,7 @@ const REQUIRED_ENV_KEYS = [
   "DEPLOYMENT_MODE",
   "NEXT_DEPLOYMENT_ID",
   "ALLOW_INSECURE_LOCAL_PRODUCTION",
+  "ALLOW_INSECURE_HTTP_COOKIES",
   "ALLOW_LOCAL_NETWORK_PROXY",
   "TRUST_PROXY_HEADERS",
   "RATE_LIMIT_STORE",
@@ -78,6 +79,7 @@ function scanDirectProcessEnvKeys(): Set<string> {
     "src/lib/byok/server.ts",
     "src/lib/defaultConfig/server.ts",
     "src/lib/security/accessControl.ts",
+    "src/lib/security/cookiePolicy.ts",
     "src/lib/security/deployment.ts",
     "src/lib/security/requestGuards.ts",
     "src/lib/security/requestProof.ts",
@@ -153,6 +155,7 @@ describe(".env.example", () => {
     for (const key of [
       "NEXT_DEPLOYMENT_ID",
       "ALLOW_INSECURE_LOCAL_PRODUCTION",
+      "ALLOW_INSECURE_HTTP_COOKIES",
       "ALLOW_LOCAL_NETWORK_PROXY",
       "TRUST_PROXY_HEADERS",
       "RATE_LIMIT_STORE",

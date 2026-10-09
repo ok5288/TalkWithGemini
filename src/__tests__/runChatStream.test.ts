@@ -182,3 +182,66 @@ describe("runChatStream transport-free dispatch", () => {
     );
   });
 });
+
+describe("Gemini tool schema API version selection", () => {
+  const parameters = {
+    type: "object",
+    properties: { value: { type: ["string", "null"] } },
+    additionalProperties: false,
+  };
+  it.each([undefined, "https://example.com", "https://example.com/v1beta"])(
+    "passes original JSON Schema for %s",
+    async (baseUrl) => {
+      mocks.streamGeminiResponse.mockResolvedValue(undefined);
+      const { runtime } = makeRuntime();
+      await runChatStream({
+        ...baseOptions("Google"),
+        provider: { type: "Google", baseUrl, apiKey: "k" },
+        tools: [
+          { type: "function", function: { name: "lookup", parameters } },
+          { type: "function", function: { name: "noop" } },
+        ],
+        runtime,
+        send: () => {},
+      });
+      const declarations = mocks.streamGeminiResponse.mock.lastCall![0].tools;
+      expect(declarations[0].parametersJsonSchema).toBe(parameters);
+      expect(declarations[0]).not.toHaveProperty("parameters");
+      expect(declarations[1]).not.toHaveProperty("parameters");
+      expect(declarations[1]).not.toHaveProperty("parametersJsonSchema");
+    },
+  );
+  it("uses the compatibility converter for explicit v1", async () => {
+    mocks.streamGeminiResponse.mockResolvedValue(undefined);
+    const { runtime } = makeRuntime();
+    await runChatStream({
+      ...baseOptions("Google"),
+      provider: {
+        type: "Google",
+        baseUrl: "https://example.com/v1",
+        apiKey: "k",
+      },
+      tools: [
+        {
+          type: "function",
+          function: {
+            name: "lookup",
+            parameters: { type: "object", properties: parameters.properties },
+          },
+        },
+      ],
+      runtime,
+      send: () => {},
+    });
+    expect(mocks.streamGeminiResponse.mock.lastCall![0].tools).toEqual([
+      {
+        name: "lookup",
+        description: undefined,
+        parameters: {
+          type: "OBJECT",
+          properties: { value: { type: "STRING", nullable: true } },
+        },
+      },
+    ]);
+  });
+});

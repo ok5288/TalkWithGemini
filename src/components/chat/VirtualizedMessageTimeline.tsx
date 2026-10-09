@@ -113,6 +113,9 @@ const VirtualizedMessageTimeline = React.forwardRef<
     const autoScrollEnabled = useSettingsStore(
       (state) => state.system.enableAutoScroll === true,
     );
+    const chatLayout = useSettingsStore((state) => state.system.chatLayout);
+    const previousLayoutRef = React.useRef(chatLayout);
+    const timelineRef = React.useRef<HTMLDivElement>(null);
     const rows = React.useMemo<TimelineRow[]>(() => {
       const nextRows: TimelineRow[] = [];
       if (
@@ -174,6 +177,38 @@ const VirtualizedMessageTimeline = React.forwardRef<
       instance,
     ) => item.end <= (scrollElement?.scrollTop ?? instance.scrollOffset ?? 0);
 
+    React.useLayoutEffect(() => {
+      if (previousLayoutRef.current === chatLayout) return;
+      previousLayoutRef.current = chatLayout;
+      if (!scrollElement) return;
+
+      const offset = scrollElement.scrollTop;
+      const atEnd =
+        scrollElement.scrollHeight - scrollElement.clientHeight - offset <=
+        FOLLOW_END_THRESHOLD_PX;
+      const anchor = virtualizer
+        .getVirtualItems()
+        .find((item) => item.end > offset);
+      const offsetWithinRow = anchor ? offset - anchor.start : 0;
+      virtualizer.measure();
+      timelineRef.current
+        ?.querySelectorAll<HTMLDivElement>("[data-index]")
+        .forEach((element) => virtualizer.measureElement(element));
+      if (atEnd) {
+        virtualizer.scrollToOffset(
+          Math.max(0, virtualizer.getTotalSize() - scrollElement.clientHeight),
+          { behavior: "auto" },
+        );
+      } else if (anchor) {
+        const nextOffset = virtualizer.getOffsetForIndex(anchor.index, "start");
+        if (nextOffset) {
+          virtualizer.scrollToOffset(nextOffset[0] + offsetWithinRow, {
+            behavior: "auto",
+          });
+        }
+      }
+    }, [chatLayout, scrollElement, virtualizer]);
+
     const virtualItems = virtualizer.getVirtualItems();
     const totalSize = virtualizer.getTotalSize();
     const pendingToolRowIndex = pendingToolMessageId
@@ -218,7 +253,8 @@ const VirtualizedMessageTimeline = React.forwardRef<
 
     return (
       <div
-        className="relative mx-auto w-full max-w-3xl"
+        ref={timelineRef}
+        className={`relative mx-auto w-full ${chatLayout === "conversation" ? "max-w-4xl" : "max-w-3xl"}`}
         style={{ height: totalSize }}
         data-testid="virtualized-message-timeline"
       >
@@ -257,6 +293,7 @@ const VirtualizedMessageTimeline = React.forwardRef<
                 >
                   <MessageItem
                     message={row.message}
+                    chatLayout={chatLayout}
                     actionsDisabled={actionsDisabled}
                     mutationsDisabled={mutationsDisabled}
                     toolActionsDisabled={toolActionsDisabled}

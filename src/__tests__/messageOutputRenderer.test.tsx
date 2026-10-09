@@ -215,9 +215,9 @@ describe("MessageOutputRenderer reasoning presentation", () => {
     );
     expect(blocks).toHaveLength(3);
     expect(blocks.map((block) => block.className)).toEqual([
-      expect.stringContaining("mb-3"),
-      expect.stringContaining("mb-3"),
-      expect.stringContaining("mb-3"),
+      expect.stringContaining("m-0"),
+      expect.stringContaining("m-0"),
+      expect.stringContaining("m-0"),
     ]);
     expect(blocks.every((block) => !block.className.includes("mt-3"))).toBe(
       true,
@@ -229,7 +229,82 @@ describe("MessageOutputRenderer reasoning presentation", () => {
     expect(screen.getByRole("button", { name: "Search failed" })).toBeTruthy();
   });
 
-  it("keeps bottom-only spacing when a framed block follows ordinary Markdown", () => {
+  it("keeps one parent-owned gap around search and thinking without blank text spacers", () => {
+    const { container } = renderMessage({
+      id: "consistent-tool-spacing",
+      role: "model",
+      content: "",
+      timestamp: 1,
+      outputBlocks: [
+        {
+          id: "thought-1",
+          type: "reasoning",
+          content: "Before search",
+          endedAt: 1,
+        },
+        { id: "blank-1", type: "text", content: "\n\n  " },
+        {
+          id: "search",
+          type: "search",
+          sources: [
+            { title: "Result", url: "https://example.com", content: "Found" },
+          ],
+          images: [],
+          isSearching: false,
+        },
+        { id: "blank-2", type: "text", content: "\n\t" },
+        {
+          id: "thought-2",
+          type: "reasoning",
+          content: "After search",
+          endedAt: 2,
+        },
+      ],
+    });
+    const output = container.firstElementChild!;
+    expect(output.className).toContain("flex-col");
+    expect(output.className).toContain("gap-3");
+    expect(output.querySelector(":scope > .markdown-body")).toBeNull();
+    const blocks = Array.from(output.children);
+    expect(blocks).toHaveLength(3);
+    for (const block of blocks) {
+      expect(block.hasAttribute("data-message-output-block")).toBe(true);
+      expect(block.classList.contains("m-0")).toBe(true);
+      expect(block.className).not.toMatch(/\bm[bt]-/);
+      expect(block.className).toContain("[&>*]:m-0!");
+    }
+  });
+
+  it("hides the empty wrapper of a search card with no visible results", () => {
+    const { container } = renderMessage({
+      id: "hidden-search",
+      role: "model",
+      content: "",
+      timestamp: 1,
+      outputBlocks: [
+        { id: "thought", type: "reasoning", content: "Thinking", endedAt: 1 },
+        {
+          id: "empty-search",
+          type: "search",
+          sources: [],
+          images: [],
+          isSearching: false,
+        },
+        {
+          id: "thought-after",
+          type: "reasoning",
+          content: "Continue",
+          endedAt: 2,
+        },
+      ],
+    });
+    const blocks = container.querySelectorAll("[data-message-output-block]");
+    expect(blocks).toHaveLength(3);
+    expect(blocks[1]?.childElementCount).toBe(0);
+    expect(blocks[1]?.className).toContain("empty:hidden");
+  });
+
+  it("keeps parent-owned spacing when a framed block follows ordinary Markdown", () => {
     const { container } = renderMessage({
       id: "text-before-reasoning",
       role: "model",
@@ -256,7 +331,7 @@ describe("MessageOutputRenderer reasoning presentation", () => {
       "[data-message-output-block]",
     );
     expect(blocks).toHaveLength(1);
-    expect(blocks[0]?.className).toContain("mb-3");
+    expect(blocks[0]?.className).toContain("m-0");
     expect(blocks[0]?.className).not.toMatch(/\bmt-/);
     expect(blocks[0]?.className).not.toMatch(/\bp(?:[trblxy])?-/);
   });

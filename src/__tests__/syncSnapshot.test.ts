@@ -14,7 +14,10 @@ describe("sync snapshot partitioning", () => {
   it("splits workspaces, sessions, messages and knowledge collections then reassembles them", () => {
     const data: AppExportPayload["data"] = {
       coreSettings: { state: { theme: "light" }, version: 6 },
-      settings: { state: { system: { language: "en" } }, version: 6 },
+      settings: {
+        state: { system: { chatLayout: "conversation" } },
+        version: 6,
+      },
       chat: {
         state: {
           currentSessionId: "session-1",

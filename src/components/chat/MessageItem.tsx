@@ -15,6 +15,7 @@ import type {
   MessageOutputBlock,
   ToolConfirmationDecision,
   WorkspaceFilePresentation,
+  SystemSettings,
 } from "@/types";
 import type { ModelInfo } from "@/services/api/chatService";
 import MarkdownRenderer from "../content/MarkdownRenderer";
@@ -104,6 +105,7 @@ import { Button } from "@/components/ui/primitives";
 
 interface MessageItemProps {
   message: Message;
+  chatLayout?: SystemSettings["chatLayout"];
   actionsDisabled?: boolean;
   mutationsDisabled?: boolean;
   toolActionsDisabled?: boolean;
@@ -319,6 +321,7 @@ const proxyMessageExportImages = async (
 
 const MessageItem: React.FC<MessageItemProps> = ({
   message,
+  chatLayout = "document",
   actionsDisabled = false,
   mutationsDisabled = false,
   toolActionsDisabled = false,
@@ -1482,9 +1485,14 @@ const MessageItem: React.FC<MessageItemProps> = ({
           document.body,
         )}
 
-      <div className="message-item group relative flex flex-col md:flex-row gap-2 md:gap-3 rounded-md transition-[background-color,border-color] duration-200 border border-transparent px-3 py-3 bg-gray-50/0 hover:bg-gray-50/80 dark:hover:bg-muted/40">
+      <div
+        data-chat-layout={chatLayout}
+        data-message-role={message.role}
+        data-editing={isEditing || undefined}
+        className="message-item group relative flex flex-col md:flex-row gap-2 md:gap-3 rounded-md transition-[background-color,border-color] duration-200 border border-transparent px-3 py-3 bg-gray-50/0 hover:bg-gray-50/80 dark:hover:bg-muted/40"
+      >
         {/* Avatar & Header Section */}
-        <div className="flex items-center w-full md:w-auto justify-between md:justify-start gap-2 md:block md:shrink-0 md:mt-0.5 select-none">
+        <div className="message-item-header flex items-center w-full md:w-auto justify-between md:justify-start gap-2 md:block md:shrink-0 md:mt-0.5 select-none">
           <div className="flex items-center gap-2">
             {message.role === "model" ? (
               <Tooltip content={message.model || t("model")} position="right">
@@ -1507,7 +1515,9 @@ const MessageItem: React.FC<MessageItemProps> = ({
                 />
               </div>
             )}
-            <span className="text-sm font-medium text-gray-700 dark:text-foreground md:hidden">
+            <span
+              className={`text-sm font-medium text-gray-700 dark:text-foreground ${chatLayout === "document" ? "md:hidden" : ""}`}
+            >
               {message.role === "model"
                 ? message.model || t("model")
                 : t("user")}
@@ -1524,7 +1534,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
         {/* Content Area */}
         <div
           ref={visibleMessageContentRef}
-          className="flex-1 min-w-0 pl-1 md:pl-0"
+          className="message-item-content flex-1 min-w-0 pl-1 md:pl-0"
         >
           {message.replyTo ? (
             <Button
@@ -1722,7 +1732,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 
           {/* Footer / Toolbar */}
           {!isEditing && !isTyping && (
-            <div className="flex items-center justify-between mt-1 h-6 opacity-100 md:opacity-40 md:group-hover:opacity-100 transition-opacity duration-200">
+            <div className="message-item-toolbar flex items-center justify-between mt-1 h-6 opacity-100 md:opacity-40 md:group-hover:opacity-100 transition-opacity duration-200">
               <div className="flex items-center text-xs text-gray-400 dark:text-muted-foreground/70 select-none [&>span:not(:last-child)]:after:content-['·'] [&>span:not(:last-child)]:after:mx-1 [&>span:not(:last-child)]:after:text-gray-300 dark:[&>span:not(:last-child)]:after:text-border">
                 <span className="hidden md:inline hover:text-gray-600 dark:hover:text-foreground/85 transition-colors cursor-default">
                   <Tooltip

@@ -26,7 +26,9 @@ interface FenceMarker {
 }
 
 export function getMessageOutputBlockSpacingClass(): string {
-  return "mb-3";
+  // The output container owns the gap. Cards keep their standalone margins
+  // elsewhere, but must not add to it here or leave space when returning null.
+  return "flow-root m-0 empty:hidden [&>*]:m-0!";
 }
 
 function getOpeningFence(line: string): FenceMarker | null {

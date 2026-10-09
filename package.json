@@ -2,7 +2,7 @@
   "name": "neo-chat",
   "description": "An omni AI chat application with a clean UI and excellent performance.",
   "private": true,
-  "version": "2.5.2",
+  "version": "2.6.0",
   "license": "MIT",
   "packageManager": "pnpm@10.30.3",
   "type": "module",
@@ -27,7 +27,7 @@
     "byok:generate": "node scripts/generate-byok-key.mjs"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.111.0",
+    "@anthropic-ai/sdk": "^0.128.0",
     "@automerge/automerge": "^3.3.2",
     "@cfworker/json-schema": "^4.1.1",
     "@datafe-open/markdown-chart": "0.1.16",
@@ -48,7 +48,7 @@
     "html-url-attributes": "^3.0.1",
     "katex": "^0.18.4",
     "localforage": "^1.10.0",
-    "lucide-react": "1.36.0",
+    "lucide-react": "1.48.0",
     "mermaid": "^11.17.2",
     "next": "^16.3.5",
     "next-intl": "^4.14.1",
@@ -58,7 +58,7 @@
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-markdown": "^10.1.0",
-    "react-zoom-pan-pinch": "^4.0.3",
+    "react-zoom-pan-pinch": "^4.2.0",
     "rehype-highlight": "^7.0.2",
     "rehype-katex": "^7.0.1",
     "rehype-raw": "^7.0.0",
@@ -69,7 +69,7 @@
     "remark-rehype": "^11.1.2",
     "tailwind-merge": "^3.6.0",
     "unified": "^11.0.5",
-    "uuid": "^14.0.1",
+    "uuid": "^14.0.2",
     "zod": "^4.4.3",
     "zustand": "^5.0.14"
   },
@@ -94,7 +94,7 @@
     "prettier": "^3.9.4",
     "tailwindcss": "^4.3.3",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.11",
+    "vitest": "^5.0.2",
     "wrangler": "^4.123.0"
   }
 }

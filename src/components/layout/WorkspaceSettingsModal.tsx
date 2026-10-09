@@ -500,7 +500,7 @@ const WorkspaceSettingsModal: React.FC<WorkspaceSettingsModalProps> = ({
         if (!isMountedRef.current || optimizeRunRef.current !== runId) {
           return;
         }
-        setSystemPrompt(replacement.append(chunk));
+        setSystemPrompt(replacement.replace(chunk));
       });
       if (!isMountedRef.current || optimizeRunRef.current !== runId) {
         return;

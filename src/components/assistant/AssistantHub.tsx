@@ -592,7 +592,7 @@ const AssistantEditorModal = ({
         }
         setMeta((prev) => ({
           ...prev,
-          systemRole: replacement.append(chunk),
+          systemRole: replacement.replace(chunk),
         }));
       });
       if (!isEditorMountedRef.current || optimizeRunRef.current !== runId) {

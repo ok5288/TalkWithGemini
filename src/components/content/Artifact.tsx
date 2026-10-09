@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { streamGenerateContent } from "@/services/api/chatService";
 import * as ArtifactService from "@/services/artifactService";
+import { createStreamingReplacement } from "@/lib/utils/streamingText";
 import Tooltip from "../ui/Tooltip";
 import {
   DropdownMenu,
@@ -179,24 +180,40 @@ const Artifact: React.FC<ArtifactProps> = ({
     setProcessingError(null);
     setActiveDropdown(null);
 
-    if (!isContinuation) {
-      setContent("");
-    }
+    if (!isContinuation) setContent("");
 
-    let accumulatedNewText = "";
+    const replacement = createStreamingReplacement(originalContent);
+    let hasReceivedSnapshot = false;
 
     try {
-      await streamGenerateContent(model, prompt, (text) => {
-        if (!isMountedRef.current || actionRunIdRef.current !== runId) return;
-        accumulatedNewText += text;
-        setContent((prev) => prev + text);
-      });
+      const streamedText = await streamGenerateContent(
+        model,
+        prompt,
+        (text) => {
+          if (!isMountedRef.current || actionRunIdRef.current !== runId) return;
+          hasReceivedSnapshot = true;
+          const generatedText = replacement.replace(text);
+          setContent(
+            isContinuation ? originalContent + generatedText : generatedText,
+          );
+        },
+      );
 
       if (!isMountedRef.current || actionRunIdRef.current !== runId) return;
 
+      const generatedText = hasReceivedSnapshot
+        ? replacement.value()
+        : streamedText;
+      if (!generatedText.trim()) {
+        setContent(originalContent);
+        setProcessingError(t("artifactUpdateFailed"));
+        return;
+      }
+
       const finalContent = isContinuation
-        ? originalContent + accumulatedNewText
-        : accumulatedNewText;
+        ? originalContent + generatedText
+        : generatedText;
+      setContent(finalContent);
       const newVersion: Version = {
         id: uuidv7(),
         content: finalContent,

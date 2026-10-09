@@ -86,6 +86,7 @@ describe("browser backup export", () => {
       "neo-chat-settings",
       JSON.stringify({
         state: {
+          system: { chatLayout: "conversation" },
           installedPlugins: [{ id: "demo" }],
           marketPlugins: [{ id: "cached" }],
         },
@@ -135,6 +136,7 @@ describe("browser backup export", () => {
       skippedLegacyResearchTaskCount: 0,
       incomplete: false,
     });
+    expect(data).toContain('"chatLayout":"conversation"');
     expect(data).toContain("installedPlugins");
     expect(data).not.toContain("marketPlugins");
     expect(data).not.toContain("plain-secret");

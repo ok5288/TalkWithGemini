@@ -813,6 +813,84 @@ samp {
   contain-intrinsic-size: 0 140px;
 }
 
+.message-item[data-chat-layout="conversation"] {
+  flex-direction: column;
+  width: 92%;
+  max-width: calc(100% - 24px);
+  margin: 0 0 1rem;
+  border-radius: var(--radius-xl);
+  border-color: var(--border);
+  background: color-mix(in srgb, var(--card) 94%, var(--muted));
+  text-align: left;
+}
+
+.message-item[data-chat-layout="conversation"][data-message-role="user"] {
+  width: fit-content;
+  margin-left: auto;
+  background: color-mix(in srgb, var(--card) 88%, #86efac);
+}
+
+.message-item[data-chat-layout="conversation"][data-editing] {
+  width: 100%;
+}
+
+.message-item[data-chat-layout="conversation"] .message-item-header {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  justify-content: space-between;
+  margin-top: 0;
+}
+
+.message-item[data-chat-layout="conversation"] .message-item-header > div {
+  min-width: 0;
+}
+
+.message-item[data-chat-layout="conversation"] .message-item-header span {
+  overflow-wrap: anywhere;
+}
+
+.message-item[data-chat-layout="conversation"] .message-item-content {
+  width: 100%;
+  padding-left: 0;
+  overflow-wrap: anywhere;
+}
+
+.message-item[data-chat-layout="conversation"] .message-item-toolbar {
+  height: auto;
+  min-height: 1.5rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.message-item[data-chat-layout="conversation"] .message-item-toolbar > div {
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+
+.message-item[data-chat-layout="conversation"]
+  :where(.markdown-body, .markdown-codeblock, .markdown-table-wrap) {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.message-item[data-chat-layout="conversation"]
+  :where(.markdown-table-wrap, .katex-display) {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+@media (min-width: 768px) {
+  .message-item[data-chat-layout="conversation"] {
+    max-width: 92%;
+  }
+
+  .message-item[data-chat-layout="conversation"][data-message-role="user"] {
+    max-width: 85%;
+  }
+}
+
 .glass-surface {
   background: color-mix(in srgb, var(--card) 76%, transparent);
   border-color: color-mix(in srgb, var(--foreground) 12%, transparent);

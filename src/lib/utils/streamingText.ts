@@ -1,13 +1,17 @@
+/**
+ * Tracks a stream whose callback receives the complete generated text on each
+ * update (for example, `A`, then `AB`, then `ABC`).
+ */
 export function createStreamingReplacement(originalText: string) {
-  let nextText = "";
+  let latestText = "";
 
   return {
-    append(chunk: string): string {
-      nextText += chunk;
-      return nextText;
+    replace(snapshot: string): string {
+      latestText = snapshot;
+      return latestText;
     },
     value(): string {
-      return nextText;
+      return latestText;
     },
     restore(): string {
       return originalText;

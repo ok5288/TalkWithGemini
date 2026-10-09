@@ -22,10 +22,17 @@ import {
   isAbortError,
 } from "./streamErrors";
 
+type CumulativeTextHandler = (fullText: string) => void;
+
+/**
+ * Generate text and report each update as the complete text generated so far.
+ * Consumers must replace their displayed value with each callback snapshot;
+ * callback values are not deltas.
+ */
 export const streamGenerateContent = async (
   model: string,
   prompt: string,
-  onChunk: (text: string) => void,
+  onTextSnapshot: CumulativeTextHandler,
   signal?: AbortSignal,
 ): Promise<string> => {
   const { providerId, modelName } = parseModelString(model);
@@ -58,7 +65,7 @@ export const streamGenerateContent = async (
         send: (message) => {
           if (message.type === "content") {
             fullText += message.content;
-            onChunk(fullText);
+            onTextSnapshot(fullText);
           }
         },
       });
@@ -126,7 +133,7 @@ export const streamGenerateContent = async (
       switch (parsed.type) {
         case "content":
           fullText += parsed.content;
-          onChunk(fullText);
+          onTextSnapshot(fullText);
           return false;
         case "error":
           throw createChatStreamEventError(parsed);
