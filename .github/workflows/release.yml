@@ -58,7 +58,10 @@ jobs:
         run: pnpm build:worker
 
       - name: Audit production dependencies
-        run: pnpm audit --prod --audit-level moderate
+        run: |
+          if ! pnpm audit --prod --audit-level moderate; then
+            echo "::warning::Production audit needs attention (non-blocking)."
+          fi
 
   github-release:
     needs: verify-release

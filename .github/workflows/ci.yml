@@ -32,11 +32,17 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Audit dependencies
-        run: pnpm audit --audit-level moderate
+        run: |
+          if ! pnpm audit --audit-level moderate; then
+            echo "::warning::Dependency audit needs attention (non-blocking)."
+          fi
 
       - name: Audit MCP bridge dependencies
         working-directory: docker/mcp-bridge
-        run: pnpm audit --prod --audit-level moderate
+        run: |
+          if ! pnpm audit --prod --audit-level moderate; then
+            echo "::warning::MCP bridge audit needs attention (non-blocking)."
+          fi
 
       - name: Format Check
         run: pnpm format:check

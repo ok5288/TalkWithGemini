@@ -11,6 +11,11 @@ server defaults are optional.
   [Cloudflare Workers](#cloudflare-workers): alternative deployment paths.
 - [Verify and troubleshoot](#verify-and-troubleshoot): check readiness after setup.
 
+Dependency audits in the [CI](../.github/workflows/ci.yml) and
+[release](../.github/workflows/release.yml) workflows are advisory. Vulnerabilities
+or audit service failures produce GitHub Actions warnings without blocking builds
+or releases. Review the full audit output in the affected step's log.
+
 ## Official Docker image
 
 The [Docker workflow](../.github/workflows/docker.yml) publishes
