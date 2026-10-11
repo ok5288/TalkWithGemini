@@ -468,10 +468,10 @@ describe("generation navigation ordering", () => {
 
 describe("temporary chat sidebar retention", () => {
   it("keeps temporary empty and populated sessions out of groups, previews, and counts", async () => {
-    const ordinaryRecent = Array.from({ length: 6 }, (_, index) =>
+    const ordinaryRecent = Array.from({ length: 10 }, (_, index) =>
       makeSession(`Regular recent ${index + 1}`, { messageCount: 1 }),
     );
-    const ordinaryArchived = makeSession("Regular archived", {
+    const ordinaryOlder = makeSession("Regular older", {
       messageCount: 1,
       updatedAt: now - 8 * 24 * 60 * 60 * 1000,
     });
@@ -507,7 +507,7 @@ describe("temporary chat sidebar retention", () => {
     renderSidebar(
       [
         ...ordinaryRecent,
-        ordinaryArchived,
+        ordinaryOlder,
         ordinaryWorkspace,
         temporaryEmpty,
         temporaryWithMessages,
@@ -517,14 +517,20 @@ describe("temporary chat sidebar retention", () => {
       [workspace],
     );
 
-    ordinaryRecent.slice(0, 5).forEach((session) => {
+    ordinaryRecent.forEach((session) => {
       expect(screen.getByRole("button", { name: session.title })).toBeTruthy();
     });
+    expect(screen.queryByRole("button", { name: "Archived" })).toBeNull();
+    expect(screen.queryByText("Regular older")).toBeNull();
     expect(screen.queryByText("Temporary empty")).toBeNull();
     expect(screen.queryByText("Temporary with messages")).toBeNull();
     expect(screen.queryByText("Temporary archived")).toBeNull();
     expect(screen.queryByText("Temporary workspace")).toBeNull();
-    expect(screen.getByRole("button", { name: "Show all (1)" })).toBeTruthy();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Load more (1)" }),
+    );
+    expect(screen.getByRole("button", { name: "Regular older" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Load more/u })).toBeNull();
 
     await userEvent.click(screen.getByRole("button", { name: "A workspace" }));
     expect(
@@ -534,5 +540,99 @@ describe("temporary chat sidebar retention", () => {
       ).getByRole("button", { name: "Regular workspace" }),
     ).toBeTruthy();
     expect(screen.queryByText("Temporary workspace")).toBeNull();
+  });
+});
+
+describe("sidebar session pagination", () => {
+  it("starts with the ten latest chats and adds at most ten per click", async () => {
+    const sessions = Array.from({ length: 24 }, (_, index) =>
+      makeSession(`Chat ${index + 1}`, { updatedAt: now - index * 1_000 }),
+    );
+    renderSidebar([...sessions].reverse());
+    const visibleChats = () =>
+      screen.getAllByRole("button", { name: /^Chat \d+$/u });
+
+    expect(visibleChats().map((button) => button.textContent)).toEqual(
+      sessions.slice(0, 10).map((session) => session.title),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Load more (14)" }),
+    );
+    expect(visibleChats()).toHaveLength(20);
+    expect(screen.queryByRole("button", { name: "Chat 21" })).toBeNull();
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Load more (4)" }),
+    );
+    expect(visibleChats()).toHaveLength(24);
+    expect(screen.queryByRole("button", { name: /Load more/u })).toBeNull();
+  });
+
+  it("paginates pinned and workspace chats independently", async () => {
+    const workspaces = ["First workspace", "Second workspace"].map((name) => ({
+      id: name,
+      name,
+      knowledgeCollectionIds: [],
+      files: [],
+      createdAt: now,
+    }));
+    const sessions = [
+      ...Array.from({ length: 21 }, (_, index) =>
+        makeSession(`Pinned ${index + 1}`, { pinned: true }),
+      ),
+      ...workspaces.flatMap((workspace) =>
+        Array.from({ length: 21 }, (_, index) =>
+          makeSession(`${workspace.name} chat ${index + 1}`, {
+            workspaceId: workspace.id,
+            updatedAt: now - index * 1_000,
+          }),
+        ).reverse(),
+      ),
+    ];
+    renderSidebar(sessions, workspaces);
+    for (const workspace of workspaces) {
+      await userEvent.click(
+        screen.getByRole("button", { name: workspace.name }),
+      );
+    }
+    const sessionList = (name: string) => {
+      const controlId = screen
+        .getByRole("button", { name })
+        .getAttribute("aria-controls");
+      return within(document.getElementById(controlId!)!);
+    };
+    const pinned = sessionList("Pinned");
+    const first = sessionList("First workspace");
+    const second = sessionList("Second workspace");
+    const chatButtons = (list: ReturnType<typeof sessionList>): HTMLElement[] =>
+      list.getAllByRole("button", {
+        name: /^(Pinned \d+|(First|Second) workspace chat \d+)$/u,
+      });
+
+    expect(chatButtons(pinned)).toHaveLength(10);
+    expect(chatButtons(first).map((button) => button.textContent)).toEqual(
+      Array.from(
+        { length: 10 },
+        (_, index) => `First workspace chat ${index + 1}`,
+      ),
+    );
+    expect(chatButtons(second)).toHaveLength(10);
+
+    await userEvent.click(
+      first.getByRole("button", { name: "Load more (11)" }),
+    );
+    expect(chatButtons(first)).toHaveLength(20);
+    expect(chatButtons(second)).toHaveLength(10);
+    expect(chatButtons(pinned)).toHaveLength(10);
+    expect(first.getByRole("button", { name: "Load more (1)" })).toBeTruthy();
+    expect(second.getByRole("button", { name: "Load more (11)" })).toBeTruthy();
+
+    await userEvent.click(
+      pinned.getByRole("button", { name: "Load more (11)" }),
+    );
+    expect(chatButtons(pinned)).toHaveLength(20);
+    expect(chatButtons(first)).toHaveLength(20);
+    expect(chatButtons(second)).toHaveLength(10);
+    expect(pinned.getByRole("button", { name: "Load more (1)" })).toBeTruthy();
   });
 });

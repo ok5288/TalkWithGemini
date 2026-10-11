@@ -4,7 +4,7 @@ Layout components define app navigation, workspace structure, and global shell b
 
 ## Files
 
-- `Sidebar.tsx` renders session navigation, workspace navigation, pinned sessions, and primary app actions.
+- `Sidebar.tsx` renders session navigation, workspace navigation, pinned sessions, and primary app actions. Each session list shows the ten most recently updated chats initially and loads up to ten more per click. The load-more count shows the total number of remaining hidden chats. Older chats remain in the recent list without automatic archive grouping; temporary chats stay excluded from history.
 - `WorkspaceSettingsModal.tsx` manages workspace metadata, preset files, workspace-level settings, active plugin presets, and active skill presets.
 
 ## Guidelines

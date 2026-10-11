@@ -38,6 +38,7 @@ import {
 import {
   buildMermaidPaletteCSS,
   buildMermaidPaletteOverrides,
+  buildMermaidThemeVariables,
 } from "./mermaidPalette";
 import "./diagram.css";
 export type { DiagramTheme } from "./types";
@@ -71,39 +72,6 @@ function useResolvedDiagramTheme(): DiagramTheme {
   }, []);
 
   return theme;
-}
-
-function buildMermaidThemeVariables(theme: DiagramTheme, enhanced: boolean) {
-  const dark = theme === "dark";
-  if (!enhanced) {
-    return {
-      background: "transparent",
-      primaryColor: dark ? "#27272a" : "#f8fafc",
-      primaryTextColor: dark ? "#f4f4f5" : "#18181b",
-      primaryBorderColor: dark ? "#52525b" : "#d4d4d8",
-      lineColor: dark ? "#a1a1aa" : "#71717a",
-      secondaryColor: dark ? "#18181b" : "#ffffff",
-      tertiaryColor: "transparent",
-      textColor: dark ? "#f4f4f5" : "#18181b",
-      fontFamily: "ui-sans-serif, system-ui, sans-serif",
-    };
-  }
-
-  return {
-    background: "transparent",
-    primaryColor: dark ? "#0f2a37" : "#ecfeff",
-    primaryTextColor: dark ? "#cffafe" : "#155e75",
-    primaryBorderColor: dark ? "#22d3ee" : "#67e8f9",
-    lineColor: dark ? "#34d399" : "#10b981",
-    secondaryColor: dark ? "#102b24" : "#ecfdf5",
-    tertiaryColor: dark ? "#221a3a" : "#f5f3ff",
-    textColor: dark ? "#f4f8ff" : "#0b1324",
-    nodeBorder: dark ? "#22d3ee" : "#06b6d4",
-    mainBkg: dark ? "#0f2a37" : "#ecfeff",
-    clusterBkg: dark ? "#0b1220" : "#f8fbff",
-    clusterBorder: dark ? "#2a4763" : "#a5f3fc",
-    fontFamily: "ui-sans-serif, system-ui, sans-serif",
-  };
 }
 
 const DiagramStatus = ({
@@ -332,10 +300,11 @@ const MermaidDiagram = ({
                   themeCSS: buildMermaidMindmapCSS(theme),
                 });
               } else if (palette) {
+                const themeCSS = buildMermaidPaletteCSS(diagramType, theme);
                 mermaid.initialize({
                   ...config,
                   themeVariables: { ...config.themeVariables, ...palette },
-                  themeCSS: buildMermaidPaletteCSS(diagramType, theme),
+                  ...(themeCSS ? { themeCSS } : {}),
                 });
               }
               const renderSource = isMindmap

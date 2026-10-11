@@ -27,6 +27,26 @@ describe("diagram SVG normalization", () => {
     expect(normalized).toContain('class="markdown-mindmap-svg-snapshot"');
   });
 
+  it("preserves accessible names, descriptions, and embedded theme styles", () => {
+    const svg = `<svg viewBox="0 0 320 120" aria-labelledby="chart-title-sample" aria-describedby="chart-desc-sample">
+      <title id="chart-title-sample">任务生命周期</title>
+      <desc id="chart-desc-sample">任务可失败后重试或取消。</desc>
+      <style>.node rect { fill: #0f2a37; stroke: #22d3ee; }</style>
+      <g><text>执行中</text></g>
+    </svg>`;
+
+    const normalized = normalizeMermaidSvg(svg);
+    expect(normalized).toContain('aria-labelledby="chart-title-sample"');
+    expect(normalized).toContain('aria-describedby="chart-desc-sample"');
+    expect(normalized).toContain(
+      '<title id="chart-title-sample">任务生命周期</title>',
+    );
+    expect(normalized).toContain(
+      '<desc id="chart-desc-sample">任务可失败后重试或取消。</desc>',
+    );
+    expect(normalized).toContain("fill: #0f2a37; stroke: #22d3ee;");
+  });
+
   it("preserves generated SVG internals while normalizing root attributes", () => {
     const svg = `
       <svg viewBox="0 0 100 40">

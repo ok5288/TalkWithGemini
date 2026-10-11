@@ -100,19 +100,10 @@ const WORKSPACE_COLOR_MAP: Record<string, string> = {
   gray: "text-gray-500",
 };
 
-const WORKSPACE_SESSION_PREVIEW_LIMIT = 5;
-const ROOT_SESSION_PREVIEW_LIMIT = 5;
+const SESSION_PAGE_SIZE = 10;
 const SIDEBAR_PANE_GAP = 8;
 
-type RootSessionListKey = "pinned" | "recent" | "archived";
-
-const DEFAULT_ROOT_SESSION_LISTS: Record<RootSessionListKey, boolean> = {
-  pinned: false,
-  recent: false,
-  archived: false,
-};
-
-const getNow = () => Date.now();
+type RootSessionListKey = "pinned" | "recent";
 
 const SIDEBAR_FOCUSABLE_SELECTOR = [
   "a[href]",
@@ -192,11 +183,12 @@ const Sidebar: React.FC<SidebarProps> = ({
     workspaceId: string;
   } | null>(null);
   const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
-  const [expandedWorkspaceSessionLists, setExpandedWorkspaceSessionLists] =
-    useState<Record<string, boolean>>({});
-  const [expandedRootSessionLists, setExpandedRootSessionLists] = useState(
-    DEFAULT_ROOT_SESSION_LISTS,
-  );
+  const [workspaceSessionLimits, setWorkspaceSessionLimits] = useState<
+    Record<string, number>
+  >({});
+  const [rootSessionLimits, setRootSessionLimits] = useState<
+    Record<RootSessionListKey, number>
+  >({ pinned: SESSION_PAGE_SIZE, recent: SESSION_PAGE_SIZE });
   const [sidebarPaneHeights, setSidebarPaneHeights] =
     useState<SidebarPaneHeights>({ workspace: 0, chat: 0 });
 
@@ -206,7 +198,6 @@ const Sidebar: React.FC<SidebarProps> = ({
   }>({
     pinned: true,
     recent: true,
-    archived: false,
     // Workspaces are expanded by default? Or store their state?
     // Let's use ID for workspace keys
   });
@@ -422,9 +413,6 @@ const Sidebar: React.FC<SidebarProps> = ({
     setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }));
   };
 
-  const now = getNow();
-  const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
-
   // Split sessions into Workspace-bound and Unbound (Root)
   const historySessions = sessions.filter((s) => !isTemporarySession(s));
   const rootSessions = historySessions.filter((s) => !s.workspaceId);
@@ -433,62 +421,39 @@ const Sidebar: React.FC<SidebarProps> = ({
   workspaces.forEach((w) => {
     workspaceSessionsMap.set(
       w.id,
-      historySessions.filter((s) => s.workspaceId === w.id),
+      historySessions
+        .filter((s) => s.workspaceId === w.id)
+        .sort((a, b) => b.updatedAt - a.updatedAt),
     );
   });
 
   const pinnedSessions = rootSessions
     .filter((s) => s.pinned)
     .sort((a, b) => b.updatedAt - a.updatedAt);
-  const unpinnedSessions = rootSessions
+  const recentSessions = rootSessions
     .filter((s) => !s.pinned)
     .sort((a, b) => b.updatedAt - a.updatedAt);
-  const recentSessions = unpinnedSessions.filter(
-    (s) => now - s.updatedAt <= SEVEN_DAYS_MS,
+  const visiblePinnedSessions = pinnedSessions.slice(
+    0,
+    rootSessionLimits.pinned,
   );
-  const archivedSessions = unpinnedSessions.filter(
-    (s) => now - s.updatedAt > SEVEN_DAYS_MS,
+  const visibleRecentSessions = recentSessions.slice(
+    0,
+    rootSessionLimits.recent,
   );
-  const getVisibleRootSessions = (
-    sectionKey: RootSessionListKey,
-    items: Session[],
-  ) => {
-    if (expandedRootSessionLists[sectionKey]) {
-      return items;
-    }
-    return items.slice(0, ROOT_SESSION_PREVIEW_LIMIT);
-  };
-  const visiblePinnedSessions = getVisibleRootSessions(
-    "pinned",
-    pinnedSessions,
-  );
-  const visibleRecentSessions = getVisibleRootSessions(
-    "recent",
-    recentSessions,
-  );
-  const visibleArchivedSessions = getVisibleRootSessions(
-    "archived",
-    archivedSessions,
-  );
-
-  const getVisibleWorkspaceSessions = (
-    workspaceId: string,
-    items: Session[],
-  ) => {
-    if (expandedWorkspaceSessionLists[workspaceId]) {
-      return items;
-    }
-    return items.slice(0, WORKSPACE_SESSION_PREVIEW_LIMIT);
-  };
 
   const hasMeasuredSidebarPanes =
     sidebarPaneHeights.workspace > 0 || sidebarPaneHeights.chat > 0;
-  const workspacePaneStyle = hasMeasuredSidebarPanes
-    ? { height: sidebarPaneHeights.workspace }
-    : undefined;
-  const chatPaneStyle = hasMeasuredSidebarPanes
-    ? { height: sidebarPaneHeights.chat }
-    : undefined;
+  const workspacePaneStyle: React.CSSProperties = {
+    scrollbarGutter: "stable",
+    ...(hasMeasuredSidebarPanes
+      ? { height: sidebarPaneHeights.workspace }
+      : {}),
+  };
+  const chatPaneStyle: React.CSSProperties = {
+    scrollbarGutter: "stable",
+    ...(hasMeasuredSidebarPanes ? { height: sidebarPaneHeights.chat } : {}),
+  };
 
   const renderSessionItem = (session: Session) => {
     const displayTitle = getSessionDisplayTitle(session.title, t("newChat"));
@@ -519,11 +484,12 @@ const Sidebar: React.FC<SidebarProps> = ({
             variant="bare"
             type="button"
             aria-current={isActive ? "page" : undefined}
-            className="flex min-w-0 flex-1 items-center gap-1.5 rounded-md pr-6 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
+            className="flex min-w-0 flex-1 items-center gap-1.5 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
             onClick={() => {
               onSelectSession(session.id);
             }}
           >
+            <span className="min-w-0 flex-1 truncate">{displayTitle}</span>
             {session.pinned && (
               <Pin
                 size={12}
@@ -531,14 +497,13 @@ const Sidebar: React.FC<SidebarProps> = ({
                 aria-hidden="true"
               />
             )}
-            <span className="truncate">{displayTitle}</span>
           </Button>
 
           <Button
             variant="bare"
             type="button"
             aria-label={t("moreActionsAria", { title: displayTitle })}
-            className={`absolute right-2 rounded-lg p-1 opacity-100 transition-[opacity,background-color] hover:bg-white/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 md:opacity-0 md:group-hover:opacity-100 dark:hover:bg-accent ${contextMenu?.sessionId === session.id ? "opacity-100" : ""}`}
+            className={`flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-lg transition-[width,opacity,background-color] hover:bg-white/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 md:group-hover:w-6 md:group-hover:opacity-100 md:group-focus-within:w-6 md:group-focus-within:opacity-100 dark:hover:bg-accent ${contextMenu?.sessionId === session.id ? "md:w-6 md:opacity-100" : "md:w-0 md:opacity-0"}`}
             onClick={(e) => handleContextMenu(e, session.id)}
           >
             <MoreVertical size={14} aria-hidden="true" />
@@ -548,29 +513,26 @@ const Sidebar: React.FC<SidebarProps> = ({
     );
   };
 
-  const renderShowAllButton = ({
+  const renderLoadMoreButton = ({
     controlId,
-    expanded,
-    hiddenCount,
-    onToggle,
+    remainingCount,
+    onLoadMore,
   }: {
     controlId: string;
-    expanded: boolean;
-    hiddenCount: number;
-    onToggle: () => void;
+    remainingCount: number;
+    onLoadMore: () => void;
   }) => {
-    if (hiddenCount <= 0) return null;
+    if (remainingCount <= 0) return null;
 
     return (
       <Button
         variant="bare"
         type="button"
-        aria-expanded={expanded}
         aria-controls={controlId}
-        onClick={onToggle}
+        onClick={onLoadMore}
         className="mt-1 flex w-full items-center rounded-md px-3 py-1 text-left text-xs font-medium text-gray-400 transition-colors hover:bg-gray-100/70 hover:text-gray-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:text-muted-foreground/70 dark:hover:bg-muted/60 dark:hover:text-foreground/85"
       >
-        {expanded ? t("showLess") : t("showAll", { count: hiddenCount })}
+        {t("loadMore", { count: remainingCount })}
       </Button>
     );
   };
@@ -579,10 +541,9 @@ const Sidebar: React.FC<SidebarProps> = ({
     title: string,
     sectionKey: string,
     items: Session[],
-    listExpansion?: {
-      expanded: boolean;
-      hiddenCount: number;
-      onToggle: () => void;
+    pagination?: {
+      remainingCount: number;
+      onLoadMore: () => void;
     },
   ) => {
     if (items.length === 0) return null;
@@ -615,12 +576,10 @@ const Sidebar: React.FC<SidebarProps> = ({
         >
           <div className="overflow-hidden">
             {items.map(renderSessionItem)}
-            {listExpansion
-              ? renderShowAllButton({
+            {pagination
+              ? renderLoadMoreButton({
                   controlId: contentId,
-                  expanded: listExpansion.expanded,
-                  hiddenCount: listExpansion.hiddenCount,
-                  onToggle: listExpansion.onToggle,
+                  ...pagination,
                 })
               : null}
           </div>
@@ -887,13 +846,9 @@ const Sidebar: React.FC<SidebarProps> = ({
                   <div ref={workspacePaneContentRef} className="space-y-1 pb-1">
                     {workspaces.map((ws) => {
                       const wsSessions = workspaceSessionsMap.get(ws.id) || [];
-                      const visibleWorkspaceSessions =
-                        getVisibleWorkspaceSessions(ws.id, wsSessions);
-                      const workspaceListExpanded =
-                        !!expandedWorkspaceSessionLists[ws.id];
-                      const hiddenWorkspaceSessionCount = Math.max(
-                        wsSessions.length - WORKSPACE_SESSION_PREVIEW_LIMIT,
+                      const visibleWorkspaceSessions = wsSessions.slice(
                         0,
+                        workspaceSessionLimits[ws.id] ?? SESSION_PAGE_SIZE,
                       );
                       const isExpanded = expandedSections[ws.id] === true;
                       const folderColorClass = ws.color
@@ -968,17 +923,18 @@ const Sidebar: React.FC<SidebarProps> = ({
                                   {visibleWorkspaceSessions.map(
                                     renderSessionItem,
                                   )}
-                                  {renderShowAllButton({
+                                  {renderLoadMoreButton({
                                     controlId: workspaceContentId,
-                                    expanded: workspaceListExpanded,
-                                    hiddenCount: hiddenWorkspaceSessionCount,
-                                    onToggle: () =>
-                                      setExpandedWorkspaceSessionLists(
-                                        (prev) => ({
-                                          ...prev,
-                                          [ws.id]: !prev[ws.id],
-                                        }),
-                                      ),
+                                    remainingCount:
+                                      wsSessions.length -
+                                      visibleWorkspaceSessions.length,
+                                    onLoadMore: () =>
+                                      setWorkspaceSessionLimits((prev) => ({
+                                        ...prev,
+                                        [ws.id]:
+                                          (prev[ws.id] ?? SESSION_PAGE_SIZE) +
+                                          SESSION_PAGE_SIZE,
+                                      })),
                                   })}
                                 </>
                               ) : (
@@ -1037,15 +993,12 @@ const Sidebar: React.FC<SidebarProps> = ({
                       "pinned",
                       visiblePinnedSessions,
                       {
-                        expanded: expandedRootSessionLists.pinned,
-                        hiddenCount: Math.max(
-                          pinnedSessions.length - ROOT_SESSION_PREVIEW_LIMIT,
-                          0,
-                        ),
-                        onToggle: () =>
-                          setExpandedRootSessionLists((prev) => ({
+                        remainingCount:
+                          pinnedSessions.length - visiblePinnedSessions.length,
+                        onLoadMore: () =>
+                          setRootSessionLimits((prev) => ({
                             ...prev,
-                            pinned: !prev.pinned,
+                            pinned: prev.pinned + SESSION_PAGE_SIZE,
                           })),
                       },
                     )}
@@ -1054,38 +1007,15 @@ const Sidebar: React.FC<SidebarProps> = ({
                       "recent",
                       visibleRecentSessions,
                       {
-                        expanded: expandedRootSessionLists.recent,
-                        hiddenCount: Math.max(
-                          recentSessions.length - ROOT_SESSION_PREVIEW_LIMIT,
-                          0,
-                        ),
-                        onToggle: () =>
-                          setExpandedRootSessionLists((prev) => ({
+                        remainingCount:
+                          recentSessions.length - visibleRecentSessions.length,
+                        onLoadMore: () =>
+                          setRootSessionLimits((prev) => ({
                             ...prev,
-                            recent: !prev.recent,
+                            recent: prev.recent + SESSION_PAGE_SIZE,
                           })),
                       },
                     )}
-
-                    {visibleArchivedSessions.length > 0 &&
-                      renderSection(
-                        t("archived"),
-                        "archived",
-                        visibleArchivedSessions,
-                        {
-                          expanded: expandedRootSessionLists.archived,
-                          hiddenCount: Math.max(
-                            archivedSessions.length -
-                              ROOT_SESSION_PREVIEW_LIMIT,
-                            0,
-                          ),
-                          onToggle: () =>
-                            setExpandedRootSessionLists((prev) => ({
-                              ...prev,
-                              archived: !prev.archived,
-                            })),
-                        },
-                      )}
 
                     {rootSessions.length === 0 && (
                       <div className="text-center text-gray-400 text-xs mt-4">

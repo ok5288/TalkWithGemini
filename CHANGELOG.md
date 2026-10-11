@@ -7,39 +7,95 @@ group changes under a level-2 heading that matches the release tag, such as
 `## v2.0.0`; the release workflow uses that section as the GitHub release notes
 when the matching tag is pushed.
 
-## Unreleased
+## v2.6.0
 
-- Enabled search by default for new chats, with keyless public Firecrawl called
-  directly from the browser when no server or user search provider is
-  configured; models that advertise `reasoning` now initialize with automatic
-  thinking enabled unless a session has an explicit reasoning choice.
-- Kept basic Hosted API proxies available on a single instance with temporary
-  request-proof/BYOK keys and in-memory rate-limit fallback, while retaining
-  shared-store requirements for multi-instance and durable server features;
-  provider-style outbound requests no longer depend on unavailable Worker DNS
-  APIs when their policy explicitly permits private targets.
-- Reduced duplicated vertical spacing between consecutive Agent reasoning and
-  search activity blocks while preserving their individual timelines and
-  controls.
-- Added GitHub Container Registry builds for the optional `mcp-bridge` image,
-  using the same branch, tag, SHA, and `latest` metadata as the main image.
-- Isolated local E2E deployment settings and Next.js development output so smoke
-  tests can run alongside the normal dev server; fixed missing-translation errors
-  for custom skill categories.
-- Excluded Markdown extensions (including ECharts, Mermaid, mind maps, math,
-  and highlighting), browser-only action libraries, and interactive dialogs
-  from SSR bundles while preserving readable server fallbacks and browser
-  rendering, storage, export, and dialog behavior.
-- Fixed tool argument and MCP output-schema validation in strict CSP and
-  Cloudflare environments by using an interpreter without dynamic JavaScript
-  compilation; removed the application's direct Ajv dependency.
-- Fixed streaming auto-scroll with TanStack Virtual's end-anchor correction,
-  preserving the viewport when users scroll up to read earlier messages.
-- Updated E2E fixtures for explicit conversation selection, model setup, and
-  current Agent/search controls; wait for initialized layouts before testing
-  keyboard focus and shortcuts.
-- Simplified the project documentation and added a documentation hub, official
-  Docker image deployment instructions, and upgrade/rollback guidance.
+- **Intelligent UI:** Added model-generated interactive answers in ordinary chat
+  and Agent mode, with checklists, comparisons, forms, charts, quizzes,
+  flashcards, calculators, linked data explorers, and isolated HTML interfaces.
+  The feature defaults on; disabling it retains saved state and shows readable
+  static content. Invalid or unsupported interfaces have static fallbacks.
+- **Interactive data and sources:** Added linked tables, charts, parameters,
+  filtering, selection, and local dataset imports. Interfaces can reference
+  conversation materials, immutable Research report versions, and visible Tool
+  results with host-checked source permissions. Completed Research reports can
+  open an interactive-explanation chat draft; Tool-result refreshes open editable
+  drafts, and confirmed create-only Markdown workspace saves record operation
+  receipts.
+- **Interface AI actions:** AI buttons require a real user click and host
+  confirmation of the exact proposed message and frozen visible-result context.
+  Sending preserves the composer's unsent text, attachments, and reply target;
+  permissions are checked again before dispatch, including retries. Runtime
+  errors, reloads, and unmounts invalidate pending proposals.
+- **Interface state and durability:** Stored definitions and interaction state
+  in the existing session tree for private backups and encrypted session sync;
+  copied sessions receive independent state, while temporary chats stay in
+  memory. Session transitions, backups, sync, and exports wait for pending
+  writes, and failed saves retain local state for explicit retry. Workspace
+  writes with unknown outcomes are blocked from replay.
+- **Interface sharing and export:** Public sharing and Markdown/PDF/image
+  exports default to original static content. An explicit opt-in includes
+  current visible inputs and results, with a prepared sharing preview and
+  publication-time source checks. HTML snapshots are escaped text reported by
+  the interface; unavailable snapshots are labeled, and hidden state is omitted.
+- **Experimental MCP Apps:** Added a separate, default-off display host requiring
+  an independently deployed cross-origin sandbox. It receives visible Tool
+  result text without chat history, Tool arguments, or hidden metadata, and
+  cannot call tools, send chat messages, or make external network requests.
+  Installed MCP tools need refreshed, versioned visibility metadata; App-only
+  tools are excluded from Chat, Agent, and Research execution.
+- **Conversation layouts:** Added Document and Conversation layouts in system
+  settings, with right-aligned user bubbles and left-aligned AI bubbles in
+  Conversation mode. The preference participates in backups and settings sync;
+  layout switches preserve the visible message or bottom anchor, and wide code,
+  tables, and formulas scroll within their containers. Reading mode, shares,
+  and exports retain Document presentation.
+- **Search and reasoning defaults:** Enabled search for new chats, with keyless
+  public Firecrawl called directly from the browser when no server or user search
+  provider is configured. API keys, custom/self-hosted URLs, and deployment
+  defaults retain API proxy routing. Models advertising `reasoning` initialize
+  with automatic thinking unless the session has an explicit reasoning choice.
+- **Skill selection:** Fixed toolbar Skill selection before the first
+  conversation exists, carrying selected Skills and their parameters into the
+  new session and its first request.
+- **Streaming and document fixes:** Removed duplicated spacing between output
+  blocks while preserving individual Agent reasoning and search timelines.
+  Fixed repeated text during Artifact rewriting and continuation by replacing
+  cumulative streaming snapshots; empty generated updates retain the original
+  document and show an error.
+- **Reasoning feedback:** Added live elapsed time while a reasoning block is
+  active, retaining its start time across streamed updates and showing the final
+  recorded duration when thinking finishes.
+- **Sidebar history:** Unified unpinned conversations under Recents, ordered by
+  last update, and added incremental loading in batches of ten for pinned,
+  recent, and workspace lists. Temporary chats remain outside saved history.
+- **Mermaid output quality:** Refined generation instructions to choose suitable
+  diagram types, preserve conditions, failure paths, sequence fragments, and ER
+  cardinality, and request native accessible titles and descriptions for common
+  diagrams. Added light/dark palettes for flowcharts, sequence, state, and ER
+  diagrams, including readable notes, groups, and attribute rows, while retaining
+  editable source and themed SVG/PNG output.
+- **Gemini Tool schemas:** Preserved original JSON Schema through
+  `parametersJsonSchema` on the default v1beta API. Explicit legacy API versions
+  use a bounded conversion with diagnostics for unsupported constraints;
+  execution-time validation retains the original schema.
+- **Hosted API reliability:** Kept basic API proxies available on a single
+  instance with temporary request-proof/BYOK keys and in-memory rate limits,
+  while retaining shared-store requirements for multi-instance and durable
+  server features. Expired or invalid request-proof sessions refresh once for
+  replayable requests. Provider requests explicitly allowing private targets no
+  longer depend on unavailable Worker DNS APIs.
+- **Access and cookie diagnostics:** Added post-login session verification and
+  distinct network, cookie, and reverse-proxy error guidance. Production cookies
+  remain Secure by default; private plain-HTTP deployments can explicitly set
+  `ALLOW_INSECURE_HTTP_COOKIES`. An empty access password disables the page gate,
+  while production local API access retains its explicit bypass requirement.
+- **Docker deployment:** Added GitHub Container Registry builds for the optional
+  `mcp-bridge` image using the main image's branch, tag, SHA, and `latest` metadata.
+  Compose now loads the optional root `.env` for Neo Chat, keeps the bridge's
+  environment allowlist, and binds the application port to host loopback by
+  default for use behind an HTTPS reverse proxy.
+- **Vercel compatibility:** Updated Next.js and its ESLint configuration to
+  16.3.5 to address adapter builds while preserving standalone output.
 
 ## v2.5.0
 
@@ -148,6 +204,23 @@ when the matching tag is pushed.
 - **Dependency security:** Updated vulnerable root and MCP Bridge dependency
   resolutions for Sharp, JS-YAML, Vitest, baseline-browser-mapping,
   brace-expansion, Hono, qs, fast-uri, ip-address, and the Hono Node adapter.
+- Isolated local E2E deployment settings and Next.js development output so smoke
+  tests can run alongside the normal dev server; fixed missing-translation errors
+  for custom skill categories.
+- Excluded Markdown extensions (including ECharts, Mermaid, mind maps, math,
+  and highlighting), browser-only action libraries, and interactive dialogs
+  from SSR bundles while preserving readable server fallbacks and browser
+  rendering, storage, export, and dialog behavior.
+- Fixed tool argument and MCP output-schema validation in strict CSP and
+  Cloudflare environments by using an interpreter without dynamic JavaScript
+  compilation; removed the application's direct Ajv dependency.
+- Fixed streaming auto-scroll with TanStack Virtual's end-anchor correction,
+  preserving the viewport when users scroll up to read earlier messages.
+- Updated E2E fixtures for explicit conversation selection, model setup, and
+  current Agent/search controls; wait for initialized layouts before testing
+  keyboard focus and shortcuts.
+- Simplified the project documentation and added a documentation hub, official
+  Docker image deployment instructions, and upgrade/rollback guidance.
 
 ## v2.4.0
 

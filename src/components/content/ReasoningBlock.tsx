@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/primitives";
 interface ReasoningBlockProps {
   reasoning: string;
   isThinking: boolean;
+  startedAt?: number;
   durationMs?: number;
 }
 
@@ -25,9 +26,11 @@ function formatReasoningDuration(
 const ReasoningBlock: React.FC<ReasoningBlockProps> = ({
   reasoning,
   isThinking,
+  startedAt,
   durationMs,
 }) => {
   const [isExpanded, setIsExpanded] = useState(isThinking);
+  const [elapsedMs, setElapsedMs] = useState(0);
   const panelId = useId();
 
   const t = useTranslations("Content");
@@ -49,13 +52,25 @@ const ReasoningBlock: React.FC<ReasoningBlockProps> = ({
   const reasoningLabel = isThinking
     ? dynamicTitle || t("thinking")
     : t("thoughtProcess");
-  const durationLabel = !isThinking
-    ? formatReasoningDuration(durationMs, durationFormatter)
-    : null;
+  const durationLabel = formatReasoningDuration(
+    isThinking ? elapsedMs : durationMs,
+    durationFormatter,
+  );
 
   useEffect(() => {
     setIsExpanded(isThinking);
   }, [isThinking]);
+
+  useEffect(() => {
+    if (!isThinking) return;
+
+    const startTime = startedAt ?? Date.now();
+    const updateElapsed = () =>
+      setElapsedMs(Math.max(0, Date.now() - startTime));
+    updateElapsed();
+    const interval = window.setInterval(updateElapsed, 100);
+    return () => window.clearInterval(interval);
+  }, [isThinking, startedAt]);
 
   if (!reasoning) return null;
 

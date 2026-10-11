@@ -118,6 +118,11 @@ Markdown rendering sanitizes inline HTML, Mermaid, mind maps, image previews,
 citations, and Artifacts. Scripts, event handlers, iframes, unsafe URLs, full
 HTML documents, and unsafe style constructs are blocked.
 
+Mermaid generation preserves conditions, failure paths, sequence fragments,
+and relationship cardinality. Common diagram themes supply readable light/dark
+colors and native accessibility metadata; see [Mermaid output quality](mermaid-quality.md)
+for the source contract and evaluation cases.
+
 Model text and image output is stored as ordered `MessageOutputBlock` entries;
 renderers and exports use `outputBlocks` rather than only
 `message.content`. Local user and model images keep OPFS references and are

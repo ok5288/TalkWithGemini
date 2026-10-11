@@ -375,6 +375,7 @@ const MessageOutputRenderer: React.FC<MessageOutputRendererProps> = ({
             <ReasoningBlock
               reasoning={block.content}
               isThinking={block.id === activeReasoningBlockId}
+              startedAt={block.startedAt}
               durationMs={block.durationMs}
             />
           ),

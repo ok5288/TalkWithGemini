@@ -237,7 +237,7 @@ describe("dark theme token contract", () => {
     const globals = readProjectFile("src/app/globals.css");
     const renderer = `${readProjectFile(
       "src/components/content/MarkdownRendererClient.tsx",
-    )}\n${readProjectFile("src/components/content/markdown/DiagramBlock.tsx")}`;
+    )}\n${readProjectFile("src/components/content/markdown/DiagramBlock.tsx")}\n${readProjectFile("src/components/content/markdown/mermaidPalette.ts")}`;
 
     for (const token of [
       "--html-visual-surface: #f6fbff;",

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import React from "react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -15,6 +15,7 @@ import { useAgentRunStore } from "@/store/core/agentRunStore";
 
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   useAgentRunStore.setState({ runsById: {}, loadedSessionIds: {} });
 });
@@ -126,6 +127,29 @@ describe("MessageOutputRenderer workspace file presentation", () => {
 });
 
 describe("MessageOutputRenderer reasoning presentation", () => {
+  it("counts live reasoning from the streamed block's start time", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(10_000);
+    renderMessage({
+      id: "live-reasoning",
+      role: "model",
+      content: "",
+      timestamp: 1,
+      outputBlocks: [
+        {
+          id: "live-thought",
+          type: "reasoning",
+          content: "Still thinking",
+          startedAt: 9_000,
+        },
+      ],
+    });
+
+    expect(screen.getByLabelText("Thought duration: 1.0 sec")).toBeTruthy();
+    act(() => vi.advanceTimersByTime(200));
+    expect(screen.getByLabelText("Thought duration: 1.2 sec")).toBeTruthy();
+  });
+
   it("uses a reasoning block's own lifecycle even when another block follows", () => {
     render(
       <NextIntlClientProvider

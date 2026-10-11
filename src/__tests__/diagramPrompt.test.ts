@@ -6,6 +6,7 @@ import {
   isDiagramPromptInstructionEnabled,
   isEnhancedDiagramPromptInstructionEnabled,
   CHART_PROMPT_EXAMPLE,
+  MERMAID_PROMPT_EXAMPLE,
   MINDMAP_PROMPT_EXAMPLE,
 } from "../lib/chat/diagramPrompt";
 import { parseMarkdownDiagramBlocks } from "../lib/utils/markdownDiagrams";
@@ -92,6 +93,40 @@ describe("diagram prompt helpers", () => {
     expect(
       appendDiagramRequestInstructions("Use normal Markdown.", "plain prompt"),
     ).toBe("Use normal Markdown.");
+  });
+
+  it("keeps the complete Mermaid example in the system layer", () => {
+    const systemInstruction = buildDiagramPromptInstruction({ enhanced: true });
+    const message = appendDiagramRequestInstructions(
+      "Explain this architecture.",
+      systemInstruction,
+    );
+
+    expect(systemInstruction).toContain(MERMAID_PROMPT_EXAMPLE);
+    expect(message).not.toContain(MERMAID_PROMPT_EXAMPLE);
+    expect(message).toContain("accTitle");
+    expect(message).toContain("accDescr");
+    expect(systemInstruction).toContain("prose, a short list, or a table");
+    expect(systemInstruction).toContain("failure paths");
+    expect(systemInstruction).toContain("ER cardinality");
+    expect(systemInstruction).toContain("explain any merge or omission");
+  });
+
+  it("reserves room for complete request guidance when truncating long input", () => {
+    const systemInstruction = buildDiagramPromptInstruction({ enhanced: true });
+    const suffix = appendDiagramRequestInstructions("", systemInstruction);
+    const maxChars = suffix.length + 25;
+    const message = appendDiagramRequestInstructions(
+      "A".repeat(maxChars * 2),
+      systemInstruction,
+      maxChars,
+    );
+
+    expect(message).toHaveLength(maxChars);
+    expect(message).toBe(`${"A".repeat(25)}${suffix}`);
+    expect(appendDiagramRequestInstructions(message, systemInstruction)).toBe(
+      message,
+    );
   });
 
   it("ships a canonical example accepted by the installed mindmap parser", () => {

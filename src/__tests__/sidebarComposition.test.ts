@@ -14,13 +14,7 @@ describe("Sidebar composition", () => {
     );
 
     expect(sidebar).toContain("SidebarSearch");
-    expect(sidebar).toContain("WORKSPACE_SESSION_PREVIEW_LIMIT = 5");
-    expect(sidebar).toContain("ROOT_SESSION_PREVIEW_LIMIT = 5");
-    expect(sidebar).toContain("expandedWorkspaceSessionLists");
-    expect(sidebar).toContain("expandedRootSessionLists");
-    expect(sidebar).not.toContain("const [expandedRootSessionList,");
     expect(sidebar).not.toContain("isSearchingChats");
-    expect(sidebar).toContain("renderShowAllButton");
     expect(sidebar).toContain("PanelLeftOpen");
     expect(sidebar).toContain("PanelLeftClose");
     expect(sidebar).not.toContain('name="sidebar-chat-search"');
