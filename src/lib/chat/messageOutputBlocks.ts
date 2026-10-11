@@ -1,3 +1,4 @@
+import { parseIntelligentUiText } from "@/lib/intelligentUi/parser";
 import { v7 as uuidv7 } from "uuid";
 import type {
   ImageSource,
@@ -16,6 +17,7 @@ import {
 
 export interface MessageOutputBlockBuilderOptions {
   createId?: () => string;
+  enableIntelligentUi?: boolean;
   initialBlocks?: MessageOutputBlock[];
 }
 
@@ -30,6 +32,12 @@ interface SearchBlockUpdate {
 
 const cloneToolCall = (toolCall: ToolCall): ToolCall => ({
   ...toolCall,
+  ...(toolCall.intelligentUiState
+    ? { intelligentUiState: structuredClone(toolCall.intelligentUiState) }
+    : {}),
+  ...(toolCall.intelligentUiResult
+    ? { intelligentUiResult: structuredClone(toolCall.intelligentUiResult) }
+    : {}),
   ...(toolCall.resultImages
     ? { resultImages: toolCall.resultImages.map((image) => ({ ...image })) }
     : {}),
@@ -41,6 +49,8 @@ const cloneImage = (
 
 const cloneBlock = (block: MessageOutputBlock): MessageOutputBlock => {
   switch (block.type) {
+    case "intelligent_ui":
+      return structuredClone(block);
     case "text":
       return {
         ...block,
@@ -123,6 +133,8 @@ export function createMessageOutputBlockBuilder(
       break;
     }
   }
+
+  const sealedUiTextBlocks = new Map<string, { cancelled: boolean }>();
 
   const getLastBlock = () => blocks[blocks.length - 1];
 
@@ -207,7 +219,11 @@ export function createMessageOutputBlockBuilder(
       }
 
       const last = getLastBlock();
-      if (last?.type === "text" && !last.presentation) {
+      if (
+        last?.type === "text" &&
+        !last.presentation &&
+        !sealedUiTextBlocks.has(last.id)
+      ) {
         last.content += content;
         return;
       }
@@ -536,8 +552,63 @@ export function createMessageOutputBlockBuilder(
       });
     },
 
+    finalizeIntelligentUi(cancelled = false) {
+      if (!options.enableIntelligentUi) return false;
+      let changed = false;
+      for (const block of blocks) {
+        if (
+          block.type !== "text" ||
+          block.presentation ||
+          sealedUiTextBlocks.has(block.id)
+        )
+          continue;
+        const segments = parseIntelligentUiText(block.content);
+        const hasUi = segments.some(
+          (segment) => segment.type === "intelligent_ui",
+        );
+        const hasWithheldPrefix =
+          !hasUi &&
+          segments
+            .map((segment) => (segment.type === "text" ? segment.content : ""))
+            .join("") !== block.content;
+        if (!hasUi && !hasWithheldPrefix) continue;
+        // A completed provider round is immutable, even when another tool round
+        // starts. In particular, an EOF fence must never become partial again.
+        sealedUiTextBlocks.set(block.id, { cancelled });
+        changed ||=
+          hasWithheldPrefix ||
+          segments.some(
+            (segment) =>
+              segment.type === "intelligent_ui" &&
+              (segment.block.status === "receiving" ||
+                segment.block.status === "preview"),
+          );
+      }
+      return changed;
+    },
+
     getBlocks(): MessageOutputBlock[] {
-      return blocks.map(cloneBlock);
+      if (!options.enableIntelligentUi) return blocks.map(cloneBlock);
+      return blocks.flatMap((block): MessageOutputBlock[] => {
+        if (block.type !== "text" || block.presentation)
+          return [cloneBlock(block)];
+        return parseIntelligentUiText(block.content, {
+          idPrefix: block.id,
+          final: sealedUiTextBlocks.has(block.id),
+          cancelled: sealedUiTextBlocks.get(block.id)?.cancelled,
+        }).map((segment) =>
+          segment.type === "text"
+            ? {
+                ...block,
+                id:
+                  segment.offset === 0
+                    ? block.id
+                    : `${block.id}-text-${segment.offset}`,
+                content: segment.content,
+              }
+            : segment.block,
+        );
+      });
     },
 
     finalizeActiveReasoning,

@@ -12,6 +12,41 @@ import type {
   ResearchTaskRepositoryStatus,
 } from "./types";
 
+const taskListeners = new Set<() => void>();
+let taskChannel: BroadcastChannel | undefined;
+export function subscribeResearchTasks(listener: () => void): () => void {
+  taskListeners.add(listener);
+  if (
+    !taskChannel &&
+    typeof window !== "undefined" &&
+    typeof BroadcastChannel !== "undefined"
+  ) {
+    taskChannel = new BroadcastChannel("neo-chat-research-tasks-changed");
+    taskChannel.onmessage = () => taskListeners.forEach((notify) => notify());
+  }
+  return () => {
+    taskListeners.delete(listener);
+    if (!taskListeners.size) {
+      taskChannel?.close();
+      taskChannel = undefined;
+    }
+  };
+}
+function notifyTaskChange() {
+  taskListeners.forEach((notify) => notify());
+  if (taskChannel) taskChannel.postMessage("changed");
+  else if (
+    typeof window !== "undefined" &&
+    typeof BroadcastChannel !== "undefined"
+  ) {
+    const notification = new BroadcastChannel(
+      "neo-chat-research-tasks-changed",
+    );
+    notification.postMessage("changed");
+    notification.close();
+  }
+}
+
 class BrowserResearchTaskRepository implements ResearchTaskRepository {
   private readonly memory = new MemoryResearchTaskBackend();
   private persistent: ResearchTaskBackend | null;
@@ -43,12 +78,16 @@ class BrowserResearchTaskRepository implements ResearchTaskRepository {
   async save(task: ResearchTask): Promise<void> {
     const record = createStoredRecord(task);
     await this.memory.put(record);
-    if (!this.persistent) return;
+    if (!this.persistent) {
+      notifyTaskChange();
+      return;
+    }
     try {
       await this.persistent.put(record);
     } catch {
       this.downgrade("indexeddb_operation_failed");
     }
+    notifyTaskChange();
   }
 
   async get(taskId: string): Promise<ResearchTask | null> {
@@ -106,32 +145,44 @@ class BrowserResearchTaskRepository implements ResearchTaskRepository {
 
   async remove(taskId: string): Promise<void> {
     await this.memory.remove(taskId);
-    if (!this.persistent) return;
+    if (!this.persistent) {
+      notifyTaskChange();
+      return;
+    }
     try {
       await this.persistent.remove(taskId);
     } catch {
       this.downgrade("indexeddb_operation_failed");
     }
+    notifyTaskChange();
   }
 
   async clearSession(sessionId: string): Promise<void> {
     await this.memory.clearSession(sessionId);
-    if (!this.persistent) return;
+    if (!this.persistent) {
+      notifyTaskChange();
+      return;
+    }
     try {
       await this.persistent.clearSession(sessionId);
     } catch {
       this.downgrade("indexeddb_operation_failed");
     }
+    notifyTaskChange();
   }
 
   async clear(): Promise<void> {
     await this.memory.clear();
-    if (!this.persistent) return;
+    if (!this.persistent) {
+      notifyTaskChange();
+      return;
+    }
     try {
       await this.persistent.clear();
     } catch {
       this.downgrade("indexeddb_operation_failed");
     }
+    notifyTaskChange();
   }
 
   close(): void {

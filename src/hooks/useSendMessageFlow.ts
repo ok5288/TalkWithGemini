@@ -1,4 +1,17 @@
 "use client";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { API_INPUT_LIMITS } from "@/config/limits";
+import { waitForSessionMessageWrites } from "@/store/sessionMessagePersistence";
+import {
+  getActiveUiSourceContextKey,
+  createActiveUiSourceScope,
+  resolveBlockUiProjectionData,
+} from "@/lib/intelligentUi/sourceContext";
+import type { UiChatSend } from "@/components/content/intelligentUi/UiChatContext";
+import type { UiSendResult } from "@/lib/intelligentUi/bridgeTypes";
+import { projectUiBlock } from "@/lib/intelligentUi/projection";
+import { matchesUiStateTarget } from "@/lib/intelligentUi/instance";
+import { useSettingsStore } from "@/store/core/settingsStore";
 import { isTemporarySessionId } from "@/lib/chat/sessionRetention";
 import { v7 as uuidv7 } from "uuid";
 import type { ComposerForcedInvocations } from "@/components/chat/MessageInput";
@@ -79,12 +92,109 @@ export function useSendMessageFlow(deps: ChatFlowDeps) {
     commitInjectedMemoryContext,
   } = deps;
 
-  const handleSendMessage = async (
+  const currentModels = useRef(availableModels);
+  useLayoutEffect(() => {
+    currentModels.current = availableModels;
+  }, [availableModels]);
+  const sending = useRef(false);
+  const [uiSendProposal, setUiSendProposal] = useState<{
+    id: string;
+    text: string;
+    context: string;
+    saving: boolean;
+    saveFailed: boolean;
+  } | null>(null);
+  const pendingUiSend = useRef<{
+    id: string;
+    validate: () => UiSendResult | undefined;
+    acknowledge: (result: UiSendResult) => void;
+    send?: () => Promise<void>;
+  } | null>(null);
+  const cancelUiSend = (
+    result: UiSendResult = { ok: false, code: "cancelled" },
+  ) => {
+    const pending = pendingUiSend.current;
+    pendingUiSend.current = null;
+    setUiSendProposal(null);
+    pending?.acknowledge(result);
+  };
+  useEffect(() => {
+    const check = () => {
+      const invalid = pendingUiSend.current?.validate();
+      if (invalid) cancelUiSend(invalid);
+    };
+    const unsubscribeChat = useChatStore.subscribe?.(check);
+    const unsubscribeSettings = useSettingsStore.subscribe?.(check);
+    const timer = window.setInterval(check, 100);
+    return () => {
+      unsubscribeChat?.();
+      unsubscribeSettings?.();
+      window.clearInterval(timer);
+      const pending = pendingUiSend.current;
+      pendingUiSend.current = null;
+      pending?.acknowledge({ ok: false, code: "inactive" });
+    };
+  }, []);
+  const confirmUiSend = async () => {
+    const pending = pendingUiSend.current;
+    if (!pending?.send || sending.current) return;
+    const invalid = pending.validate();
+    if (invalid) {
+      cancelUiSend(invalid);
+      return;
+    }
+    sending.current = true;
+    setUiSendProposal(
+      (current) => current && { ...current, saving: true, saveFailed: false },
+    );
+    try {
+      await waitForSessionMessageWrites(
+        useChatStore.getState().currentSessionId!,
+      );
+    } catch {
+      sending.current = false;
+      if (pendingUiSend.current === pending)
+        setUiSendProposal(
+          (current) =>
+            current && { ...current, saving: false, saveFailed: true },
+        );
+      return;
+    }
+    if (pendingUiSend.current !== pending) {
+      sending.current = false;
+      return;
+    }
+    const stale = pending.validate();
+    if (stale) {
+      sending.current = false;
+      cancelUiSend(stale);
+      return;
+    }
+    pendingUiSend.current = null;
+    setUiSendProposal(null);
+    try {
+      await pending.send();
+    } catch {
+      pending.acknowledge({ ok: false, code: "send_failed" });
+    } finally {
+      sending.current = false;
+      pending.acknowledge({ ok: false, code: "send_failed" });
+    }
+  };
+  const runSendMessage = async (
     text: string,
     attachments: Attachment[],
     replyTo?: MessageReplyReference,
     skillParameters?: ComposerSkillParameterValues,
     forced?: ComposerForcedInvocations,
+    ui?: {
+      validate: () => UiSendResult | undefined;
+      validateSources: () => Promise<UiSendResult | undefined>;
+      assertDispatch: (appendedIds: readonly string[]) => Promise<void>;
+      acknowledge: (result: UiSendResult) => void;
+      context: () =>
+        { messageId: string; blockId: string; content: string } | undefined;
+    },
   ) => {
     const chatState = useChatStore.getState();
     if (!navigator.onLine) {
@@ -141,8 +251,22 @@ export function useSendMessageFlow(deps: ChatFlowDeps) {
 
     const resolvedSkillParameters =
       skillParameters ||
-      (await prepareComposerSkillParameters(sessionForCheck, selectedModel));
-    if (!resolvedSkillParameters) return;
+      (await prepareComposerSkillParameters(
+        sessionForCheck,
+        selectedModel,
+        [],
+        !!ui,
+      ));
+    if (!resolvedSkillParameters) {
+      ui?.acknowledge({ ok: false, code: "user_action_required" });
+      return;
+    }
+    const invalidAfterPreparation =
+      ui && ((await ui.validateSources()) ?? ui.validate());
+    if (invalidAfterPreparation) {
+      ui?.acknowledge(invalidAfterPreparation);
+      return;
+    }
 
     abortBackgroundPostProcessing();
     const generation = beginActiveGeneration();
@@ -196,15 +320,62 @@ export function useSendMessageFlow(deps: ChatFlowDeps) {
       }
 
       if (!isGenerationRunActive(generation)) return;
+      const invalidSource =
+        ui && ((await ui.validateSources()) ?? ui.validate());
+      if (invalidSource) {
+        ui?.acknowledge(invalidSource);
+        return;
+      }
+      const intelligentUiSource = ui?.context();
       commitInjectedMemoryContext(
         targetSessionId,
         sessionForProcessing,
         injectedMemoryIds,
       );
 
-      // Add User Message
-      await addMessage(targetSessionId, userMessage);
-      userMessageAdded = true;
+      // addMessage publishes synchronously before durable storage completes.
+      // A persistence rejection must not invite a duplicate SDK retry.
+      const insertionPath = useChatStore
+        .getState()
+        .activeMessages.map((message) => message.id);
+      const acknowledgeLiveInsertion = () => {
+        const state = useChatStore.getState();
+        if (
+          state.currentSessionId === targetSessionId &&
+          state.activeMessages.length === insertionPath.length + 1 &&
+          insertionPath.every(
+            (id, index) => state.activeMessages[index]?.id === id,
+          ) &&
+          state.activeMessages.at(-1)?.id === userMessage.id &&
+          state.activeMessages.at(-1)?.role === "user"
+        ) {
+          userMessageAdded = true;
+          ui?.acknowledge({ ok: true, messageId: userMessage.id });
+        }
+      };
+      const insertion = addMessage(targetSessionId, userMessage);
+      if (ui) acknowledgeLiveInsertion();
+      try {
+        await insertion;
+      } catch (error) {
+        if (ui) {
+          acknowledgeLiveInsertion();
+          if (userMessageAdded) {
+            showActionError(
+              error instanceof Error ? error.message : String(error),
+            );
+            return;
+          }
+        }
+        throw error;
+      }
+      if (ui) {
+        acknowledgeLiveInsertion();
+        if (!userMessageAdded) {
+          ui.acknowledge(ui.validate() ?? { ok: false, code: "send_failed" });
+          return;
+        }
+      } else userMessageAdded = true;
       if (!isGenerationRunActive(generation)) return;
 
       // Add Placeholder Bot Message
@@ -231,6 +402,32 @@ export function useSendMessageFlow(deps: ChatFlowDeps) {
 
       await addMessage(targetSessionId, botMsg);
       if (!isGenerationRunActive(generation)) return;
+      const beforeDispatch = ui
+        ? async () => {
+            try {
+              const assertGeneration = () => {
+                if (
+                  !isGenerationRunActive(generation) ||
+                  useChatStore
+                    .getState()
+                    .activeMessages.find(
+                      (message) => message.id === currentBotMsgId,
+                    )?.generation?.requestId !== agentRequestId
+                )
+                  throw new Error("UI_SOURCE_STALE");
+              };
+              assertGeneration();
+              await ui.assertDispatch([userMessage.id, currentBotMsgId]);
+              assertGeneration();
+            } catch {
+              throw Object.assign(
+                new Error(t("intelligentUiAuthorizationExpired")),
+                { code: "UI_SOURCE_STALE" },
+              );
+            }
+          }
+        : undefined;
+      await beforeDispatch?.();
 
       // Get fresh session data
       const historyMessages = useChatStore.getState().activeMessages;
@@ -268,6 +465,8 @@ export function useSendMessageFlow(deps: ChatFlowDeps) {
         selectedModel,
       );
       if (!isGenerationRunActive(generation)) return;
+
+      await beforeDispatch?.();
 
       const effectiveConfig = resolveEffectiveChatRequestConfig({
         chatConfig,
@@ -308,6 +507,7 @@ export function useSendMessageFlow(deps: ChatFlowDeps) {
             signal: generation.controller.signal,
           });
       if (!isGenerationRunActive(generation)) return;
+      await beforeDispatch?.();
       if (skillResolution.skippedSkillIds.length > 0) {
         showActionError(
           t("skillsSkipped", {
@@ -365,8 +565,9 @@ export function useSendMessageFlow(deps: ChatFlowDeps) {
             });
           }
         },
-        run: () =>
-          streamChatResponse(
+        run: async () => {
+          await beforeDispatch?.();
+          return streamChatResponse(
             targetSessionId!,
             selectedModel,
             historyForLLM,
@@ -467,6 +668,8 @@ export function useSendMessageFlow(deps: ChatFlowDeps) {
             },
             toolConfirmationController,
             {
+              intelligentUiSource,
+              beforeDispatch,
               userInputController: agentUserInputController,
               ...createAgentToolStreamOptions({
                 sessionId: targetSessionId!,
@@ -497,7 +700,8 @@ export function useSendMessageFlow(deps: ChatFlowDeps) {
                 : {}),
               forcedPluginIds: requestedPluginIds,
             },
-          ),
+          );
+        },
       });
 
       streamRenderer.flush();
@@ -663,6 +867,12 @@ export function useSendMessageFlow(deps: ChatFlowDeps) {
           });
       }
     } catch (error: any) {
+      // A rejected SDK preparation must not create a fallback turn: the caller
+      // receives a failure receipt and may explicitly retry from its UI.
+      if (ui && !userMessageAdded) {
+        ui.acknowledge(ui.validate() ?? { ok: false, code: "send_failed" });
+        return;
+      }
       streamRenderer?.flush();
       if (error.name === "AbortError" || generation.controller.signal.aborted) {
         return;
@@ -675,6 +885,7 @@ export function useSendMessageFlow(deps: ChatFlowDeps) {
         } else if (typeof error === "string") {
           errorMessage = error;
         }
+        const sourceRevoked = !!ui && error?.code === "UI_SOURCE_STALE";
         const forcedPluginFailure = isForcedPluginInvocationError(error);
         const errorCode =
           typeof error?.code === "string" ? error.code : undefined;
@@ -713,11 +924,11 @@ export function useSendMessageFlow(deps: ChatFlowDeps) {
                 }
               : undefined,
             generationError:
-              hasPartialOutput && !forcedPluginFailure
+              hasPartialOutput && !forcedPluginFailure && !sourceRevoked
                 ? undefined
                 : {
                     message: errorMessage,
-                    recoverable: true,
+                    recoverable: !sourceRevoked,
                     ...(errorCode ? { code: errorCode } : {}),
                   },
             timing: {
@@ -757,5 +968,211 @@ export function useSendMessageFlow(deps: ChatFlowDeps) {
     }
   };
 
-  return { handleSendMessage };
+  const handleSendMessage = async (
+    ...args: [
+      text: string,
+      attachments: Attachment[],
+      replyTo?: MessageReplyReference,
+      skillParameters?: ComposerSkillParameterValues,
+      forced?: ComposerForcedInvocations,
+    ]
+  ) => {
+    cancelUiSend({ ok: false, code: "inactive" });
+    if (sending.current) return;
+    sending.current = true;
+    try {
+      await runSendMessage(...args);
+    } finally {
+      sending.current = false;
+    }
+  };
+
+  const handleUiSendMessage: UiChatSend = (text, source) => {
+    if (pendingUiSend.current || sending.current || isGenerating)
+      return Promise.resolve({ ok: false, code: "busy" });
+    const initialState = useChatStore.getState();
+    const authority = getActiveUiSourceContextKey(
+      source.sessionId,
+      source.messageId,
+    );
+    const branch = initialState.activeMessages
+      .map((message) => message.id)
+      .join("\n");
+    const validate = (): UiSendResult | undefined => {
+      const state = useChatStore.getState();
+      if (!text.trim() || text.length > API_INPUT_LIMITS.maxChatTextChars)
+        return { ok: false, code: "invalid_message" };
+      if (!navigator.onLine) return { ok: false, code: "offline" };
+      if (
+        !selectedModel ||
+        state.selectedModel !== selectedModel ||
+        !currentModels.current.some((model) => model.name === selectedModel)
+      )
+        return { ok: false, code: "model_unavailable" };
+      if (
+        !useSettingsStore.getState().system.enableIntelligentUi ||
+        !source.isActive() ||
+        getActiveUiSourceContextKey(source.sessionId, source.messageId) !==
+          authority ||
+        state.currentSessionId !== source.sessionId ||
+        state.isActiveSessionLoading ||
+        state.pendingSessionId ||
+        state.activeMessages.map((message) => message.id).join("\n") !== branch
+      )
+        return { ok: false, code: "inactive" };
+      if (
+        state.activeMessages.some(
+          (message) => message.generation?.status === "streaming",
+        )
+      )
+        return { ok: false, code: "busy" };
+      const block = state.activeMessages
+        .find((message) => message.id === source.messageId)
+        ?.outputBlocks?.find((block) => block.id === source.blockId);
+      if (
+        block?.type !== "intelligent_ui" ||
+        !matchesUiStateTarget(block, source.blockId, source.definitionRevision)
+      )
+        return { ok: false, code: "inactive" };
+    };
+    const invalid = validate();
+    if (invalid) return Promise.resolve(invalid);
+    const block = initialState.activeMessages
+      .find((message) => message.id === source.messageId)
+      ?.outputBlocks?.find((block) => block.id === source.blockId);
+    if (block?.type !== "intelligent_ui")
+      return Promise.resolve({ ok: false, code: "inactive" });
+    // The host captures content before any asynchronous source reads or user confirmation.
+    const frozenBlock = structuredClone(block);
+    return new Promise<UiSendResult>((acknowledge) => {
+      const pending = {
+        id: uuidv7(),
+        validate,
+        acknowledge,
+        send: undefined as (() => Promise<void>) | undefined,
+      };
+      pendingUiSend.current = pending;
+      void (async () => {
+        const scope = await createActiveUiSourceScope(
+          source.sessionId,
+          source.messageId,
+        );
+        const data = await resolveBlockUiProjectionData(
+          frozenBlock,
+          source.sessionId,
+          source.messageId,
+          "model-continuation",
+          scope,
+        );
+        await scope.assertValid();
+        return { data, scope };
+      })()
+        .then(({ data, scope }) => {
+          if (pendingUiSend.current !== pending) return;
+          const stale = validate();
+          if (stale) {
+            cancelUiSend(stale);
+            return;
+          }
+          const content = projectUiBlock(frozenBlock, {
+            purpose: "model-continuation",
+            locale,
+            ...data,
+          });
+          const context = Object.freeze({
+            messageId: source.messageId,
+            blockId: source.blockId,
+            content,
+          });
+          pending.send = () =>
+            runSendMessage(text, [], undefined, undefined, undefined, {
+              validate,
+              validateSources: async () => {
+                try {
+                  await scope.assertValid();
+                  return validate();
+                } catch {
+                  return { ok: false, code: "inactive" };
+                }
+              },
+              assertDispatch: async (appendedIds) => {
+                const assertHost = () => {
+                  const state = useChatStore.getState();
+                  if (
+                    !(source.isInstanceActive ?? source.isActive)() ||
+                    !navigator.onLine ||
+                    !useSettingsStore.getState().system.enableIntelligentUi ||
+                    state.selectedModel !== selectedModel ||
+                    !currentModels.current.some(
+                      (model) => model.name === selectedModel,
+                    )
+                  )
+                    throw new Error("UI_SOURCE_STALE");
+                  const current = state.activeMessages
+                    .find((message) => message.id === source.messageId)
+                    ?.outputBlocks?.find((item) => item.id === source.blockId);
+                  if (
+                    current?.type !== "intelligent_ui" ||
+                    !matchesUiStateTarget(
+                      current,
+                      source.blockId,
+                      source.definitionRevision,
+                    )
+                  )
+                    throw new Error("UI_SOURCE_STALE");
+                };
+                assertHost();
+                await scope.assertDispatchValid(appendedIds);
+                assertHost();
+              },
+              acknowledge,
+              context: () => context,
+            });
+          setUiSendProposal({
+            id: pending.id,
+            text,
+            context: content,
+            saving: false,
+            saveFailed: false,
+          });
+        })
+        .catch(() => {
+          if (pendingUiSend.current === pending)
+            cancelUiSend({ ok: false, code: "send_failed" });
+        });
+    });
+  };
+
+  const prepareComposerSend = async (forced?: ComposerForcedInvocations) => {
+    if (sending.current || isGenerating) return null;
+    sending.current = true;
+    try {
+      const state = useChatStore.getState();
+      if (
+        state.activeMessages.some(
+          (message) => message.generation?.status === "streaming",
+        )
+      )
+        return null;
+      return await prepareComposerSkillParameters(
+        state.sessions.find((session) => session.id === state.currentSessionId),
+        selectedModel,
+        [
+          ...(forced?.skillIds ?? []),
+          ...(forced?.pendingSessionSkillIds ?? []),
+        ],
+      );
+    } finally {
+      sending.current = false;
+    }
+  };
+
+  return {
+    handleSendMessage,
+    handleUiSendMessage,
+    prepareComposerSend,
+    uiSendProposal,
+    confirmUiSend,
+    cancelUiSend,
+  };
 }

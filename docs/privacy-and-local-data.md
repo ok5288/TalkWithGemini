@@ -24,6 +24,43 @@ It is not uploaded, persisted, or used for telemetry. Browser site-data
 clearing can remove local conversations, settings, plugins, memories,
 knowledge data, and uploaded files.
 
+Intelligent UI definitions and state are part of the session message tree, including
+private backups and existing session sync. Temporary-session interactions stay in
+memory. Normal chat includes interface source and its latest reported visible
+results in model context. Interface AI buttons first open host confirmation with
+the exact proposed text and frozen visible result context; sending requires that
+confirmation and preserves the main composer draft. Arbitrary
+saved state is not dumped. HTML may load HTTPS media/fonts and allowlisted CDN
+assets, so resource providers receive network requests. Public shares and document
+exports exclude personal interaction values unless explicitly selected. Public
+sharing previews the exact prepared content before publishing; source permissions
+and versions are checked again at publication. Current HTML output labels its
+snapshot as text reported by the interface, not an independently verified result.
+An unavailable snapshot is identified explicitly. Research source access is read
+from the exact repository version; deleting that material revokes cached access. See
+[Intelligent UI](intelligent-ui.md) for snapshot and HTML sandbox boundaries.
+
+Explorer imports are private replacements in the same session tree; default public
+output still uses original content. Selected current rows and visible results are
+included only after opt-in. Source bindings preserve identities and versions, but
+access is rechecked against the current conversation and permissions. Tool-result
+refresh enters an editable chat draft. Saving selected results to the local
+workspace requires confirmation and records an operation receipt. The separate,
+default-off MCP Apps display host receives visible result text only, without chat
+history, tool arguments or hidden metadata; its internal state is not backed up.
+MCP tools require complete versioned visibility metadata before being exposed to
+the model; older definitions remain stored and require explicit refresh.
+
+HTML state writes are coalesced in the existing session queue. A failed save
+retains the latest in-memory state with an explicit retry; outputs and backups
+wait for pending saves. Closing the page triggers a best-effort flush, which cannot
+guarantee completion if the browser terminates abruptly. Unknown workspace-write
+outcomes cannot be retried automatically or by replaying the old confirmation.
+The local execution journal keeps independent attempt evidence to reject missing
+or damaged histories. Older failed histories without that evidence remain
+readable but cannot authorize another attempt. Completely lost older history
+cannot be reconstructed. Restoring app data excludes concurrent draft writes.
+
 ## Back up or restore
 
 Use the backup controls in **Settings → System**. A backup includes app data

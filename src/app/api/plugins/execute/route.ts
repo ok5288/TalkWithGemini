@@ -1,3 +1,5 @@
+import { isModelVisiblePluginFunction } from "@/lib/plugin/resolve";
+import { getMcpSandboxOrigin } from "@/lib/mcpApps/config";
 import { NextRequest, NextResponse } from "next/server";
 import { isResearchSourceProvider } from "@/lib/plugin/researchSources/catalog";
 import { executeResearchSourceRequest } from "@/lib/plugin/researchSources/server";
@@ -97,6 +99,15 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      if (!isModelVisiblePluginFunction(registeredPlugin, functionDef)) {
+        return NextResponse.json(
+          {
+            error: "Refresh the MCP tool definition before model execution.",
+            code: "MCP_TOOL_NOT_MODEL_VISIBLE",
+          },
+          { status: 403 },
+        );
+      }
       const argsValidation = validateToolArguments(
         functionDef.parameters,
         args,
@@ -169,6 +180,9 @@ export async function POST(request: NextRequest) {
         }
 
         const result = await executeMcpToolRequest({
+          enableMcpApps:
+            newBody.data.enableMcpApps === true &&
+            !!getMcpSandboxOrigin(request.nextUrl.origin),
           serverUrl: plugin.mcp.serverUrl,
           transport: plugin.mcp.transport,
           toolName: mcpToolName,
@@ -247,6 +261,16 @@ export async function POST(request: NextRequest) {
     const legacyBody = ToolExecutionSchema.parse(rawBody);
     const plugin = legacyBody.plugin as Plugin;
     const functionDef = legacyBody.functionDef as PluginFunction;
+    if (plugin.source === "mcp" || plugin.mcp || functionDef.mcpToolName) {
+      return NextResponse.json(
+        {
+          error:
+            "MCP requires registered execution. Refresh the tool definition.",
+          code: "MCP_REGISTERED_EXECUTION_REQUIRED",
+        },
+        { status: 403 },
+      );
+    }
     // Never allow legacy caller-supplied manifests to impersonate a trusted source.
     if (isResearchSourceProvider(plugin.id)) {
       return NextResponse.json(

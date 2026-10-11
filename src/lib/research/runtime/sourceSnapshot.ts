@@ -12,7 +12,7 @@ import {
 } from "@/lib/research/types";
 import { isAgentWorkspaceAvailable } from "@/lib/agent";
 import { normalizeSessionMessageTree } from "@/lib/chat/messageTree";
-import { getEnabledPluginFunctions } from "@/lib/plugin/resolve";
+import { getModelCallablePluginFunctions } from "@/lib/plugin/resolve";
 import { getPluginFunctionInvocationPolicy } from "@/lib/plugin/risk";
 import {
   createKnowledgeCollectionAttachment,
@@ -169,7 +169,7 @@ export async function createSourceSnapshot(
       (item) => item.id === pluginId,
     );
     if (!plugin) return;
-    const functionIds = getEnabledPluginFunctions(
+    const functionIds = getModelCallablePluginFunctions(
       plugin,
       settings.pluginConfigs[pluginId],
     )

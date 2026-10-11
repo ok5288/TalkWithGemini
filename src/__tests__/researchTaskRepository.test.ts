@@ -560,3 +560,29 @@ describe("ResearchTask repository", () => {
     });
   });
 });
+
+it("notifies authority subscribers after each committed task mutation", async () => {
+  const { subscribeResearchTasks } =
+    await import("@/services/research/taskRepository");
+  const repository = createResearchTaskRepository({ indexedDb: null });
+  const changed = vi.fn();
+  const unsubscribe = subscribeResearchTasks(changed);
+  try {
+    const task = createV2TaskFixture();
+    await repository.save(task);
+    expect(changed).toHaveBeenCalledTimes(1);
+    expect(await repository.get(task.id)).not.toBeNull();
+    await repository.remove(task.id);
+    expect(changed).toHaveBeenCalledTimes(2);
+    expect(await repository.get(task.id)).toBeNull();
+    await repository.clearSession(task.sessionId);
+    await repository.clear();
+    expect(changed).toHaveBeenCalledTimes(4);
+    unsubscribe();
+    await repository.save(task);
+    expect(changed).toHaveBeenCalledTimes(4);
+  } finally {
+    unsubscribe();
+    repository.close();
+  }
+});

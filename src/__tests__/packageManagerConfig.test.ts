@@ -34,7 +34,7 @@ describe("package manager configuration", () => {
     );
 
     expect(packageJson.pnpm?.overrides).toBeUndefined();
-    expect(packageJson.devDependencies?.vitest).toBe("^4.1.11");
+    expect(packageJson.devDependencies?.vitest).toBe("^5.0.2");
     expect(bridgePackageJson.packageManager).toBe("pnpm@10.30.3");
     expect(workspaceYaml).toContain("overrides:");
     expect(workspaceYaml).toMatch(/["']ws@>=8\.0\.0 <8\.20\.1["']: 8\.21\.0/);

@@ -66,6 +66,7 @@ describe("MCP plugin execute route", () => {
         {
           name: "mcp_io_github_context7__resolve_library_id",
           mcpToolName: "resolve-library-id",
+          mcpVisibility: ["model", "app"],
           description: "Resolve package docs.",
           parameters: { type: "object", properties: {} },
           outputSchema: {
@@ -79,6 +80,7 @@ describe("MCP plugin execute route", () => {
       ],
       auth: { type: "none", required: false },
       mcp: {
+        toolMetadataVersion: 1,
         transport: "streamable-http",
         serverUrl: "https://mcp.example.com/mcp",
         serverName: "io.github/context7",
@@ -160,4 +162,44 @@ describe("MCP plugin execute route", () => {
     });
     expect(executeMcpToolRequestMock).toHaveBeenCalledTimes(2);
   });
+  it.each([undefined, ["app"], []])(
+    "denies registered tools with non-model visibility %j before dispatch",
+    async (visibility) => {
+      const { registerServerPlugin } =
+        await import("../lib/plugin/serverRegistry");
+      await registerServerPlugin({
+        id: "mcp:restricted",
+        title: "Restricted",
+        description: "",
+        logoUrl: "",
+        manifestUrl: "",
+        source: "mcp",
+        functions: [
+          {
+            name: "hidden",
+            mcpToolName: "hidden",
+            description: "",
+            parameters: { type: "object" },
+            mcpVisibility: visibility as ("app" | "model")[] | undefined,
+          },
+        ],
+        mcp: {
+          transport: "streamable-http",
+          serverUrl: "https://mcp.example.com",
+          serverName: "restricted",
+          toolMetadataVersion: visibility ? 1 : undefined,
+        },
+      });
+      const { POST } = await import("../app/api/plugins/execute/route");
+      const response = await POST(
+        createRequest({
+          pluginId: "mcp:restricted",
+          functionName: "hidden",
+          args: {},
+        }) as never,
+      );
+      expect(response.status).toBe(403);
+      expect(executeMcpToolRequestMock).not.toHaveBeenCalled();
+    },
+  );
 });

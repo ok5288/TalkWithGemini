@@ -1,3 +1,4 @@
+import { buildIntelligentUiPromptInstruction } from "@/lib/intelligentUi/prompt";
 import type {
   ChatConfig,
   ModelMetadata,
@@ -101,6 +102,7 @@ export interface ResolveEffectiveChatContextOptions {
   systemPrompt?: string;
   personality?: SystemPersonality;
   enableHtmlVisualPrompt?: boolean;
+  enableIntelligentUi?: boolean;
   now?: Date | number;
   selectedModel: string;
   provider?: Pick<ModelProvider, "type"> | null;
@@ -180,6 +182,7 @@ function buildSystemInstruction({
   workspacePrompt,
   sessionInstruction,
   enableHtmlVisualPrompt,
+  enableIntelligentUi,
   now,
 }: {
   systemPrompt?: string;
@@ -187,6 +190,7 @@ function buildSystemInstruction({
   workspacePrompt?: string;
   sessionInstruction?: string;
   enableHtmlVisualPrompt?: boolean;
+  enableIntelligentUi?: boolean;
   now?: Date | number;
 }) {
   const sections: string[] = [];
@@ -211,6 +215,9 @@ function buildSystemInstruction({
   sections.push(buildImagePromptInstruction());
   if (enableHtmlVisualPrompt) {
     sections.push(buildHtmlVisualPromptInstruction());
+  }
+  if (enableIntelligentUi) {
+    sections.push(buildIntelligentUiPromptInstruction());
   }
   sections.push(formatCurrentDateTime(now));
   return sections.join("\n\n");
@@ -247,6 +254,40 @@ function getModelCapabilities({
   };
 }
 
+/** Current plugin access, shared by execution and passive result consumers. */
+export function resolveEffectivePluginAccess(
+  options: Pick<
+    ResolveEffectiveChatContextOptions,
+    | "session"
+    | "workspace"
+    | "activePlugins"
+    | "installedPlugins"
+    | "pluginConfigs"
+  >,
+): { requestedPluginIds: string[]; activePluginIds: string[] } {
+  const { session, workspace, activePlugins, installedPlugins, pluginConfigs } =
+    options;
+  const profile = resolveAgentProfile(
+    workspace?.agentProfile,
+    session?.config?.agentProfile,
+  );
+  const requestedPluginIds =
+    session?.config?.activePlugins !== undefined
+      ? session.config.activePlugins
+      : session?.config?.agentProfile || workspace?.agentProfile
+        ? profile.capabilities.pluginIds || []
+        : activePlugins;
+  return {
+    requestedPluginIds,
+    activePluginIds: normalizeActivePluginIds(
+      requestedPluginIds,
+      installedPlugins,
+      pluginConfigs,
+      { unauthenticatedAllowedPluginIds: ["unsplash"] },
+    ),
+  };
+}
+
 export function resolveEffectiveChatContext(
   options: ResolveEffectiveChatContextOptions,
 ): EffectiveChatContext {
@@ -256,6 +297,7 @@ export function resolveEffectiveChatContext(
     systemPrompt,
     personality,
     enableHtmlVisualPrompt,
+    enableIntelligentUi,
     now,
     selectedModel,
     provider,
@@ -291,7 +333,6 @@ export function resolveEffectiveChatContext(
   const agentModeEnabled = chatMode === "agent" && modelCapabilities.toolCall;
   const researchModeEnabled =
     chatMode === "research" && modelCapabilities.toolCall;
-  const requestedPluginIds = activePlugins;
   const resolvedAgentProfile = resolveAgentProfile(
     workspace?.agentProfile,
     session?.config?.agentProfile,
@@ -317,24 +358,19 @@ export function resolveEffectiveChatContext(
     session?.config?.agentProfile?.researchTemplate,
     session?.config?.researchTemplate,
   );
-  const profilePluginIds = resolvedAgentProfile.capabilities.pluginIds || [];
   const hasAgentProfileLayer = Boolean(
     session?.config?.agentProfile || workspace?.agentProfile,
   );
   const hasAgentSkillPolicyLayer =
     hasAgentProfileLayer || session?.config?.skillPolicies !== undefined;
-  const requestedPluginIdsWithProfile =
-    session?.config?.activePlugins !== undefined
-      ? session.config.activePlugins
-      : hasAgentProfileLayer
-        ? profilePluginIds
-        : requestedPluginIds;
-  const activePluginIds = normalizeActivePluginIds(
-    requestedPluginIdsWithProfile,
-    installedPlugins,
-    pluginConfigs,
-    { unauthenticatedAllowedPluginIds: ["unsplash"] },
-  );
+  const { requestedPluginIds: requestedPluginIdsWithProfile, activePluginIds } =
+    resolveEffectivePluginAccess({
+      session,
+      workspace,
+      activePlugins,
+      installedPlugins,
+      pluginConfigs,
+    });
   const activeSkillIds = normalizeSkillIdRefs(
     session?.config?.activeSkills ||
       workspace?.activeSkills ||
@@ -403,6 +439,7 @@ export function resolveEffectiveChatContext(
       workspacePrompt: workspace?.systemPrompt,
       sessionInstruction: session?.systemInstruction,
       enableHtmlVisualPrompt,
+      enableIntelligentUi: enableIntelligentUi && !researchModeEnabled,
       now,
     }),
     workspaceFiles: workspace?.files || [],

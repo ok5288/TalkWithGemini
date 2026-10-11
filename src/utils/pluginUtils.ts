@@ -1,9 +1,11 @@
+import { areMcpAppsEnabled } from "@/lib/mcpApps/config";
 import { isResearchSourceProvider } from "../lib/plugin/researchSources/catalog";
 import { useSettingsStore } from "../store/core/settingsStore";
 import { UNSPLASH_PLUGIN } from "../config/plugins";
 import {
   getPluginFunctionNameCollisions,
-  resolvePluginFunction,
+  resolveEnabledPluginFunction,
+  isModelVisiblePluginFunction,
 } from "../lib/plugin/resolve";
 import { readJsonResponseOrThrow, signedApiFetch } from "../lib/api/client";
 import {
@@ -130,13 +132,45 @@ async function executeBackendPluginFunction(
   expectedFingerprint?: string,
 ): Promise<any> {
   const response = await postPluginExecutionWithLegacyFallback(
-    async () => ({
-      pluginId: plugin.id,
-      functionName: functionDef.name,
-      ...(expectedFingerprint ? { expectedFingerprint } : {}),
-      args,
-      authConfig,
-    }),
+    async () => {
+      if (plugin.source === "mcp") {
+        const current = useSettingsStore.getState();
+        const resolved = resolveEnabledPluginFunction(
+          current.installedPlugins,
+          functionDef.name,
+          [plugin.id],
+          current.pluginConfigs,
+        );
+        if (
+          !resolved ||
+          !isModelVisiblePluginFunction(
+            resolved.plugin,
+            resolved.functionDef,
+          ) ||
+          (await createPluginFunctionFingerprint(
+            resolved.plugin,
+            resolved.functionDef,
+          )) !== (await createPluginFunctionFingerprint(plugin, functionDef))
+        ) {
+          throw new Error(
+            "MCP tool definition or visibility changed before execution",
+          );
+        }
+      }
+      return {
+        pluginId: plugin.id,
+        functionName: functionDef.name,
+        enableMcpApps:
+          plugin.source === "mcp" &&
+          areMcpAppsEnabled(
+            useSettingsStore.getState().system,
+            typeof window === "undefined" ? undefined : window.location.origin,
+          ),
+        ...(expectedFingerprint ? { expectedFingerprint } : {}),
+        args,
+        authConfig,
+      };
+    },
     async () => ({
       plugin,
       functionDef,
@@ -144,7 +178,9 @@ async function executeBackendPluginFunction(
       authConfig,
     }),
     signal,
-    expectedFingerprint === undefined && !isResearchSourceProvider(plugin.id),
+    expectedFingerprint === undefined &&
+      plugin.source !== "mcp" &&
+      !isResearchSourceProvider(plugin.id),
   );
 
   const data = await readJsonResponseOrThrow<PluginExecutionResponse>(
@@ -211,10 +247,11 @@ export const executePluginFunction = async (
     );
   }
 
-  const resolved = resolvePluginFunction(
+  const resolved = resolveEnabledPluginFunction(
     installedPlugins,
     functionName,
     allowedPluginIds,
+    pluginConfigs,
   );
 
   if (!resolved) {

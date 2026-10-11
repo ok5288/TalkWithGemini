@@ -6,6 +6,7 @@ import {
 import { PluginInstallSchema } from "@/lib/api/schemas";
 import { safeFetchJson } from "@/lib/security/safeFetch";
 import { getSafeUrlPolicy } from "@/lib/security/urlPolicy";
+import { getMcpSandboxOrigin } from "@/lib/mcpApps/config";
 import { discoverMcpTools } from "@/lib/mcp/client";
 import { convertOpenApiSpecToPlugin } from "@/lib/plugin/openapi";
 import { registerServerPlugin } from "@/lib/plugin/serverRegistry";
@@ -161,6 +162,9 @@ export async function POST(request: NextRequest) {
         }
 
         const discovery = await discoverMcpTools({
+          enableMcpApps:
+            body.enableMcpApps === true &&
+            !!getMcpSandboxOrigin(request.nextUrl.origin),
           serverUrl: trustedPlugin.mcp.serverUrl,
           transport: trustedPlugin.mcp.transport,
           staticHeaders: trustedPlugin.mcp.headers,
@@ -221,6 +225,7 @@ export async function POST(request: NextRequest) {
             ...trustedPlugin.mcp,
             transport: discovery.transport,
             toolNameMap,
+            toolMetadataVersion: 1,
           },
         };
 

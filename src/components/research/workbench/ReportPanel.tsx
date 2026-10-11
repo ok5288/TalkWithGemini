@@ -322,6 +322,7 @@ export function ReportPanel({
   onInspectEvidence,
   onDownloadMarkdown,
   onPrintPdf,
+  onInteractiveExplanation,
   onAskEvidence,
   onUpdateLatest,
 }: {
@@ -336,6 +337,7 @@ export function ReportPanel({
   onInspectEvidence: (evidenceId: string) => void;
   onDownloadMarkdown?: (versionId: string) => void;
   onPrintPdf?: (versionId: string) => void;
+  onInteractiveExplanation?: (versionId: string) => void;
   onAskEvidence?: () => void;
   onUpdateLatest?: () => void;
 }) {
@@ -386,6 +388,15 @@ export function ReportPanel({
             ariaLabel={t("report.selectVersion")}
             selectButtonClassName="flex h-9 min-h-0 min-w-28 items-center justify-between gap-2 rounded-md border border-border bg-background px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           />
+          {onInteractiveExplanation ? (
+            <Button
+              size="sm"
+              onClick={() => onInteractiveExplanation(report.id)}
+            >
+              <MessageSquareText size={14} aria-hidden="true" />
+              {t("actions.interactiveExplanation")}
+            </Button>
+          ) : null}
           {onDownloadMarkdown || onPrintPdf ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

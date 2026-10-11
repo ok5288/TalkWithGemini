@@ -79,5 +79,6 @@
   "conflictsDescription": "Messages and entities merge automatically. Choose a value only for scalar settings changed concurrently.",
   "chooseValue": "Use {value}",
   "disableSync": "Disable sync on this device",
-  "disableHint": "Remote encrypted objects are retained. Disabling sync does not delete your local data or the remote vault."
+  "disableHint": "Remote encrypted objects are retained. Disabling sync does not delete your local data or the remote vault.",
+  "unsupportedIntelligentUi": "Sync stopped to preserve Intelligent UI content from a newer or unsupported protocol. Upgrade this client before syncing again."
 }

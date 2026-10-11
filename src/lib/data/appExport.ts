@@ -334,7 +334,13 @@ export function scrubAppExportValue(
     }
 
     const scrubbed = scrubAppExportValue(nested, key, childContext);
-    if (scrubbed !== undefined) output[key] = scrubbed;
+    if (scrubbed !== undefined)
+      Object.defineProperty(output, key, {
+        value: scrubbed,
+        enumerable: true,
+        writable: true,
+        configurable: true,
+      });
   }
   if (
     isAttachment &&

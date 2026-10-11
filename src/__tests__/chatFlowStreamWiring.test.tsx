@@ -8,6 +8,7 @@ const chatStoreState = {
   activeMessages: [] as unknown[],
   sessions: [{ id: "session-1", compression: undefined }] as unknown[],
   currentSessionId: "session-1" as string | null,
+  pendingSessionId: null,
   syncActiveSession: vi.fn(async () => undefined),
 };
 
@@ -188,6 +189,7 @@ describe("skill and tool-confirmation wiring", () => {
         { ...conversation[1], skillInvocations: [{ id: "skill-1" }] },
       ] as Message[],
     });
+    chatStoreState.activeMessages = deps.activeMessages;
     const { handleRegenerate } = renderHook(() => useResponseBranchFlow(deps))
       .result.current;
 

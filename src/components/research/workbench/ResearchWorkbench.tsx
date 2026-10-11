@@ -36,6 +36,7 @@ export interface ResearchWorkbenchProps extends ResearchTaskActions {
   onSelectEvidence?: (evidenceId: string) => void;
   onDownloadMarkdown?: (versionId: string) => void;
   onPrintPdf?: (versionId: string) => void;
+  onInteractiveExplanation?: (versionId: string) => void;
   onContinueResearch?: (instruction: string) => void | Promise<void>;
   onUpdateLatest?: () => void;
 }
@@ -56,6 +57,7 @@ export default function ResearchWorkbench({
   onSelectEvidence,
   onDownloadMarkdown,
   onPrintPdf,
+  onInteractiveExplanation,
   onContinueResearch,
   onUpdateLatest,
 }: ResearchWorkbenchProps) {
@@ -215,6 +217,7 @@ export default function ResearchWorkbench({
             onInspectEvidence={inspectEvidence}
             onDownloadMarkdown={onDownloadMarkdown}
             onPrintPdf={onPrintPdf}
+            onInteractiveExplanation={onInteractiveExplanation}
             onAskEvidence={() => setTab("questions")}
             onUpdateLatest={
               onUpdateLatest &&

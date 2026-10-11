@@ -6,6 +6,10 @@ import type {
   McpTransport,
   ToolDescriptorV2,
 } from "../plugin/types";
+import {
+  normalizeMcpUiDescriptor,
+  normalizeMcpVisibility,
+} from "@/lib/mcpApps/policy";
 import { DEFAULT_MCP_SERVER_LOGO_URL } from "./defaults";
 
 export const MCP_REGISTRY_BASE_URL =
@@ -25,6 +29,7 @@ export interface McpRegistryTool {
   outputSchema?: unknown;
   icons?: unknown;
   annotations?: unknown;
+  _meta?: unknown;
 }
 
 interface NormalizedMcpRemote {
@@ -238,10 +243,13 @@ export function normalizeMcpToolFunctions(
     const icons = normalizeMcpToolIcons(tool.icons);
     const annotations = normalizeMcpToolAnnotations(tool.annotations);
     const outputSchema = normalizeToolOutputSchema(tool.outputSchema);
+    const mcpUi = normalizeMcpUiDescriptor(tool._meta);
 
     functions.push({
       name,
       mcpToolName,
+      ...(mcpUi ? { mcpUi } : {}),
+      mcpVisibility: normalizeMcpVisibility(tool._meta),
       description,
       parameters: normalizeToolInputSchema(tool.inputSchema),
       ...(title ? { title } : {}),

@@ -25,6 +25,7 @@ export interface McpClientRequestOptions {
   staticHeaders?: Record<string, string>;
   timeoutMs?: number;
   signal?: AbortSignal;
+  enableMcpApps?: boolean;
 }
 
 export interface CreateSafeMcpFetchOptions {
@@ -311,7 +312,15 @@ async function connectMcpClient(
 ): Promise<{ client: Client; transport: McpClientTransport }> {
   const transport = createMcpTransport(options, transportType);
   const client = new Client(MCP_CLIENT_INFO, {
-    capabilities: {},
+    capabilities: options.enableMcpApps
+      ? {
+          extensions: {
+            "io.modelcontextprotocol/ui": {
+              mimeTypes: ["text/html;profile=mcp-app"],
+            },
+          },
+        }
+      : {},
     jsonSchemaValidator: MCP_JSON_SCHEMA_VALIDATOR,
   });
 

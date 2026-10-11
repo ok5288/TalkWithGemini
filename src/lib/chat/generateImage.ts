@@ -39,6 +39,7 @@ export interface GenerateImageOptions {
  * 服务端使用 safeFetchJson 与 ProviderFactory；浏览器使用平台 fetch 并跳过出站校验。
  */
 export interface ImageGenerationRuntime {
+  beforeDispatch?: () => Promise<void>;
   assertOutboundAllowed: (
     provider: ProviderRuntimeConfig,
     signal?: AbortSignal,
@@ -98,6 +99,7 @@ async function generateOpenAIImage(
   const url = `${baseUrl}/images/${isEditRequest ? "edits" : "generations"}`;
   const shouldRequestBase64Response = provider.type === "OpenAI";
 
+  await runtime.beforeDispatch?.();
   const { response, data } = isEditRequest
     ? await (async () => {
         const formData = new FormData();
@@ -178,8 +180,15 @@ async function generateGoogleImage(
   const ai = runtime.createGoogleClient(provider);
 
   if (attachments?.length) {
-    const prepared = await uploadGoogleImageFiles(ai, [], attachments, signal);
+    const prepared = await uploadGoogleImageFiles(
+      ai,
+      [],
+      attachments,
+      signal,
+      runtime.beforeDispatch,
+    );
     try {
+      await runtime.beforeDispatch?.();
       const response: any = await ai.models.generateContent({
         model: modelName,
         contents: {
@@ -227,6 +236,7 @@ async function generateGoogleImage(
     }
   }
 
+  await runtime.beforeDispatch?.();
   const response: any = await ai.models.generateImages({
     model: modelName,
     prompt: prompt,

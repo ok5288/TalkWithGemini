@@ -4,6 +4,10 @@ import type { Plugin } from "../types";
 
 const lookupMock = vi.hoisted(() => vi.fn());
 
+function pluginVariant(id: string, title: string): Plugin {
+  return { ...plugin, id, title };
+}
+
 vi.mock("server-only", () => ({}));
 vi.mock("node:dns/promises", () => ({
   lookup: lookupMock,
@@ -151,5 +155,127 @@ describe("server plugin registry", () => {
         builtIn: true,
       },
     );
+  });
+
+  it("keeps the committed definition visible while a hosted refresh is pending", async () => {
+    vi.stubEnv("DEPLOYMENT_MODE", "hosted");
+    vi.stubEnv("PLUGIN_REGISTRY_STORE", "upstash");
+    vi.stubEnv("UPSTASH_REDIS_REST_URL", "https://redis.example");
+    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "redis-secret");
+    let releaseRefresh!: (response: Response) => void;
+    const refreshPending = new Promise<Response>((resolve) => {
+      releaseRefresh = resolve;
+    });
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(async (input) => {
+        if (String(input).endsWith("/set")) {
+          return fetchMock.mock.calls.length === 1
+            ? Response.json({ result: "OK" })
+            : refreshPending;
+        }
+        return Response.json({ result: null });
+      });
+    const {
+      clearServerPluginRegistryForTesting,
+      getServerPlugin,
+      registerServerPlugin,
+    } = await import("../lib/plugin/serverRegistry");
+    const oldPlugin = pluginVariant("custom-weather-pending", "Committed");
+    const newPlugin = pluginVariant("custom-weather-pending", "Pending");
+
+    await registerServerPlugin(oldPlugin);
+    const refresh = registerServerPlugin(newPlugin);
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    await expect(getServerPlugin(oldPlugin.id)).resolves.toMatchObject({
+      title: "Committed",
+    });
+
+    releaseRefresh(Response.json({ result: "OK" }));
+    await refresh;
+    await expect(getServerPlugin(oldPlugin.id)).resolves.toMatchObject({
+      title: "Pending",
+    });
+    clearServerPluginRegistryForTesting();
+  });
+
+  it("preserves the previous hosted definition when a refresh fails", async () => {
+    vi.stubEnv("DEPLOYMENT_MODE", "hosted");
+    vi.stubEnv("PLUGIN_REGISTRY_STORE", "upstash");
+    vi.stubEnv("UPSTASH_REDIS_REST_URL", "https://redis.example");
+    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "redis-secret");
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(Response.json({ result: "OK" }))
+      .mockResolvedValueOnce(
+        new Response("store unavailable", { status: 503 }),
+      );
+    const {
+      clearServerPluginRegistryForTesting,
+      getServerPlugin,
+      registerServerPlugin,
+    } = await import("../lib/plugin/serverRegistry");
+    const oldPlugin = pluginVariant("custom-weather-failed", "Committed");
+    const newPlugin = pluginVariant("custom-weather-failed", "Rejected");
+
+    await registerServerPlugin(oldPlugin);
+    await expect(registerServerPlugin(newPlugin)).rejects.toThrow(
+      /Expected a JSON response/,
+    );
+    await expect(getServerPlugin(oldPlugin.id)).resolves.toMatchObject({
+      title: "Committed",
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    clearServerPluginRegistryForTesting();
+  });
+
+  it("serializes same-id registrations and publishes the latest completed value", async () => {
+    vi.stubEnv("DEPLOYMENT_MODE", "hosted");
+    vi.stubEnv("PLUGIN_REGISTRY_STORE", "upstash");
+    vi.stubEnv("UPSTASH_REDIS_REST_URL", "https://redis.example");
+    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "redis-secret");
+    let releaseFirst!: (response: Response) => void;
+    let releaseSecond!: (response: Response) => void;
+    const firstPending = new Promise<Response>((resolve) => {
+      releaseFirst = resolve;
+    });
+    const secondPending = new Promise<Response>((resolve) => {
+      releaseSecond = resolve;
+    });
+    let setCalls = 0;
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(async (input) => {
+        if (!String(input).endsWith("/set")) {
+          return Response.json({ result: null });
+        }
+        setCalls += 1;
+        return setCalls === 1 ? firstPending : secondPending;
+      });
+    const {
+      clearServerPluginRegistryForTesting,
+      getServerPlugin,
+      registerServerPlugin,
+    } = await import("../lib/plugin/serverRegistry");
+    const first = registerServerPlugin(
+      pluginVariant("custom-weather-serialized", "First"),
+    );
+    await vi.waitFor(() => expect(setCalls).toBe(1));
+    const second = registerServerPlugin(
+      pluginVariant("custom-weather-serialized", "Second"),
+    );
+    await Promise.resolve();
+    expect(setCalls).toBe(1);
+
+    releaseFirst(Response.json({ result: "OK" }));
+    await vi.waitFor(() => expect(setCalls).toBe(2));
+    releaseSecond(Response.json({ result: "OK" }));
+    await Promise.all([first, second]);
+
+    await expect(
+      getServerPlugin("custom-weather-serialized"),
+    ).resolves.toMatchObject({ title: "Second" });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    clearServerPluginRegistryForTesting();
   });
 });

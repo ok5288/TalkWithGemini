@@ -31,6 +31,7 @@ import {
   getCachedPlugins,
   discoverMcpBridgeServers,
   installPlugin,
+  refreshMcpToolDefinition,
   installCustomPlugin,
   installCustomMcpServer,
   type BridgeDiscoveredServer,
@@ -2018,6 +2019,24 @@ const PluginMarket: React.FC<PluginMarketProps> = ({ onClose }) => {
     }
   };
 
+  const handleRefreshMcp = async (plugin: Plugin) => {
+    if (installingIdsRef.current.has(plugin.id)) return;
+    installingIdsRef.current.add(plugin.id);
+    setInstallingIds(Array.from(installingIdsRef.current));
+    try {
+      await refreshMcpToolDefinition(plugin.id);
+    } catch (error) {
+      if (isMountedRef.current)
+        setMarketError(
+          error instanceof Error ? error.message : t("refreshFailed"),
+        );
+    } finally {
+      installingIdsRef.current.delete(plugin.id);
+      if (isMountedRef.current)
+        setInstallingIds(Array.from(installingIdsRef.current));
+    }
+  };
+
   const handleInstall = (plugin: Plugin) => {
     if (plugin.source === "mcp" && isPluginAuthRequired(plugin)) {
       setMcpPluginAwaitingAuth(plugin);
@@ -2478,6 +2497,21 @@ const PluginMarket: React.FC<PluginMarketProps> = ({ onClose }) => {
                       <p className="text-xs text-gray-500 dark:text-muted-foreground line-clamp-2 leading-relaxed mb-3 flex-1">
                         {plugin.description}
                       </p>
+
+                      {plugin.source === "mcp" && (
+                        <div className="mb-3 text-xs text-amber-700 dark:text-amber-300">
+                          {plugin.mcp?.toolMetadataVersion !== 1 && (
+                            <p>{t("mcpToolRefreshRequired")}</p>
+                          )}
+                          <Button
+                            variant="bare"
+                            disabled={installingIds.includes(plugin.id)}
+                            onClick={() => void handleRefreshMcp(plugin)}
+                          >
+                            {t("refreshMcpToolDefinition")}
+                          </Button>
+                        </div>
+                      )}
 
                       {showWarning && (
                         <div className="mb-3 flex items-center gap-1.5 rounded bg-amber-50 px-2 py-1 text-[10px] text-amber-600 dark:bg-amber-900/20 dark:text-amber-400">

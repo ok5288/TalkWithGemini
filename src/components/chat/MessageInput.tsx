@@ -66,6 +66,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useChatStore } from "@/store/core/chatStore";
+import {
+  COMPOSER_DRAFT_EVENT,
+  type ComposerDraftRequest,
+} from "@/lib/chat/composerActions";
 import { appDb } from "@/store/storage/storageConfig";
 import {
   getActiveMessagePath,
@@ -138,7 +142,7 @@ import {
   getAgentBuiltinToolNames,
   isAgentWorkspaceAvailable,
 } from "@/lib/agent";
-import { getEnabledPluginFunctions } from "@/lib/plugin/resolve";
+import { getModelCallablePluginFunctions } from "@/lib/plugin/resolve";
 import { useMemoryStore } from "@/store/core/memoryStore";
 import {
   applyChatMode,
@@ -654,6 +658,33 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
       setShowAttachMenu,
     });
 
+    useEffect(() => {
+      const stageDraft = (event: Event) => {
+        const request = (event as CustomEvent<ComposerDraftRequest>).detail;
+        if (
+          !request ||
+          request.sessionId !== currentSessionId ||
+          typeof request.text !== "string"
+        )
+          return;
+        setInput((previous) =>
+          previous.trim() ? `${previous}\n\n${request.text}` : request.text,
+        );
+        if (!temporary && request.attachments?.length) {
+          setAttachments((previous) => [
+            ...previous,
+            ...request.attachments!.filter(
+              (attachment) =>
+                !previous.some((item) => item.id === attachment.id),
+            ),
+          ]);
+        }
+        textareaRef.current?.focus();
+      };
+      window.addEventListener(COMPOSER_DRAFT_EVENT, stageDraft);
+      return () => window.removeEventListener(COMPOSER_DRAFT_EVENT, stageDraft);
+    }, [currentSessionId, setInput, setAttachments, temporary]);
+
     const {
       isRecording,
       isTranscribing,
@@ -1013,7 +1044,7 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
         return plugin ? [plugin] : [];
       });
       const pluginFunctions = selectedPlugins.flatMap((plugin) =>
-        getEnabledPluginFunctions(plugin, pluginConfigs[plugin.id]).map(
+        getModelCallablePluginFunctions(plugin, pluginConfigs[plugin.id]).map(
           (fn) => ({ pluginId: plugin.id, name: fn.name }),
         ),
       );

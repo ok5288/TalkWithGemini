@@ -1,5 +1,16 @@
 import type { Plugin, PluginConfig, PluginFunction } from "@/types";
 
+export function isModelVisiblePluginFunction(
+  plugin: Plugin,
+  fn: PluginFunction,
+): boolean {
+  return (
+    plugin.source !== "mcp" ||
+    (plugin.mcp?.toolMetadataVersion === 1 &&
+      fn.mcpVisibility?.includes("model") === true)
+  );
+}
+
 export interface ResolvedPluginFunction {
   plugin: Plugin;
   functionDef: PluginFunction;
@@ -15,7 +26,8 @@ export function resolvePluginFunction(
     if (allowed && !allowed.has(plugin.id)) continue;
 
     const functionDef = plugin.functions?.find(
-      (fn) => fn.name === functionName,
+      (fn) =>
+        fn.name === functionName && isModelVisiblePluginFunction(plugin, fn),
     );
     if (functionDef) {
       return { plugin, functionDef };
@@ -47,6 +59,15 @@ export function getEnabledPluginFunctions(
   return functionsToAdd;
 }
 
+export function getModelCallablePluginFunctions(
+  plugin: Plugin,
+  config?: Pick<PluginConfig, "enabledFunctions" | "disabledFunctions">,
+): PluginFunction[] {
+  return getEnabledPluginFunctions(plugin, config).filter((fn) =>
+    isModelVisiblePluginFunction(plugin, fn),
+  );
+}
+
 export function resolveEnabledPluginFunction(
   installedPlugins: Plugin[],
   functionName: string,
@@ -58,7 +79,7 @@ export function resolveEnabledPluginFunction(
 
   for (const plugin of installedPlugins) {
     if (allowed && !allowed.has(plugin.id)) continue;
-    const functionDef = getEnabledPluginFunctions(
+    const functionDef = getModelCallablePluginFunctions(
       plugin,
       pluginConfigs[plugin.id],
     ).find((fn) => fn.name === functionName);
@@ -83,7 +104,7 @@ export function getPluginFunctionNameCollisions(
 
   for (const plugin of installedPlugins) {
     if (active && !active.has(plugin.id)) continue;
-    for (const fn of getEnabledPluginFunctions(
+    for (const fn of getModelCallablePluginFunctions(
       plugin,
       pluginConfigs[plugin.id],
     )) {

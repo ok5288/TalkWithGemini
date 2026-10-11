@@ -35,6 +35,13 @@ import AgentRunBar from "./AgentRunBar";
 import SafeImage from "../ui/SafeImage";
 import { Button } from "@/components/ui/primitives";
 import { useAgentRunStore } from "@/store/core/agentRunStore";
+import { projectUiBlock } from "@/lib/intelligentUi/projection";
+import { useLocale } from "next-intl";
+
+const ConnectedIntelligentUiBlock = dynamic(
+  () => import("./ConnectedIntelligentUiBlock"),
+  { ssr: false },
+);
 
 function ResearchTaskCardLoading() {
   const t = useTranslations("Research");
@@ -61,6 +68,9 @@ const ConnectedResearchTaskCard = dynamic(
 );
 
 interface MessageOutputRendererProps {
+  /** Independent of legacy readOnly storage policy (temporary chats remain interactive). */
+  intelligentUiMode?: "interactive" | "static-original" | "static-current";
+  sessionId?: string;
   message: Message;
   displayedContent: string;
   isTyping?: boolean;
@@ -198,7 +208,8 @@ function trimTextBlocksForStreaming(
   displayedContent: string,
   isStreaming: boolean,
 ): MessageOutputBlock[] {
-  if (!isStreaming) return blocks;
+  if (!isStreaming || blocks.some((block) => block.type === "intelligent_ui"))
+    return blocks;
 
   const fullText = blocks
     .filter((block) => block.type === "text")
@@ -218,6 +229,8 @@ function trimTextBlocksForStreaming(
 }
 
 const MessageOutputRenderer: React.FC<MessageOutputRendererProps> = ({
+  intelligentUiMode = "static-original",
+  sessionId,
   message,
   displayedContent,
   isTyping = false,
@@ -240,6 +253,7 @@ const MessageOutputRenderer: React.FC<MessageOutputRendererProps> = ({
   onStopAgentRun,
 }) => {
   const t = useTranslations("Message");
+  const locale = useLocale();
   const agentRunId = message.generation?.agentRunId;
   const agentRun = useAgentRunStore((state) => {
     const run = agentRunId ? state.runsById[agentRunId] : undefined;
@@ -284,6 +298,33 @@ const MessageOutputRenderer: React.FC<MessageOutputRendererProps> = ({
   }
   blocks.forEach((block) => {
     switch (block.type) {
+      case "intelligent_ui":
+        renderedItems.push({
+          key: block.id,
+          framed: true,
+          node:
+            sessionId && message.role === "model" ? (
+              <ConnectedIntelligentUiBlock
+                key={`${sessionId}:${message.id}:${block.id}:${block.definitionRevision}`}
+                block={block}
+                sessionId={sessionId}
+                messageId={message.id}
+                mode={intelligentUiMode}
+              />
+            ) : (
+              <MarkdownRenderer
+                readOnly
+                content={projectUiBlock(block, {
+                  purpose:
+                    intelligentUiMode === "static-current"
+                      ? "static-current"
+                      : "static-original",
+                  locale,
+                })}
+              />
+            ),
+        });
+        return;
       case "text":
         if (block.presentation?.kind === "long_text") {
           renderedItems.push({
@@ -421,7 +462,8 @@ const MessageOutputRenderer: React.FC<MessageOutputRendererProps> = ({
         const otherToolCalls = block.toolCalls.filter(
           (toolCall) =>
             !isMemorySearchTool(toolCall.name) &&
-            !isWebSearchTool(toolCall.name) &&
+            (!isWebSearchTool(toolCall.name) ||
+              !!toolCall.intelligentUiResult) &&
             !isSuccessfulLongTextTool(toolCall) &&
             !isSuccessfulResearchStartTool(toolCall),
         );
@@ -439,6 +481,9 @@ const MessageOutputRenderer: React.FC<MessageOutputRendererProps> = ({
             node: (
               <ToolCallBlock
                 toolCalls={otherToolCalls}
+                sessionId={sessionId}
+                messageId={message.id}
+                readOnly={intelligentUiMode !== "interactive"}
                 onConfirmationDecision={onToolConfirmationDecision}
                 onRevokeSessionApproval={onRevokeToolSessionApproval}
               />

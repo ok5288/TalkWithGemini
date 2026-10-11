@@ -1,5 +1,10 @@
 import { v7 as uuidv7 } from "uuid";
-import type { Message, MessageTreeNode, SessionMessageTree } from "@/types";
+import type {
+  Message,
+  MessageTreeNode,
+  SessionMessageTree,
+  ToolCall,
+} from "@/types";
 
 export interface MessageBranchInfo {
   index: number;
@@ -39,6 +44,18 @@ function stripLegacyVersions(message: Message): Message {
   void versions;
   void activeVersionId;
   return { ...messageWithoutVersions };
+}
+
+function cloneToolCallUiState(toolCall: ToolCall): ToolCall {
+  return {
+    ...toolCall,
+    ...(toolCall.intelligentUiState
+      ? { intelligentUiState: structuredClone(toolCall.intelligentUiState) }
+      : {}),
+    ...(toolCall.intelligentUiResult
+      ? { intelligentUiResult: structuredClone(toolCall.intelligentUiResult) }
+      : {}),
+  };
 }
 
 function cloneTree(tree: SessionMessageTree): SessionMessageTree {
@@ -549,6 +566,7 @@ export function removeMessageFromTree(
 export function cloneMessageTreeWithNewIds(
   tree: SessionMessageTree,
   createId: () => string = uuidv7,
+  clonedMessageIds?: Map<string, string>,
 ): SessionMessageTree {
   const normalized = normalizeExistingTree(tree);
   const idMap = new Map<string, string>();
@@ -556,6 +574,8 @@ export function cloneMessageTreeWithNewIds(
   for (const id of Object.keys(normalized.nodesById)) {
     idMap.set(id, createId());
   }
+  for (const [sourceId, clonedId] of idMap)
+    clonedMessageIds?.set(sourceId, clonedId);
 
   const nodesById: Record<string, MessageTreeNode> = {};
   for (const [oldId, node] of Object.entries(normalized.nodesById)) {
@@ -571,6 +591,21 @@ export function cloneMessageTreeWithNewIds(
         ...stripLegacyVersions(node.message),
         id: newId,
         suggestedQuestions: undefined,
+        ...(node.message.toolCalls
+          ? { toolCalls: node.message.toolCalls.map(cloneToolCallUiState) }
+          : {}),
+        ...(node.message.outputBlocks?.some(
+          (block) =>
+            block.type === "intelligent_ui" || block.type === "tool_group",
+        )
+          ? {
+              outputBlocks: node.message.outputBlocks.map((block, index) =>
+                block.type === "intelligent_ui"
+                  ? { ...structuredClone(block), id: `${newId}-ui-${index}` }
+                  : structuredClone(block),
+              ),
+            }
+          : {}),
       },
       parentMessageId,
       childMessageIds: node.childMessageIds

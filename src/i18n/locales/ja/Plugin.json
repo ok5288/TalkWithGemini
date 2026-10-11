@@ -116,5 +116,7 @@
   "prevPageAria": "前のプラグインページに戻る",
   "nextPageAria": "次のプラグインページに進む",
   "pageCurrent": "{currentPage} ページ",
-  "pageOf": "{currentPage} / {totalPages} ページ"
+  "pageOf": "{currentPage} / {totalPages} ページ",
+  "mcpToolRefreshRequired": "この MCP サーバーのツールをモデルに提供する前に、ツール定義を更新してください。",
+  "refreshMcpToolDefinition": "ツール定義を更新"
 }

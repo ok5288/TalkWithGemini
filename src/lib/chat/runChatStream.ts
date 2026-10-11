@@ -95,6 +95,8 @@ export interface ChatStreamOptions {
 }
 
 export interface RunChatStreamOptions extends ChatStreamOptions {
+  /** Host-only check before each SDK dispatch, including after image uploads. */
+  beforeDispatch?: () => Promise<void>;
   runtime: ProviderRuntime;
   send: (message: SSEMessage) => void;
 }
@@ -169,6 +171,7 @@ export async function runChatStream(
         history,
         attachments || [],
         signal,
+        options.beforeDispatch,
       );
       try {
         const input = prepareOpenAIResponsesInput(prepared.history);
@@ -180,6 +183,7 @@ export async function runChatStream(
         }
         input.push({ role: "user", content });
 
+        await options.beforeDispatch?.();
         await streamOpenAIResponses({
           client,
           model: modelName,
@@ -224,6 +228,7 @@ export async function runChatStream(
       }
 
       const client = runtime.createOpenAIClient(provider);
+      await options.beforeDispatch?.();
       await streamOpenAIChatCompletions({
         client,
         model: modelName,
@@ -244,6 +249,7 @@ export async function runChatStream(
         history,
         attachments || [],
         signal,
+        options.beforeDispatch,
       );
       try {
         const messages = prepareAnthropicMessages(prepared.history);
@@ -257,6 +263,7 @@ export async function runChatStream(
           content: content.length > 0 ? content : " ",
         });
 
+        await options.beforeDispatch?.();
         await streamAnthropicMessages({
           client,
           model: modelName,
@@ -283,6 +290,7 @@ export async function runChatStream(
         history,
         attachments || [],
         signal,
+        options.beforeDispatch,
       );
       try {
         const contents = prepareGeminiHistory(prepared.history);
@@ -310,6 +318,7 @@ export async function runChatStream(
           }),
         );
 
+        await options.beforeDispatch?.();
         await streamGeminiResponse({
           client,
           model: modelName,

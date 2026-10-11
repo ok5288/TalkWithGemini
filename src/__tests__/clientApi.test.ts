@@ -64,6 +64,61 @@ describe("client API response helpers", () => {
     },
   );
 
+  it("rechecks host authority after a delayed proof handshake before dispatch", async () => {
+    let finish!: (response: Response) => void;
+    let allowed = true;
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(async (input) => {
+        if (String(input) === "/api/request-proof/session")
+          return new Promise<Response>((resolve) => {
+            finish = resolve;
+          });
+        return Response.json({ ok: true });
+      });
+    const beforeDispatch = vi.fn(async () => {
+      if (!allowed) throw new Error("UI_SOURCE_STALE");
+    });
+    const pending = signedApiFetch(
+      "/api/shares",
+      { method: "POST", body: "{}" },
+      beforeDispatch,
+    );
+    const rejected = expect(pending).rejects.toThrow("UI_SOURCE_STALE");
+    await vi.waitFor(() => expect(finish).toBeDefined());
+    allowed = false;
+    finish(Response.json({ enabled: false, serverTime: Date.now() }));
+    await rejected;
+    expect(beforeDispatch).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls.map((call) => String(call[0]))).toEqual([
+      "/api/request-proof/session",
+    ]);
+  });
+
+  it("rechecks authority for a proof retry and keeps the guard out of request init", async () => {
+    let allowed = true;
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(async (input) => {
+        if (String(input) === "/api/request-proof/session")
+          return Response.json({ enabled: false, serverTime: Date.now() });
+        allowed = false;
+        return Response.json({ code: "API_PROOF_EXPIRED" }, { status: 401 });
+      });
+    const guard = vi.fn(async () => {
+      if (!allowed) throw new Error("UI_SOURCE_STALE");
+    });
+    await expect(
+      signedApiFetch("/api/shares", { method: "POST", body: "{}" }, guard),
+    ).rejects.toThrow("UI_SOURCE_STALE");
+    expect(guard).toHaveBeenCalledTimes(2);
+    const sends = fetchMock.mock.calls.filter(
+      (call) => String(call[0]) === "/api/shares",
+    );
+    expect(sends).toHaveLength(1);
+    expect(sends[0][1]).not.toHaveProperty("beforeDispatch");
+  });
+
   afterEach(() => {
     clearApiProofSessionCache();
     vi.useRealTimers();

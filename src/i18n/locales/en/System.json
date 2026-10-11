@@ -67,6 +67,9 @@
   "autoCollapseCode": "Auto-Collapse Code",
   "autoCollapseCodeDesc": "Automatically collapse long code blocks",
   "autoCollapseCodeAria": "Auto-collapse long code blocks",
+  "intelligentUi": "Intelligent UI",
+  "intelligentUiDesc": "Interactive answers can load external resources and offer AI send buttons. Chat receives their source and visible results; turning this off shows static content.",
+  "intelligentUiAria": "Enable intelligent interfaces",
   "htmlVisualPrompt": "HTML Visual Prompt",
   "htmlVisualPromptDesc": "Guide models to use safe inline HTML for compact visual structures when helpful",
   "htmlVisualPromptAria": "Guide models to use safe inline HTML",
@@ -163,5 +166,16 @@
   "clearAria": "Clear all data",
   "clearConfirmAria": "Confirm clearing all data",
   "clearConfirmHint": "Click Confirm Clear within 5 seconds to permanently remove the selected local data sources.",
-  "clearError": "Failed to clear all data. Please try again."
+  "clearError": "Failed to clear all data. Please try again.",
+  "mcpApps": {
+    "title": "Allow MCP application views",
+    "description": "Display apps from installed MCP tools in a separate sandbox. Off by default; requires a configured sandbox deployment.",
+    "source": "MCP application · {source}",
+    "unavailable": "Interactive view unavailable. The original tool result remains below.",
+    "loading": "Loading application resource…",
+    "initializing": "Initializing restricted application…",
+    "ready": "Interactive view ready",
+    "failed": "Application could not start. The original tool result remains available.",
+    "retry": "Retry"
+  }
 }

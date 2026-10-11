@@ -92,7 +92,7 @@ function createNextConfig(phase: string): NextConfig {
           ],
         },
         {
-          source: "/:path*",
+          source: "/((?!intelligent-ui/sandbox/?$).*)",
           headers: getSecurityHeaders(),
         },
       ];

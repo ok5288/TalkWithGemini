@@ -1,3 +1,5 @@
+import type { IntelligentUiBlock } from "@/lib/intelligentUi/types";
+import type { UiToolResultDescriptor } from "@/lib/intelligentUi/toolResults/adapters";
 import type {
   PluginFunctionRisk,
   ToolApprovalReason,
@@ -18,6 +20,14 @@ import type { ResearchTemplate } from "../research/templates";
 
 export interface Attachment {
   id: string;
+  /** Selected by the research host and revalidated before reading a snapshot. */
+  intelligentUiSource?: {
+    kind: "report";
+    taskId: string;
+    reportId: string;
+    version: number;
+    artifactId: string;
+  };
   mimeType: string;
   data?: string;
   url?: string;
@@ -67,6 +77,10 @@ export interface MessageGenerationState {
 
 export interface ToolCall {
   id: string;
+  /** Host-captured, immutable result view; never grants tool authority. */
+  intelligentUiResult?: UiToolResultDescriptor;
+  intelligentUiState?: import("@/lib/intelligentUi/types").JsonObject;
+  intelligentUiStateRevision?: number;
   /** Links the transcript item to its minimal execution-journal record. */
   executionRecordId?: string;
   name: string;
@@ -222,6 +236,7 @@ export interface ArchivePresentation {
 }
 
 export type MessageOutputBlock =
+  | IntelligentUiBlock
   | {
       id: string;
       type: "text";

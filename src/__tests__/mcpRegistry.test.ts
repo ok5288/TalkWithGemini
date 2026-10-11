@@ -148,6 +148,7 @@ describe("MCP registry normalization", () => {
       {
         name: "mcp_io_github_context7__resolve_library_id",
         mcpToolName: "resolve-library-id",
+        mcpVisibility: ["model", "app"],
         description: "Resolve an npm package to a Context7 library id.",
         parameters: {
           type: "object",
@@ -168,6 +169,7 @@ describe("MCP registry normalization", () => {
           /^mcp_io_github_context7__resolve_library_id_[a-f0-9]{8}$/,
         ),
         mcpToolName: "resolve library id",
+        mcpVisibility: ["model", "app"],
         description: "Call the MCP tool resolve library id.",
         parameters: { type: "object" },
         mcpPolicyHint: {

@@ -29,6 +29,7 @@ import {
 import { getSyncDeviceId } from "./deviceIdentity";
 import { ensureInterruptedBrowserSyncApplyRecovery } from "./applyJournal";
 import { createSyncRemoteClient, type SyncRemoteClient } from "./remoteClient";
+import { hasUnsupportedUiContent } from "@/lib/intelligentUi/compatibility";
 import {
   applySyncedAppData,
   assembleSyncDocuments,
@@ -60,6 +61,16 @@ export const ROOT_DOCUMENT_ID = "root-index";
 const SYNC_RUN_LOCK = "neo-chat-encrypted-sync";
 const MAX_STALE_APPLY_RETRIES = 2;
 
+export class UnsupportedIntelligentUiSyncError extends Error {
+  readonly code = "SYNC_UNSUPPORTED_INTELLIGENT_UI";
+  readonly retryable = false;
+
+  constructor() {
+    super("SYNC_UNSUPPORTED_INTELLIGENT_UI");
+    this.name = "UnsupportedIntelligentUiSyncError";
+  }
+}
+
 type SyncDoc = Automerge.Doc<SyncCrdtDocument>;
 
 interface RemoteDocumentState {
@@ -71,6 +82,11 @@ interface MergedDocument {
   descriptor: SyncDocumentDescriptor;
   doc: SyncDoc;
   payload: SyncJsonValue;
+}
+
+function assertSyncPayloadSupported(value: unknown): void {
+  if (hasUnsupportedUiContent(value))
+    throw new UnsupportedIntelligentUiSyncError();
 }
 
 let fallbackRun: Promise<SyncRunResult> | undefined;
@@ -428,6 +444,7 @@ async function runSyncAttempt(
   };
 
   const captured = await captureLocalSyncSnapshot();
+  assertSyncPayloadSupported(captured.exported.data);
   const blobs = await prepareLocalBlobManifest(
     captured.referencedOpfsUrls,
     remote,
@@ -494,6 +511,7 @@ async function runSyncAttempt(
   // loaded again and changed only here, so the discovery pass cannot consume
   // the document handles or create a duplicate branch for this device actor.
   const latest = await captureLocalSyncSnapshot();
+  assertSyncPayloadSupported(latest.exported.data);
   const latestMap = new Map(latest.documents.map((entry) => [entry.id, entry]));
   latestMap.set("opfs-manifest", capturedMap.get("opfs-manifest")!);
   const latestRootPayload = buildRootSyncIndex(
@@ -568,6 +586,7 @@ async function runSyncAttempt(
     ]),
   );
   const data = assembleSyncDocuments(materialized);
+  assertSyncPayloadSupported(data);
   const remoteFiles = await downloadRequiredBlobs(
     data,
     mergedDocuments.get("opfs-manifest")?.payload,
@@ -757,7 +776,9 @@ export async function resolveStoredSyncConflict(
     throw new Error("The conflicted sync document is not in the local index.");
   }
 
-  await applySyncedData(assembleSyncDocuments(materialized));
+  const data = assembleSyncDocuments(materialized);
+  assertSyncPayloadSupported(data);
+  await applySyncedData(data);
   await writeDocument(conflict.documentId, await saveSyncDocument(resolved));
   await refreshAppState();
 }

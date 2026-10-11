@@ -67,6 +67,9 @@
   "autoCollapseCode": "自动折叠代码",
   "autoCollapseCodeDesc": "自动折叠较长的代码块",
   "autoCollapseCodeAria": "自动折叠较长的代码块",
+  "intelligentUi": "智能界面",
+  "intelligentUiDesc": "交互回答可加载外部资源并提供 AI 发送按钮；聊天会获得界面源码和可见结果。关闭后显示静态内容。",
+  "intelligentUiAria": "启用智能界面",
   "htmlVisualPrompt": "HTML 视觉排版提示",
   "htmlVisualPromptDesc": "在有帮助时引导模型使用安全内联 HTML 呈现紧凑视觉结构",
   "htmlVisualPromptAria": "引导模型使用安全内联 HTML",
@@ -163,5 +166,16 @@
   "clearAria": "清除全部数据",
   "clearConfirmAria": "确认清除全部数据",
   "clearConfirmHint": "请在 5 秒内点击「确认清除」以永久删除所选本地数据来源。",
-  "clearError": "清除数据失败，请重试。"
+  "clearError": "清除数据失败，请重试。",
+  "mcpApps": {
+    "title": "允许 MCP 应用界面",
+    "description": "在独立沙箱中展示已安装 MCP 工具的应用。默认关闭，需要配置独立沙箱部署。",
+    "source": "MCP 应用 · {source}",
+    "unavailable": "交互界面不可用，请查看原始工具结果。",
+    "loading": "正在读取应用资源…",
+    "initializing": "正在初始化受限应用…",
+    "ready": "交互界面已就绪",
+    "failed": "应用启动失败，仍可查看原始工具结果。",
+    "retry": "重试"
+  }
 }

@@ -30,6 +30,7 @@ vi.mock("@/utils/pluginUtils", () => ({
 
 vi.mock("@/lib/plugin/resolve", () => ({
   getEnabledPluginFunctions: vi.fn(() => []),
+  getModelCallablePluginFunctions: vi.fn(() => []),
 }));
 
 vi.mock("@/lib/utils/model", () => ({

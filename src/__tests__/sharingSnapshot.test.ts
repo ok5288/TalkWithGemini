@@ -29,6 +29,21 @@ const imageDependencies = () => ({
 });
 
 describe("public conversation projection", () => {
+  it("does not rebuild source contexts or revalidate each plain message in a shared projection", async () => {
+    const scope = { load: vi.fn(), assertValid: vi.fn(async () => undefined) };
+    await prepareSessionShare({
+      session,
+      messages: [
+        message("one"),
+        { ...message("two"), id: "two" },
+        { ...message("three"), id: "three" },
+      ],
+      sourceScope: scope,
+    });
+    expect(scope.load).not.toHaveBeenCalled();
+    expect(scope.assertValid).toHaveBeenCalledTimes(1);
+  });
+
   it("never publishes temporary conversations", async () => {
     await expect(
       prepareSessionShare({

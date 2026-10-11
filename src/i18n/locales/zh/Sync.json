@@ -79,5 +79,6 @@
   "conflictsDescription": "消息和实体会自动合并；只有被并发修改的标量设置需要选择。",
   "chooseValue": "使用 {value}",
   "disableSync": "在此设备停用同步",
-  "disableHint": "远端密文会保留。停用同步不会删除本地数据或远端保险库。"
+  "disableHint": "远端密文会保留。停用同步不会删除本地数据或远端保险库。",
+  "unsupportedIntelligentUi": "同步已停止，以保留本客户端不支持的智能界面内容。请升级客户端后重新同步。"
 }

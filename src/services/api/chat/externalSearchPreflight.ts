@@ -54,6 +54,15 @@ function isAbortError(error: unknown, signal?: AbortSignal): boolean {
   );
 }
 
+function isUiAuthorizationError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code === "UI_SOURCE_STALE"
+  );
+}
+
 async function decideExternalSearchUse({
   model,
   history,
@@ -76,7 +85,8 @@ async function decideExternalSearchUse({
     );
     return parseSearchDecisionResult(rawDecision, message);
   } catch (error) {
-    if (isAbortError(error, signal)) throw error;
+    if (isAbortError(error, signal) || isUiAuthorizationError(error))
+      throw error;
     logDevWarn("Search decision failed:", error);
     return { shouldSearch: false, query: message };
   }
@@ -92,6 +102,7 @@ export async function runExternalSearchPreflight({
   attachments,
   signal,
   generate,
+  beforeDispatch,
   onSearchStatus,
   upsertSearchBlock,
   emitOutputBlocks,
@@ -109,6 +120,7 @@ export async function runExternalSearchPreflight({
   attachments: Attachment[];
   signal?: AbortSignal;
   generate: GenerateText;
+  beforeDispatch?: () => Promise<void>;
   onSearchStatus: (isSearching: boolean, results?: SearchStatusResults) => void;
   upsertSearchBlock: (update: SearchBlockUpdate) => void;
   emitOutputBlocks: () => void;
@@ -127,6 +139,7 @@ export async function runExternalSearchPreflight({
       return effectiveNewMessage;
     }
 
+    await beforeDispatch?.();
     const decision = await decideExternalSearchUse({
       model: searchDecisionModel,
       history,
@@ -144,6 +157,7 @@ export async function runExternalSearchPreflight({
     externalSearchStarted = true;
     onSearchStatus(true);
     emitOutputBlocks();
+    await beforeDispatch?.();
     const searchResults = await createSearchProvider(
       { query: decision.query },
       signal,
@@ -188,6 +202,17 @@ export async function runExternalSearchPreflight({
     }
   } catch (searchError) {
     if (isAbortError(searchError, signal)) throw searchError;
+    if (isUiAuthorizationError(searchError)) {
+      if (externalSearchStarted) {
+        upsertSearchBlock({
+          isSearching: false,
+          results: { sources: [], images: [] },
+        });
+        emitOutputBlocks();
+      }
+      onSearchStatus(false, { sources: [], images: [] });
+      throw searchError;
+    }
     logDevWarn("Search preflight failed:", searchError);
     if (externalSearchStarted) {
       upsertSearchBlock({

@@ -9,6 +9,8 @@ const REQUIRED_ENV_KEYS = [
   "BYOK_ALLOW_EPHEMERAL_KEY",
   "DEPLOYMENT_MODE",
   "NEXT_DEPLOYMENT_ID",
+  "NEXT_PUBLIC_ENABLE_INTELLIGENT_UI_EXPLORER",
+  "NEXT_PUBLIC_MCP_APPS_SANDBOX_ORIGIN",
   "ALLOW_INSECURE_LOCAL_PRODUCTION",
   "ALLOW_INSECURE_HTTP_COOKIES",
   "ALLOW_LOCAL_NETWORK_PROXY",
@@ -88,6 +90,8 @@ function scanDirectProcessEnvKeys(): Set<string> {
     "src/lib/plugin/serverRegistry.ts",
     "src/lib/api/docParseJobs.ts",
     "src/lib/seo.ts",
+    "src/lib/intelligentUi/featurePolicy.ts",
+    "src/lib/mcpApps/config.ts",
     "src/config/api.ts",
   ];
   const keys = new Set<string>();

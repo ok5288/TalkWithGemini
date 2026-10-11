@@ -95,5 +95,6 @@
   "archiveAria": "アーカイブ: {title}",
   "archiveDownloadAria": "アーカイブ {title} をダウンロード",
   "archiveEntryCount": "{count, plural, other {# 個のファイル}}",
-  "archiveMissing": "このアーカイブは利用できません。"
+  "archiveMissing": "このアーカイブは利用できません。",
+  "knowledgePrepareFailed": "このメッセージを準備できませんでした。参照元を確認して、もう一度お試しください。"
 }

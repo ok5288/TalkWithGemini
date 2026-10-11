@@ -835,6 +835,30 @@ const SystemSettings = () => {
         />
 
         <ToggleRow
+          title={t("intelligentUi")}
+          description={t("intelligentUiDesc")}
+          ariaLabel={t("intelligentUiAria")}
+          name="enableIntelligentUi"
+          checked={system.enableIntelligentUi}
+          onChange={() =>
+            updateSystemSettings({
+              enableIntelligentUi: !system.enableIntelligentUi,
+            })
+          }
+        />
+
+        <ToggleRow
+          title={t("mcpApps.title")}
+          description={t("mcpApps.description")}
+          ariaLabel={t("mcpApps.title")}
+          name="enableMcpApps"
+          checked={system.enableMcpApps}
+          onChange={() =>
+            updateSystemSettings({ enableMcpApps: !system.enableMcpApps })
+          }
+        />
+
+        <ToggleRow
           title={t("htmlVisualPrompt")}
           description={t("htmlVisualPromptDesc")}
           ariaLabel={t("htmlVisualPromptAria")}

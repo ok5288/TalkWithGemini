@@ -22,6 +22,11 @@ import MarkdownRenderer from "../content/MarkdownRenderer";
 import Tooltip from "../ui/Tooltip";
 import Artifact from "../content/Artifact";
 import MessageOutputRenderer from "../content/MessageOutputRenderer";
+import {
+  prepareMessageUiForStatic,
+  assertPreparedMessageUiValid,
+  projectMessageUiForExport,
+} from "@/lib/chat/intelligentUiPortability";
 import WorkspaceFileBlock from "../content/WorkspaceFileBlock";
 import MessageAttachmentView from "./MessageAttachmentView";
 import UserMessageEditor from "./UserMessageEditor";
@@ -30,6 +35,7 @@ import AddToKnowledgeModal from "../knowledge/AddToKnowledgeModal";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuCheckboxItem,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -80,6 +86,7 @@ import {
   type MarkdownGeneratedFile,
 } from "@/lib/utils/markdownFiles";
 import { copyTextToClipboard } from "@/lib/utils/clipboard";
+import { readMessageForPresentation } from "@/lib/chat/readSessionForPresentation";
 import { signedApiFetch } from "@/lib/api/client";
 import { getNextTypewriterFrame } from "@/lib/utils/typewriter";
 import {
@@ -150,6 +157,7 @@ interface ReadableAttachmentDocument {
 }
 
 interface PdfPrintJob {
+  includeIntelligentUiState: boolean;
   id: string;
   title: string;
   message: Message;
@@ -158,6 +166,7 @@ interface PdfPrintJob {
 }
 
 interface ImageExportJob {
+  includeIntelligentUiState: boolean;
   id: string;
   title: string;
   message: Message;
@@ -348,6 +357,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
   const mutationActionsDisabled = actionsDisabled || mutationsDisabled;
   const confirmationActionsDisabled = actionsDisabled || toolActionsDisabled;
   const t = useTranslations("Message");
+  const uiT = useTranslations("IntelligentUi");
   const locale = useLocale();
   const durationFormatter = useMemo(
     () =>
@@ -377,12 +387,20 @@ const MessageItem: React.FC<MessageItemProps> = ({
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [isDeleteConfirming, setIsDeleteConfirming] = useState(false);
   const [showAddToKnowledgeModal, setShowAddToKnowledgeModal] = useState(false);
+  const [knowledgeContent, setKnowledgeContent] = useState("");
+  const [knowledgePreparing, setKnowledgePreparing] = useState(false);
+  const [knowledgeError, setKnowledgeError] = useState<string | null>(null);
   const [pdfPrintJob, setPdfPrintJob] = useState<PdfPrintJob | null>(null);
   const [imageExportJob, setImageExportJob] = useState<ImageExportJob | null>(
     null,
   );
   const [downloadingFormat, setDownloadingFormat] =
     useState<MessageDownloadFormat | null>(null);
+  const [includeIntelligentUiState, setIncludeIntelligentUiState] =
+    useState(false);
+  const hasIntelligentUi = message.outputBlocks?.some(
+    (block) => block.type === "intelligent_ui",
+  );
   const [imageExportError, setImageExportError] = useState<string | null>(null);
 
   // Immersive / Reading Mode State
@@ -448,6 +466,20 @@ const MessageItem: React.FC<MessageItemProps> = ({
   }, []);
 
   const isDownloading = downloadingFormat !== null;
+
+  const readCurrentMessageForExport = useCallback(async () => {
+    const sessionId = getCurrentSession()?.id;
+    if (!sessionId) throw new Error("SESSION_NOT_FOUND");
+    const snapshot = await readMessageForPresentation(sessionId, message.id);
+    const liveState = useChatStore.getState();
+    if (
+      liveState.currentSessionId !== sessionId ||
+      liveState.isActiveSessionLoading
+    ) {
+      throw new Error("SESSION_CHANGED");
+    }
+    return snapshot.message;
+  }, [getCurrentSession, message.id]);
 
   const stopCurrentAudio = () => {
     currentAudioRef.current?.dispose();
@@ -637,13 +669,17 @@ const MessageItem: React.FC<MessageItemProps> = ({
               signal: readyController.signal,
             });
           }
+          await assertPreparedMessageUiValid(pdfPrintJob.message);
           if (readyController.signal.aborted) return;
           window.print();
           if (!cleanedUp) {
             cleanupTimer = setTimeout(cleanupPrintJob, 30000);
           }
         };
-        void print();
+        void print().catch((error) => {
+          logMessageItemError("Failed to validate message PDF", error);
+          cleanupPrintJob();
+        });
       });
     });
 
@@ -723,6 +759,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
           waitForMarkdownCharts(root, { signal: proxyController.signal }),
         ]);
         const dataUrl = await exportRootToPng(root);
+        await assertPreparedMessageUiValid(imageExportJob.message);
         if (!cancelled) downloadImageDataUrl(dataUrl);
       } catch (error) {
         if (!cancelled) {
@@ -792,8 +829,17 @@ const MessageItem: React.FC<MessageItemProps> = ({
   }, [isTyping, message.content]);
 
   const handleCopy = async () => {
-    const copied = await copyTextToClipboard(message.content);
-    setCopyFeedback(copied ? "copied" : "error");
+    try {
+      const copied = await copyTextToClipboard(
+        await projectMessageUiForExport(message, getCurrentSession()?.id, {
+          purpose: "static-original",
+          locale,
+        }),
+      );
+      setCopyFeedback(copied ? "copied" : "error");
+    } catch {
+      setCopyFeedback("error");
+    }
   };
 
   const handleEditClick = () => {
@@ -831,11 +877,25 @@ const MessageItem: React.FC<MessageItemProps> = ({
       `message.${extension}`,
     );
 
-  const handleDownloadMarkdown = () => {
+  const handleDownloadMarkdown = async () => {
     if (!beginDownload("markdown")) return;
 
     try {
-      const blob = new Blob([message.content], { type: "text/markdown" });
+      const sessionId = getCurrentSession()?.id;
+      const exportMessage = includeIntelligentUiState
+        ? await readCurrentMessageForExport()
+        : message;
+      const blob = new Blob(
+        [
+          await projectMessageUiForExport(exportMessage, sessionId, {
+            purpose: includeIntelligentUiState
+              ? "static-current"
+              : "static-original",
+            locale,
+          }),
+        ],
+        { type: "text/markdown" },
+      );
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -844,6 +904,8 @@ const MessageItem: React.FC<MessageItemProps> = ({
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
+    } catch (error) {
+      logMessageItemError("Failed to prepare message Markdown", error);
     } finally {
       setShowMoreMenu(false);
       if (downloadResetTimerRef.current !== null) {
@@ -856,36 +918,91 @@ const MessageItem: React.FC<MessageItemProps> = ({
     }
   };
 
-  const handleDownloadPdf = () => {
+  const handleDownloadPdf = async () => {
     if (!beginDownload("pdf")) return;
-    setPdfPrintJob({
-      id: `${message.id}-${Date.now()}`,
-      title: getMessageDownloadName("pdf"),
-      message,
-      searchSources: message.searchSources || [],
-      ragSources: message.ragSources || [],
-    });
-    setShowMoreMenu(false);
+    try {
+      const sessionId = getCurrentSession()?.id;
+      const exportMessage = includeIntelligentUiState
+        ? await readCurrentMessageForExport()
+        : message;
+      const preparedMessage = await prepareMessageUiForStatic(
+        exportMessage,
+        sessionId,
+        {
+          purpose: includeIntelligentUiState
+            ? "static-current"
+            : "static-original",
+          locale,
+        },
+      );
+      setPdfPrintJob({
+        includeIntelligentUiState,
+        id: `${message.id}-${Date.now()}`,
+        title: getMessageDownloadName("pdf"),
+        message: preparedMessage,
+        searchSources: preparedMessage.searchSources || [],
+        ragSources: preparedMessage.ragSources || [],
+      });
+      setShowMoreMenu(false);
+    } catch (error) {
+      logMessageItemError("Failed to prepare message PDF", error);
+      finishDownload("pdf");
+    }
   };
 
-  const handleDownloadImage = () => {
+  const handleDownloadImage = async () => {
     if (!beginDownload("image")) return;
-    setImageExportError(null);
-    setImageExportJob({
-      id: `${message.id}-${Date.now()}`,
-      title: getMessageDownloadName("png"),
-      message,
-      searchSources: message.searchSources || [],
-      ragSources: message.ragSources || [],
-      width: getMessageImageExportWidth(visibleMessageContentRef.current),
-    });
-    setShowMoreMenu(false);
+    try {
+      const sessionId = getCurrentSession()?.id;
+      const exportMessage = includeIntelligentUiState
+        ? await readCurrentMessageForExport()
+        : message;
+      const preparedMessage = await prepareMessageUiForStatic(
+        exportMessage,
+        sessionId,
+        {
+          purpose: includeIntelligentUiState
+            ? "static-current"
+            : "static-original",
+          locale,
+        },
+      );
+      setImageExportError(null);
+      setImageExportJob({
+        includeIntelligentUiState,
+        id: `${message.id}-${Date.now()}`,
+        title: getMessageDownloadName("png"),
+        message: preparedMessage,
+        searchSources: preparedMessage.searchSources || [],
+        ragSources: preparedMessage.ragSources || [],
+        width: getMessageImageExportWidth(visibleMessageContentRef.current),
+      });
+      setShowMoreMenu(false);
+    } catch (error) {
+      logMessageItemError("Failed to prepare message image", error);
+      finishDownload("image");
+    }
   };
 
-  const handleAddToKnowledge = () => {
-    if (mutationActionsDisabled) return;
-    setShowAddToKnowledgeModal(true);
-    setShowMoreMenu(false);
+  const handleAddToKnowledge = async () => {
+    if (mutationActionsDisabled || knowledgePreparing) return;
+    setKnowledgePreparing(true);
+    setKnowledgeError(null);
+    try {
+      const content = await projectMessageUiForExport(
+        message,
+        getCurrentSession()?.id,
+        { purpose: "static-original", locale },
+      );
+      setKnowledgeContent(content);
+      setShowAddToKnowledgeModal(true);
+      setShowMoreMenu(false);
+    } catch (error) {
+      logMessageItemError("Failed to prepare knowledge content", error);
+      setKnowledgeError(t("knowledgePrepareFailed"));
+    } finally {
+      setKnowledgePreparing(false);
+    }
   };
 
   const handleImmersiveReading = () => {
@@ -1292,6 +1409,11 @@ const MessageItem: React.FC<MessageItemProps> = ({
           >
             <MessageOutputRenderer
               readOnly={isTemporarySession(getCurrentSession())}
+              intelligentUiMode={
+                pdfPrintJob.includeIntelligentUiState
+                  ? "static-current"
+                  : "static-original"
+              }
               message={pdfPrintJob.message}
               displayedContent={pdfPrintJob.message.content}
               searchSources={pdfPrintJob.searchSources}
@@ -1318,6 +1440,11 @@ const MessageItem: React.FC<MessageItemProps> = ({
               <div className="message-export-content-root">
                 <MessageOutputRenderer
                   readOnly={isTemporarySession(getCurrentSession())}
+                  intelligentUiMode={
+                    imageExportJob.includeIntelligentUiState
+                      ? "static-current"
+                      : "static-original"
+                  }
                   message={imageExportJob.message}
                   displayedContent={imageExportJob.message.content}
                   searchSources={imageExportJob.searchSources}
@@ -1337,7 +1464,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
         <AddToKnowledgeModal
           onClose={() => setShowAddToKnowledgeModal(false)}
           defaultTitle={`${getCurrentSession()?.title || t("readingMessage")}.md`}
-          defaultContent={message.content}
+          defaultContent={knowledgeContent}
         />
       )}
 
@@ -1445,6 +1572,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
                 ) : (
                   <MessageOutputRenderer
                     readOnly={isTemporarySession(getCurrentSession())}
+                    sessionId={getCurrentSession()?.id}
                     message={message}
                     displayedContent={message.content}
                     searchSources={readingMode === "message" ? sources : []}
@@ -1671,6 +1799,8 @@ const MessageItem: React.FC<MessageItemProps> = ({
               ) : null}
 
               <MessageOutputRenderer
+                intelligentUiMode="interactive"
+                sessionId={getCurrentSession()?.id}
                 readOnly={isTemporarySession(getCurrentSession())}
                 message={message}
                 displayedContent={displayedContent}
@@ -1720,6 +1850,11 @@ const MessageItem: React.FC<MessageItemProps> = ({
               {ttsError}
             </div>
           ) : null}
+          {knowledgeError && (
+            <p role="alert" className="mt-2 text-xs text-destructive">
+              {knowledgeError}
+            </p>
+          )}
           {imageExportError ? (
             <div
               role="alert"
@@ -2055,9 +2190,17 @@ const MessageItem: React.FC<MessageItemProps> = ({
                       onClick={handleImmersiveReading}
                     />
                     <ActionButton
-                      icon={<LibraryBig size={13} />}
+                      icon={
+                        knowledgePreparing ? (
+                          <Loader2 size={13} className="animate-spin" />
+                        ) : (
+                          <LibraryBig size={13} />
+                        )
+                      }
+                      disabled={knowledgePreparing || mutationActionsDisabled}
                       tooltip={t("addToKnowledge")}
-                      onClick={handleAddToKnowledge}
+                      onClick={() => void handleAddToKnowledge()}
+                      aria-busy={knowledgePreparing}
                       containerClass="hidden! md:flex!"
                     />
                     <div className="hidden! md:flex!">
@@ -2096,6 +2239,20 @@ const MessageItem: React.FC<MessageItemProps> = ({
                           </DropdownMenuTrigger>
                         </Tooltip>
                         <DropdownMenuContent side="top" align="end">
+                          {hasIntelligentUi && (
+                            <>
+                              <DropdownMenuCheckboxItem
+                                checked={includeIntelligentUiState}
+                                onCheckedChange={(checked) =>
+                                  setIncludeIntelligentUiState(checked === true)
+                                }
+                                onSelect={(event) => event.preventDefault()}
+                              >
+                                {uiT("includeInputs")}
+                              </DropdownMenuCheckboxItem>
+                              <DropdownMenuSeparator />
+                            </>
+                          )}
                           <DropdownMenuItem
                             disabled={isDownloading}
                             onSelect={handleDownloadMarkdown}
@@ -2223,8 +2380,10 @@ const MessageItem: React.FC<MessageItemProps> = ({
                         </DropdownMenuItem>
 
                         <DropdownMenuItem
-                          disabled={mutationActionsDisabled}
-                          onSelect={handleAddToKnowledge}
+                          disabled={
+                            mutationActionsDisabled || knowledgePreparing
+                          }
+                          onSelect={() => void handleAddToKnowledge()}
                         >
                           <LibraryBig
                             size={14}
@@ -2256,6 +2415,22 @@ const MessageItem: React.FC<MessageItemProps> = ({
                             </span>
                           </DropdownMenuSubTrigger>
                           <DropdownMenuSubContent>
+                            {hasIntelligentUi && (
+                              <>
+                                <DropdownMenuCheckboxItem
+                                  checked={includeIntelligentUiState}
+                                  onCheckedChange={(checked) =>
+                                    setIncludeIntelligentUiState(
+                                      checked === true,
+                                    )
+                                  }
+                                  onSelect={(event) => event.preventDefault()}
+                                >
+                                  {uiT("includeInputs")}
+                                </DropdownMenuCheckboxItem>
+                                <DropdownMenuSeparator />
+                              </>
+                            )}
                             <DropdownMenuItem
                               disabled={isDownloading}
                               onSelect={handleDownloadMarkdown}

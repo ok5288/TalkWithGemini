@@ -6,13 +6,20 @@ import { Check, Copy, ExternalLink, X } from "lucide-react";
 import { Button, Dialog, IconButton } from "@/components/ui/primitives";
 import { useChatStore } from "@/store/core/chatStore";
 import { readSessionForPresentation } from "@/components/chat/sessionPresentation";
-import { prepareSessionShare } from "@/services/sharing/snapshot";
+import {
+  assertPreparedSessionShareValid,
+  prepareSessionShare,
+} from "@/services/sharing/snapshot";
 import {
   getSessionShare,
   publishSessionShare,
   revokeSessionShare,
 } from "@/services/sharing/client";
-import type { ShareExpiry, ShareMetadata } from "@/lib/sharing/types";
+import type {
+  PreparedSessionShare,
+  ShareExpiry,
+  ShareMetadata,
+} from "@/lib/sharing/types";
 import { copyTextToClipboard } from "@/lib/utils/clipboard";
 
 export default function ShareDialog({
@@ -22,29 +29,41 @@ export default function ShareDialog({
   sessionId: string;
   onClose: () => void;
 }) {
+  const locale = useLocale();
   const t = useTranslations("Sharing");
   const common = useTranslations("Common");
-  const locale = useLocale();
   const [share, setShare] = useState<ShareMetadata | null>(null);
   const [expiry, setExpiry] = useState<ShareExpiry>("1d");
+  const [includeIntelligentUiState, setIncludeIntelligentUiState] =
+    useState(false);
   const [expiryChanged, setExpiryChanged] = useState(false);
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [preview, setPreview] = useState<PreparedSessionShare | null>(null);
+  const operation = useRef(false);
+  const generation = useRef(0);
+  useEffect(() => {
+    generation.current++;
+    controller.current?.abort();
+    setPreview(null);
+  }, [sessionId, locale, expiry, expiryChanged, includeIntelligentUiState]);
   const mounted = useRef(true);
   const controller = useRef<AbortController | null>(null);
 
   useEffect(() => {
     mounted.current = true;
+    const epoch = generation.current;
     void getSessionShare(sessionId)
       .then((value) => {
-        if (mounted.current) setShare(value);
+        if (mounted.current && generation.current === epoch) setShare(value);
       })
       .catch(() => {
-        if (mounted.current) setError(t("loadFailed"));
+        if (mounted.current && generation.current === epoch)
+          setError(t("loadFailed"));
       })
       .finally(() => {
-        if (mounted.current) setBusy(false);
+        if (mounted.current && generation.current === epoch) setBusy(false);
       });
     return () => {
       mounted.current = false;
@@ -58,36 +77,63 @@ export default function ShareDialog({
       : "";
   const isExpired = share?.expiresAt != null && share.expiresAt <= Date.now();
   const submit = async () => {
-    if (busy) return;
+    if (busy || operation.current) return;
+    operation.current = true;
     setBusy(true);
     setError(null);
     setCopied(false);
     const request = new AbortController();
     controller.current = request;
+    const epoch = generation.current;
     try {
       const session = useChatStore
         .getState()
         .sessions.find((item) => item.id === sessionId);
       if (!session) throw new Error("SESSION_UNAVAILABLE");
-      const frozen = await readSessionForPresentation(session);
-      const prepared = await prepareSessionShare({
-        session: frozen,
-        messages: frozen.messages,
-        signal: request.signal,
-      });
+      let prepared = preview;
+      if (!prepared) {
+        const frozen = await readSessionForPresentation(session);
+        const { createFrozenUiSourceScope } =
+          await import("@/lib/intelligentUi/sourceContext");
+        const sourceScope = await createFrozenUiSourceScope(
+          frozen,
+          frozen.messages,
+        );
+        prepared = await prepareSessionShare({
+          session: frozen,
+          messages: frozen.messages,
+          signal: request.signal,
+          includeIntelligentUiState,
+          locale,
+          sourceScope,
+        });
+        request.signal.throwIfAborted();
+        if (mounted.current && epoch === generation.current)
+          setPreview(prepared);
+        return;
+      }
+      await assertPreparedSessionShareValid(prepared);
       request.signal.throwIfAborted();
+      if (epoch !== generation.current) return;
       const next = await publishSessionShare({
         sessionId,
         signal: request.signal,
         ...prepared,
+        beforeDispatch: () => assertPreparedSessionShareValid(prepared),
         ...(!share || isExpired || expiryChanged ? { expiresIn: expiry } : {}),
       });
       if (mounted.current) {
         setShare(next);
+        setPreview(null);
         setExpiryChanged(false);
       }
     } catch (failure) {
       if (!mounted.current || request.signal.aborted) return;
+      if (failure instanceof Error && failure.message === "UI_SOURCE_STALE") {
+        setPreview(null);
+        setError(t("previewStale"));
+        return;
+      }
       const code =
         failure && typeof failure === "object" && "code" in failure
           ? String(failure.code)
@@ -102,11 +148,13 @@ export default function ShareDialog({
               : t("publishFailed"),
       );
     } finally {
+      operation.current = false;
       if (mounted.current) setBusy(false);
     }
   };
   const revoke = async () => {
-    if (busy) return;
+    if (busy || operation.current) return;
+    operation.current = true;
     setBusy(true);
     setError(null);
     try {
@@ -118,6 +166,7 @@ export default function ShareDialog({
     } catch {
       if (mounted.current) setError(t("revokeFailed"));
     } finally {
+      operation.current = false;
       if (mounted.current) setBusy(false);
     }
   };
@@ -141,6 +190,18 @@ export default function ShareDialog({
         <p className="text-sm leading-relaxed text-muted-foreground">
           {t("description")}
         </p>
+        <label className="flex items-start gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={includeIntelligentUiState}
+            disabled={busy}
+            onChange={(event) =>
+              setIncludeIntelligentUiState(event.target.checked)
+            }
+            className="mt-1"
+          />
+          <span>{t("includeIntelligentUiState")}</span>
+        </label>
         {shareUrl && (
           <div className="space-y-2">
             <label htmlFor="session-share-url" className="text-sm font-medium">
@@ -236,6 +297,75 @@ export default function ShareDialog({
         <p className="text-xs leading-relaxed text-muted-foreground">
           {t("deleteNotice")}
         </p>
+        {preview && (
+          <section
+            aria-label={t("preview")}
+            className="space-y-3 rounded-md border p-3"
+          >
+            <h3 className="font-medium">{t("preview")}</h3>
+            <p className="text-xs text-muted-foreground">
+              {t("previewDescription")}
+            </p>
+            <h4>{preview.snapshot.title}</h4>
+            {preview.snapshot.messages.map((message) => (
+              <article key={message.id} className="space-y-2 border-t pt-2">
+                <p className="text-xs text-muted-foreground">{message.role}</p>
+                {message.blocks.map((block, index) => {
+                  if (block.type === "text" || block.type === "report")
+                    return (
+                      <div key={index}>
+                        {block.type === "report" && <h5>{block.title}</h5>}
+                        <pre className="whitespace-pre-wrap break-words font-sans text-sm">
+                          {block.content}
+                        </pre>
+                        {preview.assets
+                          .filter((asset) =>
+                            block.content.includes(`share-asset:${asset.id}`),
+                          )
+                          .map((asset) => (
+                            <img
+                              key={asset.id}
+                              src={`data:${asset.mimeType};base64,${asset.data}`}
+                              alt=""
+                              className="max-w-full"
+                            />
+                          ))}
+                      </div>
+                    );
+                  if (block.type === "image") {
+                    const asset = preview.assets.find(
+                      (item) => item.id === block.assetId,
+                    );
+                    return asset ? (
+                      <figure key={index}>
+                        <img
+                          src={`data:${asset.mimeType};base64,${asset.data}`}
+                          alt={block.alt}
+                          className="max-w-full"
+                        />
+                        <figcaption>
+                          {block.alt}
+                          {block.sourceUrl && <span> {block.sourceUrl}</span>}
+                        </figcaption>
+                      </figure>
+                    ) : null;
+                  }
+                  if (block.type === "attachment")
+                    return <p key={index}>{block.fileName}</p>;
+                  return (
+                    <ul key={index}>
+                      {block.sources.map((source, sourceIndex) => (
+                        <li key={sourceIndex}>
+                          {source.title} — {source.url}
+                        </li>
+                      ))}
+                    </ul>
+                  );
+                })}
+              </article>
+            ))}
+          </section>
+        )}
         {error && (
           <p role="alert" className="text-sm text-destructive">
             {error}
@@ -258,9 +388,11 @@ export default function ShareDialog({
           >
             {busy
               ? t("working")
-              : share && !isExpired
-                ? t("update")
-                : t("create")}
+              : preview
+                ? t("confirmPublish")
+                : share && !isExpired
+                  ? t("update")
+                  : t("create")}
           </Button>
         </div>
       </div>

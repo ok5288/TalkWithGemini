@@ -16,6 +16,8 @@ const controls = vi.hoisted(() => ({
     resize: ReturnType<typeof vi.fn>;
     dispose: ReturnType<typeof vi.fn>;
     getDataURL: ReturnType<typeof vi.fn>;
+    on: ReturnType<typeof vi.fn>;
+    off: ReturnType<typeof vi.fn>;
   }>,
   fail: false,
   lastRegistry: null as {
@@ -41,6 +43,8 @@ vi.mock("echarts", () => ({
       resize: vi.fn(),
       dispose: vi.fn(),
       getDataURL: vi.fn(() => "data:image/png;base64,chart"),
+      on: vi.fn(),
+      off: vi.fn(),
     };
     controls.echartsInstances.push(instance);
     return instance;
@@ -401,6 +405,70 @@ describe("ChartBlock", () => {
     expect(document.activeElement).toBe(fullscreen);
     expect(controls.echartsInstances).toHaveLength(2);
     expect(controls.echartsInstances[1]?.dispose).toHaveBeenCalled();
+  });
+
+  it("routes point events for inline and fullscreen charts and ignores stale instances", async () => {
+    stubMotionPreference(false);
+    const onDataPointClick = vi.fn();
+    const changedSource = JSON.stringify({
+      ...JSON.parse(source),
+      spec: { series: [{ type: "line" }] },
+    });
+    const view = render(
+      <ChartBlock
+        source={source}
+        incomplete={false}
+        onDataPointClick={onDataPointClick}
+      />,
+    );
+
+    await waitFor(() => expect(controls.echartsInstances).toHaveLength(1));
+    const first = controls.echartsInstances[0]!;
+    const firstHandler = first.on.mock.calls[0]?.[1] as
+      ((event: unknown) => void) | undefined;
+    expect(firstHandler).toBeTypeOf("function");
+    firstHandler?.({
+      componentType: "series",
+      seriesType: "bar",
+      seriesIndex: 0,
+      dataIndex: 0,
+    });
+    expect(onDataPointClick).toHaveBeenCalledTimes(1);
+
+    view.rerender(
+      <ChartBlock
+        source={changedSource}
+        incomplete={false}
+        onDataPointClick={onDataPointClick}
+      />,
+    );
+    await waitFor(() => expect(controls.echartsInstances).toHaveLength(2));
+    firstHandler?.({
+      componentType: "series",
+      seriesType: "bar",
+      seriesIndex: 0,
+      dataIndex: 1,
+    });
+    expect(onDataPointClick).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "fullscreenChartAria" }),
+    );
+    await waitFor(() => expect(controls.echartsInstances).toHaveLength(3));
+    const fullscreen = controls.echartsInstances[2]!;
+    const fullscreenHandler = fullscreen.on.mock.calls[0]?.[1] as
+      ((event: unknown) => void) | undefined;
+    fullscreenHandler?.({
+      componentType: "series",
+      seriesType: "line",
+      seriesIndex: 0,
+      dataIndex: 0,
+    });
+    expect(onDataPointClick).toHaveBeenCalledTimes(2);
+
+    view.unmount();
+    expect(first.off).toHaveBeenCalledWith("click", firstHandler);
+    expect(fullscreen.off).toHaveBeenCalledWith("click", fullscreenHandler);
   });
 
   it("keeps source details and exposes retry after a render error", async () => {

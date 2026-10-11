@@ -74,6 +74,7 @@ export async function cloneResearchExtensions(
   target: ResearchTask,
   repository: ResearchExtensionRepository = getResearchExtensionRepository(),
 ) {
+  const sourceRefMap = new Map<string, string>();
   const runIds = new Map(
     source.reportRuns.map((run, index) => [
       run.id,
@@ -146,6 +147,12 @@ export async function cloneResearchExtensions(
           claim.contradictingEvidenceIds.map(mapEvidence),
       })),
     };
+    snapshot.evidence.forEach((evidence, index) => {
+      sourceRefMap.set(
+        `evidence:${snapshot.id}:${evidence.id}`,
+        `evidence:${cloned.id}:${cloned.evidence[index].id}`,
+      );
+    });
     await repository.put("evidence_snapshot", report.id, cloned, {
       taskId: target.id,
       sessionId: target.sessionId,
@@ -211,4 +218,5 @@ export async function cloneResearchExtensions(
       sessionId: target.sessionId,
     });
   }
+  return sourceRefMap;
 }

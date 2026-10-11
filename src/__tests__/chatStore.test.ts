@@ -1,3 +1,4 @@
+import { registerHtmlRuntimeFlusher } from "@/lib/intelligentUi/runtimeFlush";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   Attachment,
@@ -522,6 +523,51 @@ describe("chat store persistence", () => {
     });
   });
 
+  it("keeps the leaving runtime active until flush and ignores a superseded switch", async () => {
+    let acknowledge!: () => void;
+    const ack = new Promise<void>((resolve) => {
+      acknowledge = resolve;
+    });
+    const unregister = registerHtmlRuntimeFlusher("a", () => ack);
+    const original = makeMessage("a1", "before buffer flush");
+    storedItems.set(
+      "session_messages_b",
+      normalizeSessionMessageTree([makeMessage("b1", "b")]),
+    );
+    storedItems.set(
+      "session_messages_c",
+      normalizeSessionMessageTree([makeMessage("c1", "c")]),
+    );
+    useChatStore.setState({
+      sessions: [makeSession("a"), makeSession("b"), makeSession("c")],
+      currentSessionId: "a",
+      activeMessages: [original],
+      activeMessageTree: normalizeSessionMessageTree([original]),
+    });
+    try {
+      const firstSwitch = useChatStore.getState().selectSession("b");
+      const latestSwitch = useChatStore.getState().selectSession("c");
+      expect(useChatStore.getState()).toMatchObject({
+        currentSessionId: "a",
+        isActiveSessionLoading: false,
+        pendingSessionId: null,
+      });
+      const latest = normalizeSessionMessageTree([
+        makeMessage("a1", "accepted runtime update"),
+      ]);
+      const saved = useChatStore
+        .getState()
+        .syncActiveSession("a", latest, "coalesced");
+      acknowledge();
+      await Promise.all([firstSwitch, latestSwitch, saved]);
+      expect(useChatStore.getState().currentSessionId).toBe("c");
+      expect(storedItems.get("session_messages_a")).toEqual(latest);
+      expect(appDbMock.getItem).not.toHaveBeenCalledWith("session_messages_b");
+    } finally {
+      unregister();
+    }
+  });
+
   it("commits only the newest session load and keeps the previous session visible while loading", async () => {
     const activeMessage = makeMessage("a1", "session a");
     const bMessage = makeMessage("b1", "session b");
@@ -809,12 +855,12 @@ describe("chat store persistence", () => {
       .syncActiveSession(session.id, secondTree);
 
     expect(pendingWrites).toHaveLength(1);
-    expect(pendingWrites[0].value).toBe(firstTree);
+    expect(pendingWrites[0].value).toEqual(firstTree);
 
     pendingWrites[0].resolve();
     await firstSave;
-    expect(pendingWrites).toHaveLength(2);
-    expect(pendingWrites[1].value).toBe(secondTree);
+    await vi.waitFor(() => expect(pendingWrites).toHaveLength(2));
+    expect(pendingWrites[1].value).toEqual(secondTree);
 
     pendingWrites[1].resolve();
     await secondSave;
@@ -1538,7 +1584,7 @@ describe("chat store persistence", () => {
       getActiveMessagePath(storedTree as any).map((message) => message.id),
     ).toEqual(["u1", branchId]);
 
-    useChatStore.getState().switchMessageVersion("a", branchId, "prev");
+    await useChatStore.getState().switchMessageVersion("a", branchId, "prev");
 
     expect(useChatStore.getState().activeMessages.map((m) => m.id)).toEqual([
       "u1",
@@ -1550,7 +1596,7 @@ describe("chat store persistence", () => {
       useChatStore.getState().sessions.find((session) => session.id === "a"),
     ).toMatchObject({ messageCount: 4 });
 
-    useChatStore.getState().selectMessageVersion("a", "m1", branchId);
+    await useChatStore.getState().selectMessageVersion("a", "m1", branchId);
     expect(useChatStore.getState().activeMessages.map((m) => m.id)).toEqual([
       "u1",
       branchId,
@@ -1599,7 +1645,7 @@ describe("chat store persistence", () => {
       modelPlaceholder,
     ]);
 
-    useChatStore.getState().switchMessageVersion("a", "u2b", "prev");
+    await useChatStore.getState().switchMessageVersion("a", "u2b", "prev");
 
     expect(useChatStore.getState().activeMessages.map((m) => m.id)).toEqual([
       "u1",
@@ -1636,7 +1682,9 @@ describe("chat store persistence", () => {
       rootBranchId,
     ]);
 
-    useChatStore.getState().switchMessageVersion("a", rootBranchId, "prev");
+    await useChatStore
+      .getState()
+      .switchMessageVersion("a", rootBranchId, "prev");
 
     expect(useChatStore.getState().activeMessages.map((m) => m.id)).toEqual([
       "u1",
@@ -1692,6 +1740,50 @@ describe("chat store persistence", () => {
     expect(deleteFromOPFSMock).not.toHaveBeenCalled();
     expect(cancelSessionShareDeletion).toHaveBeenCalledWith("a");
   });
+
+  it.each(["pending", "dirty"] as const)(
+    "recovers latest %s UI snapshot after failed deletion changes the active session",
+    async (kind) => {
+      const oldMessage = makeMessage("a1", "old durable content");
+      const latestMessage = makeMessage("a1", "latest UI content");
+      const latest = normalizeSessionMessageTree([latestMessage]);
+      storedItems.set(
+        "session_messages_a",
+        normalizeSessionMessageTree([oldMessage]),
+      );
+      storedItems.set(
+        "session_messages_b",
+        normalizeSessionMessageTree([makeMessage("b1", "other")]),
+      );
+      useChatStore.setState({
+        sessions: [makeSession("a"), makeSession("b")],
+        currentSessionId: "a",
+        activeMessages: [latestMessage],
+        activeMessageTree: latest,
+      });
+      if (kind === "dirty")
+        appDbMock.setItem.mockRejectedValueOnce(new Error("quota"));
+      const save = useChatStore
+        .getState()
+        .syncActiveSession("a", latest, "coalesced");
+      const rejected = expect(save).rejects.toThrow(
+        kind === "dirty" ? "quota" : "cancelled",
+      );
+      if (kind === "dirty") await rejected;
+      appDbMock.removeItem.mockRejectedValueOnce(new Error("delete failed"));
+      await expect(useChatStore.getState().deleteSession("a")).rejects.toThrow(
+        "delete failed",
+      );
+      await rejected;
+      expect(useChatStore.getState().currentSessionId).toBe("b");
+      expect(
+        useChatStore.getState().sessions.map((session) => session.id),
+      ).toEqual(["a", "b"]);
+      await useChatStore.getState().selectSession("a");
+      expect(useChatStore.getState().activeMessages).toEqual([latestMessage]);
+      expect(storedItems.get("session_messages_a")).toEqual(latest);
+    },
+  );
 
   it("queues deletion after pending writes so a deleted tree cannot reappear", async () => {
     const pendingTree = normalizeSessionMessageTree([

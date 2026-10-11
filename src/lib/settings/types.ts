@@ -71,6 +71,8 @@ export interface SystemSettings {
   imageCompressionMaxWidthOrHeight: number;
   enableCodeCollapse: boolean;
   enableHtmlVisualPrompt: boolean;
+  enableIntelligentUi: boolean;
+  enableMcpApps: boolean;
   enableDestructiveToolConfirmation: boolean;
   fontSize: "small" | "medium" | "large";
   chatLayout: "document" | "conversation";

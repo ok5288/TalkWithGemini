@@ -4,6 +4,7 @@ import React, {
   useCallback,
   useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -53,6 +54,7 @@ export interface ChartBlockProps {
   source: string;
   incomplete: boolean;
   forcedTheme?: DiagramTheme;
+  onDataPointClick?: (event: ChartDataPointEvent) => void;
 }
 
 type ReadyState = "false" | "true" | "error";
@@ -80,6 +82,40 @@ interface CapturedEChartsInstance extends EChartsInstance {
     pixelRatio?: number;
     backgroundColor?: string;
   }) => string;
+}
+
+export interface ChartDataPointEvent {
+  componentType?: string;
+  seriesType?: string;
+  seriesIndex?: number;
+  dataIndex?: number;
+}
+
+type EChartsEventHandler = (event: unknown) => void;
+type EChartsEventInstance = EChartsInstance & {
+  on?: (event: string, handler: EChartsEventHandler) => void;
+  off?: (event: string, handler: EChartsEventHandler) => void;
+};
+
+class ChartPointClickDispatcher {
+  private currentGeneration: string;
+  handler?: (event: ChartDataPointEvent) => void;
+
+  constructor(generation: string) {
+    this.currentGeneration = generation;
+  }
+
+  setGeneration(generation: string) {
+    this.currentGeneration = generation;
+  }
+
+  getGeneration() {
+    return this.currentGeneration;
+  }
+
+  dispatch(event: ChartDataPointEvent) {
+    this.handler?.(event);
+  }
 }
 
 interface EChartsRuntimeLike {
@@ -139,13 +175,29 @@ function loadEChartsModule(): Promise<unknown> {
 function createEChartsLoader(
   onInstanceMount?: (instance: CapturedEChartsInstance) => void,
   onInstanceDispose?: (instance: CapturedEChartsInstance) => void,
+  onDataPointClick?: (event: ChartDataPointEvent) => void,
+  getGeneration?: () => string,
 ) {
   return async (): Promise<EChartsRuntimeLike> => {
     const runtime = resolveEChartsRuntime(await loadEChartsModule());
     return {
       init(container, theme) {
         const instance = runtime.init(container, theme);
+        const generation = getGeneration?.();
         let disposed = false;
+        const eventHandler: EChartsEventHandler | undefined = onDataPointClick
+          ? (event) => {
+              if (
+                disposed ||
+                (generation !== undefined && generation !== getGeneration?.())
+              )
+                return;
+              if (!event || typeof event !== "object") return;
+              onDataPointClick(event as ChartDataPointEvent);
+            }
+          : undefined;
+        if (eventHandler)
+          (instance as EChartsEventInstance).on?.("click", eventHandler);
         const captured: CapturedEChartsInstance = {
           setOption: (option, options) => instance.setOption(option, options),
           resize: () => instance.resize(),
@@ -153,6 +205,8 @@ function createEChartsLoader(
             if (disposed) return;
             disposed = true;
             try {
+              if (eventHandler)
+                (instance as EChartsEventInstance).off?.("click", eventHandler);
               instance.dispose();
             } finally {
               onInstanceDispose?.(captured);
@@ -315,9 +369,16 @@ function createChartRegistry(
   reducedMotion: boolean,
   onInstanceMount?: (instance: CapturedEChartsInstance) => void,
   onInstanceDispose?: (instance: CapturedEChartsInstance) => void,
+  onDataPointClick?: (event: ChartDataPointEvent) => void,
+  getGeneration?: () => string,
 ): ChartRendererRegistry {
   const baseRenderer = createEChartsRenderer({
-    loadECharts: createEChartsLoader(onInstanceMount, onInstanceDispose),
+    loadECharts: createEChartsLoader(
+      onInstanceMount,
+      onInstanceDispose,
+      onDataPointClick,
+      getGeneration,
+    ),
     limits: { maxSeries: 12 },
     defaultStyle: false,
   });
@@ -565,6 +626,7 @@ export function ChartBlock({
   source,
   incomplete,
   forcedTheme,
+  onDataPointClick,
 }: ChartBlockProps) {
   const t = useTranslations("Content");
   const theme = useResolvedTheme(forcedTheme);
@@ -584,6 +646,27 @@ export function ChartBlock({
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const fullscreenButtonRef = useRef<HTMLButtonElement>(null);
   const titleId = useId();
+  const generation = `${retryVersion}:${source}`;
+  const [pointClickDispatcher] = useState(
+    () => new ChartPointClickDispatcher(generation),
+  );
+  useLayoutEffect(() => {
+    pointClickDispatcher.setGeneration(generation);
+  }, [generation, pointClickDispatcher]);
+  useEffect(() => {
+    pointClickDispatcher.handler = onDataPointClick;
+    return () => {
+      pointClickDispatcher.handler = undefined;
+    };
+  }, [onDataPointClick, pointClickDispatcher]);
+  const dispatchPointClick = useCallback(
+    (event: ChartDataPointEvent) => pointClickDispatcher.dispatch(event),
+    [pointClickDispatcher],
+  );
+  const getGeneration = useCallback(
+    () => pointClickDispatcher.getGeneration(),
+    [pointClickDispatcher],
+  );
   const handleInlineInstanceDispose = useCallback(
     (disposedInstance: CapturedEChartsInstance) => {
       setInlineInstance((current) =>
@@ -598,12 +681,26 @@ export function ChartBlock({
         reducedMotion,
         setInlineInstance,
         handleInlineInstanceDispose,
+        dispatchPointClick,
+        getGeneration,
       ),
-    [handleInlineInstanceDispose, reducedMotion],
+    [
+      dispatchPointClick,
+      getGeneration,
+      handleInlineInstanceDispose,
+      reducedMotion,
+    ],
   );
   const fullscreenRegistry = useMemo(
-    () => createChartRegistry(reducedMotion),
-    [reducedMotion],
+    () =>
+      createChartRegistry(
+        reducedMotion,
+        undefined,
+        undefined,
+        dispatchPointClick,
+        getGeneration,
+      ),
+    [dispatchPointClick, getGeneration, reducedMotion],
   );
 
   const labels = useMemo(

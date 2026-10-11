@@ -115,7 +115,14 @@ export async function resolveImageGenerationOptions({
       createImageGenerationOptionsPrompt(userMessage),
     );
     return parseImageGenerationOptions(raw);
-  } catch {
+  } catch (error) {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      error.code === "UI_SOURCE_STALE"
+    )
+      throw error;
     return {};
   }
 }

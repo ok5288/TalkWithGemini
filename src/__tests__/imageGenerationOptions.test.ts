@@ -18,6 +18,24 @@ const imageOnlyModel: ModelMetadata = {
 };
 
 describe("image generation options planning", () => {
+  it("propagates revoked UI authorization instead of continuing with defaults", async () => {
+    const error = Object.assign(new Error("Authorization expired"), {
+      code: "UI_SOURCE_STALE",
+    });
+    await expect(
+      resolveImageGenerationOptions({
+        userMessage: "Draw two images",
+        selectedModel: "openai:gpt-image-2",
+        selectedModelMetadata: imageOnlyModel,
+        defaultPromptOptimizationModel: "openai:gpt-5-mini",
+        availableModels: [],
+        generate: async () => {
+          throw error;
+        },
+      }),
+    ).rejects.toBe(error);
+  });
+
   it("parses strict image count JSON and ignores unclear output", () => {
     expect(parseImageGenerationOptions('{"imageCount":3}')).toEqual({
       imageCount: 3,

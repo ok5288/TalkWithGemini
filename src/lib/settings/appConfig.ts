@@ -164,6 +164,11 @@ export function normalizeSystemSettings(
       typeof raw.enableHtmlVisualPrompt === "boolean"
         ? raw.enableHtmlVisualPrompt
         : defaults.enableHtmlVisualPrompt,
+    enableIntelligentUi:
+      typeof raw.enableIntelligentUi === "boolean"
+        ? raw.enableIntelligentUi
+        : defaults.enableIntelligentUi,
+    enableMcpApps: raw.enableMcpApps === true,
     enableDestructiveToolConfirmation:
       typeof raw.enableDestructiveToolConfirmation === "boolean"
         ? raw.enableDestructiveToolConfirmation

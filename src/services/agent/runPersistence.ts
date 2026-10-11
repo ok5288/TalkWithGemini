@@ -27,6 +27,11 @@ export interface AgentRunPersistence {
   save(run: AgentRun): Promise<void>;
   get(runId: string): Promise<AgentRun | null>;
   list(sessionId?: string): Promise<AgentRun[]>;
+  /** Strict journal read: malformed or removed draft attempts are errors. */
+  readDraftHistory(
+    baseRunId: string,
+    sessionId: string,
+  ): Promise<{ runs: AgentRun[]; hasEvidence: boolean }>;
   remove(runId: string): Promise<void>;
   clearSession(sessionId: string): Promise<void>;
   close(): void;
@@ -43,6 +48,58 @@ interface StoredAgentRunRecord {
   sessionId: string;
   updatedAt: number;
   run: AgentRun;
+}
+
+// Kept in the existing store and committed atomically with each attempt. Normal
+// run removal deliberately retains this evidence; explicit session deletion
+// removes it along with the rest of the session. It is not a public backup type.
+interface DraftJournalEvidence {
+  kind: "ui-draft-journal";
+  runId: string;
+  sessionId: string;
+  baseRunId: string;
+  highestAttempt: number;
+}
+function draftAttempt(runId: string) {
+  const match = /^(ui-draft-[^-]+)(?:-a([1-9][0-9]*))?$/.exec(runId);
+  if (!match) return null;
+  const attempt = match[2] ? Number(match[2]) : 1;
+  if (!Number.isSafeInteger(attempt)) return null;
+  return { baseRunId: match[1], attempt };
+}
+function draftEvidence(
+  record: StoredAgentRunRecord,
+): DraftJournalEvidence | null {
+  const attempt = draftAttempt(record.runId);
+  if (!attempt) return null;
+  return {
+    kind: "ui-draft-journal",
+    runId: `ui-draft-journal:${attempt.baseRunId}`,
+    sessionId: record.sessionId,
+    baseRunId: attempt.baseRunId,
+    highestAttempt: attempt.attempt,
+  };
+}
+function mergeDraftEvidence(
+  next: DraftJournalEvidence,
+  previous: unknown,
+): DraftJournalEvidence {
+  if (previous === undefined || previous === null) return next;
+  const prior = previous as Partial<DraftJournalEvidence>;
+  if (
+    prior.kind !== next.kind ||
+    prior.runId !== next.runId ||
+    prior.sessionId !== next.sessionId ||
+    prior.baseRunId !== next.baseRunId ||
+    !Number.isSafeInteger(prior.highestAttempt) ||
+    (prior.highestAttempt ?? 0) < 1
+  ) {
+    throw new Error("Invalid workspace draft journal evidence");
+  }
+  return {
+    ...next,
+    highestAttempt: Math.max(next.highestAttempt, prior.highestAttempt!),
+  };
 }
 
 interface AgentRunRecordBackend {
@@ -457,8 +514,23 @@ class IndexedDbAgentRunBackend implements AgentRunRecordBackend {
   async put(record: StoredAgentRunRecord): Promise<void> {
     const database = await this.open();
     const transaction = database.transaction(STORE_NAME, "readwrite");
-    transaction.objectStore(STORE_NAME).put(record);
-    await transactionToPromise(transaction);
+    const store = transaction.objectStore(STORE_NAME);
+    const completion = transactionToPromise(transaction);
+    const evidence = draftEvidence(record);
+    if (evidence) {
+      const request = store.get(evidence.runId);
+      request.onsuccess = () => {
+        try {
+          store.put(mergeDraftEvidence(evidence, request.result));
+          store.put(record);
+        } catch {
+          transaction.abort();
+        }
+      };
+    } else {
+      store.put(record);
+    }
+    await completion;
   }
 
   async get(runId: string): Promise<unknown> {
@@ -503,9 +575,18 @@ class IndexedDbAgentRunBackend implements AgentRunRecordBackend {
 }
 
 class MemoryAgentRunBackend implements AgentRunRecordBackend {
-  private readonly records = new Map<string, StoredAgentRunRecord>();
+  private readonly records = new Map<
+    string,
+    StoredAgentRunRecord | DraftJournalEvidence
+  >();
 
   async put(record: StoredAgentRunRecord): Promise<void> {
+    const evidence = draftEvidence(record);
+    if (evidence)
+      this.records.set(
+        evidence.runId,
+        mergeDraftEvidence(evidence, this.records.get(evidence.runId)),
+      );
     this.records.set(record.runId, createStoredRecord(record.run));
   }
 
@@ -607,6 +688,57 @@ class BrowserAgentRunPersistence implements AgentRunPersistence {
       .filter((run): run is AgentRun => Boolean(run))
       .filter((run) => !sessionId || run.sessionId === sessionId)
       .sort((left, right) => right.updatedAt - left.updatedAt);
+  }
+
+  async readDraftHistory(
+    baseRunId: string,
+    sessionId: string,
+  ): Promise<{ runs: AgentRun[]; hasEvidence: boolean }> {
+    let values: unknown[];
+    try {
+      values = await (this.persistent ?? this.memory).getAll();
+    } catch {
+      this.downgrade("indexeddb_operation_failed");
+      throw new Error("Workspace draft history could not be verified");
+    }
+    const matches = (id: unknown) =>
+      typeof id === "string" &&
+      (id === baseRunId || id.startsWith(`${baseRunId}-a`));
+    const records = values.filter((value) => {
+      if (!value || typeof value !== "object") return false;
+      const record = value as Partial<StoredAgentRunRecord>;
+      return matches(record.runId) || matches(record.run?.id);
+    });
+    const runs = records.map((value) => {
+      const run = parseStoredAgentRun(value);
+      if (!run || run.sessionId !== sessionId)
+        throw new Error("Invalid workspace draft attempt history");
+      return run;
+    });
+    const evidenceId = `ui-draft-journal:${baseRunId}`;
+    const rawEvidence = values.find(
+      (value) =>
+        !!value &&
+        typeof value === "object" &&
+        (value as { runId?: unknown }).runId === evidenceId,
+    );
+    if (rawEvidence) {
+      const evidence = mergeDraftEvidence(
+        {
+          kind: "ui-draft-journal",
+          runId: evidenceId,
+          baseRunId,
+          sessionId,
+          highestAttempt: 1,
+        },
+        rawEvidence,
+      );
+      if (evidence.highestAttempt !== runs.length)
+        throw new Error("Workspace draft attempts are missing");
+    }
+    // Marker-free pre-upgrade chains remain readable. Only a subsequent save
+    // under the caller's session lock establishes durable high-water evidence.
+    return { runs, hasEvidence: !!rawEvidence };
   }
 
   async remove(runId: string): Promise<void> {

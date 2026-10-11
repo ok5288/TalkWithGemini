@@ -1,3 +1,5 @@
+import { projectUiBlock, projectUiText } from "@/lib/intelligentUi/projection";
+import { INTELLIGENT_UI_PROMPT_MARKER } from "@/lib/intelligentUi/prompt";
 import {
   getTemporarySessionSignal,
   isTemporarySessionId,
@@ -30,9 +32,10 @@ import {
 } from "@/types";
 import { useSettingsStore, getTaskModel } from "@/store/core/settingsStore";
 import { useCoreSettingsStore } from "@/store/core/coreSettingsStore";
+import { captureToolResultView } from "@/lib/intelligentUi/toolResults/adapters";
 import { v7 as uuidv7 } from "uuid";
 import { executePluginFunction } from "@/utils/pluginUtils";
-import { getEnabledPluginFunctions } from "@/lib/plugin/resolve";
+import { getModelCallablePluginFunctions } from "@/lib/plugin/resolve";
 import { getPluginFunctionInvocationPolicy } from "@/lib/plugin/risk";
 import type {
   PluginFunction,
@@ -101,7 +104,11 @@ import {
   hydrateDirectProviderImageFiles,
   shouldUseDirectCall,
 } from "./chat/transport";
-import { ATTACHMENT_LIMITS, PLUGIN_EXECUTION_LIMITS } from "@/config/limits";
+import {
+  API_INPUT_LIMITS,
+  ATTACHMENT_LIMITS,
+  PLUGIN_EXECUTION_LIMITS,
+} from "@/config/limits";
 import {
   collectBuiltinTools,
   consumeBuiltinResearchSourceBodies,
@@ -130,7 +137,10 @@ import {
   createBuiltinSearchAggregator,
 } from "./chat/builtinResultAggregators";
 import { mapWithConcurrencyGroups } from "@/lib/utils/concurrency";
-import { boundHistoryForRequest } from "@/lib/chat/requestContextBudget";
+import {
+  boundHistoryForRequest,
+  ContextBudgetExceededError,
+} from "@/lib/chat/requestContextBudget";
 import { prepareResearchResultHistory } from "./chat/researchResultHistory";
 import type { StructuredResponseFormat } from "@/lib/chat/responseFormat";
 import {
@@ -418,6 +428,10 @@ export class ResearchStartRequiredError extends Error {
 }
 
 export interface StreamChatResponseOptions {
+  /** Host-only final authorization, never part of serialized request payloads. */
+  beforeDispatch?: () => Promise<void>;
+  /** Host-frozen UI context for this request only, including compressed sources. */
+  intelligentUiSource?: { messageId: string; blockId: string; content: string };
   executionWorkflow?: ChatExecutionWorkflow;
   /** Unaugmented user request used when Auto restarts as isolated Research. */
   researchLaunchMessage?: string;
@@ -677,6 +691,14 @@ export const streamChatResponse = async (
 
   let effectiveNewMessage = newMessage;
   const { search } = useSettingsStore.getState();
+  const { language } = useCoreSettingsStore.getState();
+  let projectionLocale: string = language;
+  if (language === "auto") {
+    projectionLocale =
+      typeof document === "undefined"
+        ? "en"
+        : document.documentElement.lang || "en";
+  }
   const searchConfig =
     search.provider === "google" ? undefined : search.configs[search.provider];
   const searchCompatibility = resolveEffectiveSearchCapability({
@@ -687,6 +709,10 @@ export const streamChatResponse = async (
   });
   const outputBlockBuilder = createMessageOutputBlockBuilder({
     initialBlocks: options?.initialOutputBlocks,
+    enableIntelligentUi:
+      !researchPhase &&
+      useSettingsStore.getState().system.enableIntelligentUi !== false &&
+      Boolean(userSystemInstruction?.includes(INTELLIGENT_UI_PROMPT_MARKER)),
   });
   if (options?.resumeLongTextBlockId) {
     outputBlockBuilder.resumeLongTextCapture(options.resumeLongTextBlockId);
@@ -735,7 +761,15 @@ export const streamChatResponse = async (
       newMessage,
       attachments,
       signal,
-      generate: streamGenerateContent,
+      beforeDispatch: options?.beforeDispatch,
+      generate: (model, prompt, onText, signal) =>
+        streamGenerateContent(
+          model,
+          prompt,
+          onText,
+          signal,
+          options?.beforeDispatch,
+        ),
       onSearchStatus,
       upsertSearchBlock: outputBlockBuilder.upsertSearch,
       emitOutputBlocks,
@@ -861,7 +895,7 @@ export const streamChatResponse = async (
     const candidates = effectiveActivePlugins.flatMap((pluginId) => {
       const plugin = installedPlugins.find((item) => item.id === pluginId);
       if (!plugin) return [];
-      return getEnabledPluginFunctions(plugin, pluginConfigs[pluginId])
+      return getModelCallablePluginFunctions(plugin, pluginConfigs[pluginId])
         .map((functionDef) => ({ plugin, functionDef }))
         .filter(({ plugin: candidatePlugin, functionDef }) => {
           if (!restrictToolEffects) return true;
@@ -1079,12 +1113,29 @@ export const streamChatResponse = async (
         forcedToolDirective,
       )
     : workflowSystemInstruction;
-  const effectiveSystemInstruction = automaticModeEnabled
+  let effectiveSystemInstruction = automaticModeEnabled
     ? appendAgentSystemInstruction(
         workflowWithForcedTools,
         AUTO_MODE_SYSTEM_INSTRUCTION,
       )
     : workflowWithForcedTools;
+
+  if (
+    !researchModeEnabled &&
+    useSettingsStore.getState().system.enableIntelligentUi &&
+    effectiveSystemInstruction?.includes(INTELLIGENT_UI_PROMPT_MARKER)
+  ) {
+    const { buildActiveUiSourcePrompt } =
+      await import("@/lib/intelligentUi/sourceContext");
+    const sourcePrompt = await buildActiveUiSourcePrompt(sessionId).catch(
+      () => "",
+    );
+    if (sourcePrompt)
+      effectiveSystemInstruction = appendAgentSystemInstruction(
+        effectiveSystemInstruction,
+        sourcePrompt,
+      );
+  }
 
   if (agentRun) {
     const lease = acquireAgentRunLease({ sessionId, runId: agentRun.id });
@@ -1139,10 +1190,87 @@ export const streamChatResponse = async (
     };
     let committedContent = "";
     let committedReasoning = "";
+    const uiSource = options?.intelligentUiSource;
     let requestHistory =
       researchPhase === "start" || researchPhase === "plan"
         ? []
-        : await stripMessagesDisplayCacheForModel(history as Message[]);
+        : await stripMessagesDisplayCacheForModel(
+            await Promise.all(
+              history.map(async (message) => {
+                if (message.role !== "model") return message;
+                const hasUiBlocks = message.outputBlocks?.some(
+                  (block) => block.type === "intelligent_ui",
+                );
+                const outputBlocks = await Promise.all(
+                  (message.outputBlocks ?? []).map(async (block) => {
+                    if (block.type === "intelligent_ui") {
+                      // The requesting block belongs to current mandatory context,
+                      // so history trimming cannot lose or duplicate its snapshot.
+                      if (
+                        uiSource?.messageId === message.id &&
+                        uiSource.blockId === block.id
+                      )
+                        return {
+                          id: block.id,
+                          type: "text" as const,
+                          content: "",
+                        };
+                      const { resolveBlockUiProjectionData } =
+                        await import("@/lib/intelligentUi/sourceContext");
+                      const data = await resolveBlockUiProjectionData(
+                        block,
+                        sessionId,
+                        message.id,
+                        "model-continuation",
+                      ).catch(() => ({ sourceSummary: [] }));
+                      return {
+                        id: block.id,
+                        type: "text" as const,
+                        content: projectUiBlock(block, {
+                          purpose: "model-continuation",
+                          locale: projectionLocale,
+                          ...data,
+                        }),
+                      };
+                    }
+                    if (block.type === "text" && !block.presentation)
+                      return {
+                        ...block,
+                        content: projectUiText(block.content, {
+                          purpose: "model-continuation",
+                          locale: projectionLocale,
+                        }),
+                      };
+                    return block;
+                  }),
+                );
+                return {
+                  ...message,
+                  // The API schema and provider adapters consume content, not
+                  // outputBlocks. Use persisted state in transcript order.
+                  content: hasUiBlocks
+                    ? outputBlocks
+                        .filter((block) => block.type === "text")
+                        .map((block) => block.content)
+                        .filter(Boolean)
+                        .join("\n\n")
+                    : projectUiText(message.content, {
+                        purpose: "model-continuation",
+                        locale: projectionLocale,
+                      }),
+                  ...(message.outputBlocks ? { outputBlocks } : {}),
+                };
+              }),
+            ),
+          );
+    const withUiSource = (message: string) => {
+      if (!uiSource) return message;
+      const combined = `${message}\n\nInteractive interface context (host-reported data):\n${uiSource.content}`;
+      // Required context is never silently clipped by the input helper.
+      if (combined.length > API_INPUT_LIMITS.maxChatTextChars)
+        throw new ContextBudgetExceededError();
+      return combined;
+    };
     const messageWithSkills = researchModeEnabled
       ? effectiveNewMessage
       : skillsContext?.trim()
@@ -1269,7 +1397,13 @@ export const streamChatResponse = async (
         defaultPromptOptimizationModel: getTaskModel("promptOptimization"),
         availableModels,
         generate: (planningModel, prompt) =>
-          streamGenerateContent(planningModel, prompt, () => {}, signal),
+          streamGenerateContent(
+            planningModel,
+            prompt,
+            () => {},
+            signal,
+            options?.beforeDispatch,
+          ),
       });
       requestConfig = { ...requestConfig, ...imageOptions };
     }
@@ -1284,7 +1418,7 @@ export const streamChatResponse = async (
     ) {
       assertForcedPluginsCalled();
       boundHistoryForRequest([], {
-        newMessage: requestMessage,
+        newMessage: withUiSource(requestMessage),
         attachments: requestAttachments,
         systemInstruction: effectiveSystemInstruction,
         tools,
@@ -1299,12 +1433,13 @@ export const streamChatResponse = async (
       try {
         const result = await generateImage(
           model,
-          requestMessage,
+          withUiSource(requestMessage),
           {
             imageCount: requestConfig.imageCount,
             attachments: requestAttachments,
           },
           signal,
+          options?.beforeDispatch,
         );
         images = result.images;
         message = result.message;
@@ -1386,8 +1521,9 @@ export const streamChatResponse = async (
     };
 
     const runRound = async (): Promise<ChatStreamRoundResult> => {
+      const roundRequestMessage = withUiSource(requestMessage);
       const boundedRequestHistory = boundHistoryForRequest(requestHistory, {
-        newMessage: requestMessage,
+        newMessage: roundRequestMessage,
         attachments: requestAttachments,
         modelInputTokenLimit: selectedModelMetadata?.limit?.context,
         reservedOutputTokens: selectedModelMetadata?.limit?.output,
@@ -1397,7 +1533,7 @@ export const streamChatResponse = async (
       const requestPayload = {
         modelName,
         history: boundedRequestHistory,
-        newMessage: requestMessage,
+        newMessage: roundRequestMessage,
         attachments: requestAttachments,
         config: requestConfig,
         systemInstruction: effectiveSystemInstruction,
@@ -1558,6 +1694,7 @@ export const streamChatResponse = async (
             throw createChatStreamEventError(parsed);
 
           case "done":
+            if (outputBlockBuilder.finalizeIntelligentUi()) emitOutputBlocks();
             if (outputBlockBuilder.finalizeActiveReasoning()) {
               emitOutputBlocks();
             }
@@ -1599,8 +1736,10 @@ export const streamChatResponse = async (
             { signal },
           );
 
+          await options?.beforeDispatch?.();
           await runChatStream({
             ...requestPayload,
+            beforeDispatch: options?.beforeDispatch,
             history: directImages.history,
             attachments: directImages.attachments,
             provider: directProvider,
@@ -1649,12 +1788,16 @@ export const streamChatResponse = async (
           },
           { signal },
         );
-        return signedApiFetch("/api/chat", {
-          method: "POST",
-          headers: request.headers,
-          body: request.body,
-          signal,
-        });
+        return signedApiFetch(
+          "/api/chat",
+          {
+            method: "POST",
+            headers: request.headers,
+            body: request.body,
+            signal,
+          },
+          options?.beforeDispatch,
+        );
       });
 
       const contentType = response.headers.get("content-type");
@@ -2616,6 +2759,7 @@ export const streamChatResponse = async (
                   },
                 };
               } else {
+                await options?.beforeDispatch?.();
                 resultData = builtinBinding
                   ? await builtinBinding.execute(toolCall.args, {
                       signal,
@@ -2750,6 +2894,7 @@ export const streamChatResponse = async (
               ? undefined
               : offeredPluginFunctionsByName.get(toolCall.name)?.functionDef
                   .outputSchema;
+            let outputSchemaValidated = false;
             if (outputSchema) {
               const preliminaryEnvelope = normalizeToolResultEnvelope(
                 resultData,
@@ -2772,6 +2917,7 @@ export const streamChatResponse = async (
                   outputSchema,
                   record?.structuredContent ?? resultData,
                 );
+                outputSchemaValidated = outputValidation.ok;
                 if (!outputValidation.ok) {
                   resultData = {
                     ok: false,
@@ -3017,6 +3163,19 @@ export const streamChatResponse = async (
               status: isError ? "error" : "success",
               isError,
               result: storedResultData,
+              intelligentUiResult: !isError
+                ? ((await captureToolResultView({
+                    callId: toolCall.id,
+                    toolName: toolCall.name,
+                    pluginId: toolCall.pluginId,
+                    executionId: toolCall.executionRecordId,
+                    definitionFingerprint: toolCall.functionFingerprint,
+                    retrievedAt: endedAt,
+                    result: storedResultData,
+                    outputSchema,
+                    outputSchemaValidated,
+                  }).catch(() => undefined)) ?? undefined)
+                : undefined,
               endedAt,
               durationMs: toolCall.startedAt
                 ? Math.max(0, endedAt - toolCall.startedAt)
@@ -3254,7 +3413,10 @@ export const streamChatResponse = async (
         {
           id: uuidv7(),
           role: "model",
-          content: result.content,
+          content: projectUiText(result.content, {
+            purpose: "model-continuation",
+            locale: projectionLocale,
+          }),
           reasoning: result.reasoning,
           toolCalls: executedToolCalls,
           timestamp: Date.now(),
@@ -3290,10 +3452,12 @@ export const streamChatResponse = async (
       requestAttachments = roundPluginImages;
     }
 
+    if (outputBlockBuilder.finalizeIntelligentUi()) emitOutputBlocks();
     assertForcedPluginsCalled();
     await completeAgentRun();
     return committedContent;
   } catch (error) {
+    if (outputBlockBuilder.finalizeIntelligentUi(true)) emitOutputBlocks();
     if (
       agentRun &&
       agentRun.status !== "completed" &&

@@ -3,6 +3,7 @@
   "errSaveStopped": "Couldn't save the stopped response. Please try again.",
   "errRegenerate": "Couldn't regenerate this reply. Previous prompt is missing.",
   "errModelUnavailable": "That model is no longer available. Choose another model to regenerate.",
+  "intelligentUiAuthorizationExpired": "Intelligent UI authorization expired. Prepare and confirm a new request.",
   "errSkillParameters": "Check the required skill parameters and try again.",
   "errRecordedSkillChanged": "This reply used a skill version that is no longer available. Restore that skill version before regenerating.",
   "skillsSkipped": "Skipped {count} automatically selected skill(s) because required parameters were missing.",

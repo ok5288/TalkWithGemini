@@ -10,6 +10,7 @@ const mockStore = vi.hoisted(() => ({
   state: {
     installedPlugins: [] as Plugin[],
     pluginConfigs: {},
+    system: {},
   },
 }));
 
@@ -53,6 +54,7 @@ describe("plugin execution utility", () => {
     mockStore.state = {
       installedPlugins: [plugin],
       pluginConfigs: {},
+      system: {},
     };
   });
 
@@ -111,6 +113,7 @@ describe("plugin execution utility", () => {
         },
       ],
       pluginConfigs: {},
+      system: {},
     };
     vi.stubGlobal(
       "fetch",
@@ -140,9 +143,11 @@ describe("plugin execution utility", () => {
               ...plugin.functions[0],
               method: undefined,
               mcpToolName: "lookup",
+              mcpVisibility: ["model", "app"],
             },
           ],
           mcp: {
+            toolMetadataVersion: 1,
             transport: "streamable-http",
             serverUrl: "https://mcp.example.com/mcp",
             serverName: "Example MCP",
@@ -150,6 +155,7 @@ describe("plugin execution utility", () => {
         },
       ],
       pluginConfigs: {},
+      system: {},
     };
     vi.stubGlobal(
       "fetch",
@@ -200,6 +206,7 @@ describe("plugin execution utility", () => {
     mockStore.state = {
       installedPlugins: [plugin, duplicatePlugin],
       pluginConfigs: {},
+      system: {},
     };
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
@@ -234,6 +241,7 @@ describe("plugin execution utility", () => {
         },
       ],
       pluginConfigs: {},
+      system: {},
     };
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
@@ -329,6 +337,7 @@ describe("plugin execution utility", () => {
   it("passes saved plugin model defaults to backend execution", async () => {
     mockStore.state = {
       installedPlugins: [plugin],
+      system: {},
       pluginConfigs: {
         [plugin.id]: {
           model: "provider-image-model",
@@ -362,6 +371,7 @@ describe("plugin execution utility", () => {
     mockStore.state = {
       installedPlugins: [AGNES_VIDEO_PLUGIN],
       pluginConfigs: {},
+      system: {},
     };
     const fetchMock = vi.fn().mockResolvedValueOnce(
       new Response(

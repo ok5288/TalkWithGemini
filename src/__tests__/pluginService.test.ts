@@ -1,9 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { DEFAULT_SYSTEM_SETTINGS } from "../config/defaults";
+import type { SystemSettings } from "../lib/settings/types";
 import type { Plugin } from "../types";
 
 const encryptSecretMock = vi.hoisted(() => vi.fn());
 const storeMock = vi.hoisted(() => ({
   state: {} as {
+    system: SystemSettings;
     marketPlugins: Plugin[];
     marketPluginsTimestamp: number;
     marketMcpServers: Plugin[];
@@ -77,6 +80,7 @@ describe("plugin market service cache", () => {
     vi.resetModules();
     encryptSecretMock.mockReset();
     storeMock.state = {
+      system: { ...DEFAULT_SYSTEM_SETTINGS },
       marketPlugins: [],
       marketPluginsTimestamp: 0,
       marketMcpServers: [],
@@ -94,8 +98,41 @@ describe("plugin market service cache", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
     vi.useRealTimers();
   });
+
+  it.each([
+    [true, true, "https://sandbox.example", true],
+    [true, true, "", false],
+    [true, false, "https://sandbox.example", false],
+    [false, true, "https://sandbox.example", false],
+  ] as const)(
+    "negotiates MCP Apps discovery only under both toggles and valid deployment (%j, %j, %j)",
+    async (enabled, intelligent, origin, expected) => {
+      storeMock.state.system = {
+        ...DEFAULT_SYSTEM_SETTINGS,
+        enableMcpApps: enabled,
+        enableIntelligentUi: intelligent,
+      };
+      vi.stubEnv("NEXT_PUBLIC_MCP_APPS_SANDBOX_ORIGIN", origin);
+      const plugin: Plugin = {
+        ...pluginA,
+        source: "mcp",
+        mcp: {
+          serverUrl: "https://mcp.example/mcp",
+          serverName: "test",
+          transport: "streamable-http",
+        },
+      };
+      const fetchMock = vi.fn(async () => jsonResponse({ plugin }));
+      vi.stubGlobal("fetch", fetchMock);
+      const { installPlugin } = await import("../services/api/pluginService");
+      await installPlugin(plugin);
+      const payload = JSON.parse(String(getFetchCalls(fetchMock)[0][1]?.body));
+      expect(payload.enableMcpApps).toBe(expected ? true : undefined);
+    },
+  );
 
   it("returns valid cached plugins without fetching", async () => {
     storeMock.state.marketPlugins = [pluginA];

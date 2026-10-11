@@ -97,6 +97,8 @@ export async function publishSessionShare(
     sessionId: string;
     expiresIn?: ShareExpiry;
     signal?: AbortSignal;
+    /** Host-only authority guard, never serialized into the share. */
+    beforeDispatch?: () => Promise<void>;
   },
 ): Promise<ShareMetadata> {
   return runWithAppDataWriteLock(() =>
@@ -180,6 +182,7 @@ export async function publishSessionShare(
       binding.pending = pending;
       await appDb.setItem(bindingKey(input.sessionId), binding);
       try {
+        input.signal?.throwIfAborted();
         const isCreate = pending.expectedRevision === 0;
         const response = await signedApiFetch(
           isCreate ? "/api/shares" : `/api/shares/${binding.id}`,
@@ -193,6 +196,7 @@ export async function publishSessionShare(
             cache: "no-store",
             signal: input.signal,
           },
+          input.beforeDispatch,
         );
         const metadata = await readShareResponse<ShareMetadata>(response);
         await appDb.setItem(bindingKey(input.sessionId), {

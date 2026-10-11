@@ -4,7 +4,7 @@ import type {
   ResearchTask,
 } from "@/lib/research/types";
 import { createPluginFunctionFingerprint } from "../confirmation";
-import { getEnabledPluginFunctions } from "../resolve";
+import { getModelCallablePluginFunctions } from "../resolve";
 import { getResearchExtensionRepository } from "@/services/research/extensionRepository";
 import { isResearchSourceProvider, RESEARCH_SOURCE_FUNCTIONS } from "./catalog";
 
@@ -31,7 +31,10 @@ export async function freezeResearchSourceContracts(
     );
   const next: ResearchSourceContracts = {};
   for (const plugin of providers)
-    for (const fn of getEnabledPluginFunctions(plugin, configs[plugin.id])) {
+    for (const fn of getModelCallablePluginFunctions(
+      plugin,
+      configs[plugin.id],
+    )) {
       if (snapshot.toolIds.includes(fn.name))
         next[fn.name] = {
           pluginId: plugin.id,
@@ -97,7 +100,9 @@ export async function assertFrozenResearchSourceContracts(
     )
       continue;
     const plugin = plugins.find((p) => p.id === contract.pluginId);
-    const fn = plugin?.functions.find((f) => f.name === name);
+    const fn =
+      plugin &&
+      getModelCallablePluginFunctions(plugin).find((f) => f.name === name);
     if (
       !plugin ||
       !fn ||

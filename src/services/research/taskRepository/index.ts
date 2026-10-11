@@ -4,7 +4,10 @@ export {
   parseStoredResearchTask,
   toPersistedResearchTask,
 } from "./persistedTask";
-export { createResearchTaskRepository } from "./repository";
+export {
+  createResearchTaskRepository,
+  subscribeResearchTasks,
+} from "./repository";
 export type {
   CreateResearchTaskRepositoryOptions,
   ResearchTaskRepository,

@@ -116,5 +116,7 @@
   "prevPageAria": "转到上一页插件",
   "nextPageAria": "转到下一页插件",
   "pageCurrent": "第 {currentPage} 页",
-  "pageOf": "第 {currentPage} / {totalPages} 页"
+  "pageOf": "第 {currentPage} / {totalPages} 页",
+  "mcpToolRefreshRequired": "请刷新工具定义，再允许此 MCP 服务器向模型提供工具。",
+  "refreshMcpToolDefinition": "刷新工具定义"
 }

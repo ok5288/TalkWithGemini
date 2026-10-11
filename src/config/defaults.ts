@@ -76,6 +76,8 @@ export const DEFAULT_SYSTEM_SETTINGS = {
   imageCompressionMaxWidthOrHeight: 1024,
   enableCodeCollapse: false,
   enableHtmlVisualPrompt: true,
+  enableIntelligentUi: true,
+  enableMcpApps: false,
   enableDestructiveToolConfirmation: true,
   fontSize: "medium",
   chatLayout: "document",

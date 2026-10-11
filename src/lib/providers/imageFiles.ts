@@ -126,8 +126,10 @@ export async function uploadOpenAIImageFiles(
   history: Message[],
   attachments: ProviderImageAttachment[],
   signal?: AbortSignal,
+  beforeDispatch?: () => Promise<void>,
 ): Promise<PreparedProviderImageFiles> {
   return prepareProviderImageFiles(history, attachments, async (attachment) => {
+    await beforeDispatch?.();
     const uploaded = await client.files.create(
       {
         file: attachment.file,
@@ -148,8 +150,10 @@ export async function uploadGoogleImageFiles(
   history: Message[],
   attachments: ProviderImageAttachment[],
   signal?: AbortSignal,
+  beforeDispatch?: () => Promise<void>,
 ): Promise<PreparedProviderImageFiles> {
   return prepareProviderImageFiles(history, attachments, async (attachment) => {
+    await beforeDispatch?.();
     const uploaded = await client.files.upload({
       file: attachment.file,
       config: {
@@ -173,8 +177,10 @@ export async function uploadAnthropicImageFiles(
   history: Message[],
   attachments: ProviderImageAttachment[],
   signal?: AbortSignal,
+  beforeDispatch?: () => Promise<void>,
 ): Promise<PreparedProviderImageFiles> {
   return prepareProviderImageFiles(history, attachments, async (attachment) => {
+    await beforeDispatch?.();
     const uploaded = await client.beta.files.upload(
       {
         file: attachment.file,

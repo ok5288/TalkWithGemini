@@ -1,5 +1,7 @@
 "use client";
 import dynamic from "next/dynamic";
+import UiSendConfirmationDialog from "@/components/content/intelligentUi/UiSendConfirmationDialog";
+import { UiChatContext } from "@/components/content/intelligentUi/UiChatContext";
 import {
   endTemporarySession,
   isTemporarySessionId,
@@ -27,6 +29,11 @@ import { Message, LobeAgent, SessionMessageTree, ToolCall } from "@/types";
 import { useChatStore } from "@/store/core/chatStore";
 import { useAgentRunStore } from "@/store/core/agentRunStore";
 import { appDb } from "@/store/storage/storageConfig";
+import {
+  flushSessionMessageWrites,
+  waitForSessionMessageWrites,
+} from "@/store/sessionMessagePersistence";
+import { createSessionCreationGate } from "@/lib/chat/sessionCreationGate";
 import { formatModelName } from "@/store/core/settingsStore";
 import { buildAvailableModels } from "@/lib/utils/models";
 import {
@@ -601,8 +608,18 @@ const ChatApp = () => {
 
   useEffect(() => {
     const flushCheckpoint = () => {
-      activeStreamRenderRef.current?.flush();
-      void activeStreamCheckpointRef.current?.flush();
+      // Lifecycle delivery is best effort. Drain after checkpointing, including
+      // when the checkpoint fails, so its queued writes are covered as well.
+      void (async () => {
+        try {
+          activeStreamRenderRef.current?.flush();
+          await activeStreamCheckpointRef.current?.flush();
+        } finally {
+          await flushSessionMessageWrites();
+        }
+      })().catch((error) => {
+        logChatAppError("Lifecycle message persistence failed:", error);
+      });
     };
     const handleVisibilityChange = () => {
       if (document.visibilityState === "hidden") flushCheckpoint();
@@ -621,6 +638,7 @@ const ChatApp = () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("pagehide", handlePageHide);
       useChatStore.getState().discardTemporarySession();
+      flushCheckpoint();
     };
   }, [abortBackgroundPostProcessing, abortManualCompression]);
 
@@ -849,7 +867,14 @@ const ChatApp = () => {
     skillBundleParameterValuesRef,
   };
 
-  const { handleSendMessage } = useSendMessageFlow(chatFlowDeps);
+  const {
+    handleSendMessage,
+    handleUiSendMessage,
+    prepareComposerSend,
+    uiSendProposal,
+    confirmUiSend,
+    cancelUiSend,
+  } = useSendMessageFlow(chatFlowDeps);
 
   const {
     handleRegenerate,
@@ -858,82 +883,103 @@ const ChatApp = () => {
     handleVersionSelect,
   } = useResponseBranchFlow(chatFlowDeps);
 
+  const [sessionCreationGate] = useState(() =>
+    createSessionCreationGate({
+      selection: () => useChatStore.getState(),
+      subscribe: (listener) => useChatStore.subscribe(listener),
+      waitForWrites: waitForSessionMessageWrites,
+    }),
+  );
+  useEffect(() => () => sessionCreationGate.cancel(), [sessionCreationGate]);
+  const showSessionCreationError = (error: unknown) => {
+    logChatAppError("Failed to save before creating session", error);
+    showActionError(t("errSaveChanges"));
+  };
+
   const handleAssistantSelect = async (agent: LobeAgent) => {
-    const requestId = assistantSelectRequestRef.current + 1;
-    assistantSelectRequestRef.current = requestId;
-
-    if (isGenerating) {
-      await stopActiveGenerationWithFeedback();
-    }
-
-    if (viewMode === "assistants") {
-      navigateToPanel("chat");
-    }
-
-    let instruction = agent.meta.systemRole;
-    let profile = agent.profile;
-
-    if (!instruction && !agent.isCustom) {
-      try {
-        const detail = await getAgentDetail(agent.identifier, locale);
-        if (requestId !== assistantSelectRequestRef.current) return;
-        instruction = detail.config?.systemRole;
-        profile = detail.profile || profile;
-      } catch (e) {
-        if (requestId !== assistantSelectRequestRef.current) return;
-        logChatAppError("Failed to fetch agent details for instruction", e);
-      }
-    }
-
-    if (requestId !== assistantSelectRequestRef.current) return;
-
-    if (!instruction) {
-      instruction = `You are ${agent.meta.title}. ${agent.meta.description}`;
-    }
-
-    const profileConfig = createProfileSessionConfig(agent.identifier, profile);
-    if (
-      profile?.runtime.preferredModel &&
-      availableModels.some(
-        (candidate) => candidate.name === profile.runtime.preferredModel,
-      )
-    ) {
-      setModel(profile.runtime.preferredModel);
-    }
-    if (profileConfig) {
-      setChatConfig({
-        chatMode: profileConfig.chatMode,
-        useAgentMode: profileConfig.useAgentMode,
-        ...(profileConfig.useSearch !== undefined
-          ? { useSearch: profileConfig.useSearch }
-          : {}),
-        ...(profileConfig.reasoningMode
-          ? {
-              reasoningMode: profileConfig.reasoningMode,
-              useReasoning: profileConfig.useReasoning,
-            }
-          : {}),
-      });
-    }
-
-    if (currentSessionId) {
-      const session = getCurrentSession();
-      if (
-        session &&
-        session.messageCount === 0 &&
-        session.title === "New Chat"
-      ) {
-        updateSessionInstruction(currentSessionId, instruction);
-        updateSessionTitle(currentSessionId, agent.meta.title);
-        if (profileConfig) {
-          updateSessionConfig(currentSessionId, profileConfig);
+    const requestId = ++assistantSelectRequestRef.current;
+    await sessionCreationGate.run(
+      async () => {
+        if (isGenerating) await stopActiveGenerationWithFeedback();
+        let instruction = agent.meta.systemRole;
+        let profile = agent.profile;
+        if (!instruction && !agent.isCustom) {
+          try {
+            const detail = await getAgentDetail(agent.identifier, locale);
+            instruction = detail.config?.systemRole;
+            profile = detail.profile || profile;
+          } catch (error) {
+            logChatAppError(
+              "Failed to fetch agent details for instruction",
+              error,
+            );
+          }
         }
-        return;
-      }
-    }
+        return { instruction, profile };
+      },
+      ({ instruction, profile }) => {
+        if (requestId !== assistantSelectRequestRef.current) return;
+        if (viewMode === "assistants") navigateToPanel("chat");
+        if (!instruction) {
+          instruction = `You are ${agent.meta.title}. ${agent.meta.description}`;
+        }
 
-    abortBackgroundPostProcessing();
-    createSession(instruction, agent.meta.title, undefined, [], profileConfig);
+        const profileConfig = createProfileSessionConfig(
+          agent.identifier,
+          profile,
+        );
+        if (
+          profile?.runtime.preferredModel &&
+          availableModels.some(
+            (candidate) => candidate.name === profile.runtime.preferredModel,
+          )
+        ) {
+          setModel(profile.runtime.preferredModel);
+        }
+        if (profileConfig) {
+          setChatConfig({
+            chatMode: profileConfig.chatMode,
+            useAgentMode: profileConfig.useAgentMode,
+            ...(profileConfig.useSearch !== undefined
+              ? { useSearch: profileConfig.useSearch }
+              : {}),
+            ...(profileConfig.reasoningMode
+              ? {
+                  reasoningMode: profileConfig.reasoningMode,
+                  useReasoning: profileConfig.useReasoning,
+                }
+              : {}),
+          });
+        }
+
+        const activeSessionId = useChatStore.getState().currentSessionId;
+        if (activeSessionId) {
+          const session = getCurrentSession();
+          if (
+            session &&
+            session.messageCount === 0 &&
+            session.title === "New Chat"
+          ) {
+            updateSessionInstruction(activeSessionId, instruction);
+            updateSessionTitle(activeSessionId, agent.meta.title);
+            if (profileConfig) {
+              updateSessionConfig(activeSessionId, profileConfig);
+            }
+            return;
+          }
+        }
+
+        abortBackgroundPostProcessing();
+        createSession(
+          instruction,
+          agent.meta.title,
+          undefined,
+          [],
+          profileConfig,
+        );
+      },
+      showSessionCreationError,
+    );
   };
 
   const {
@@ -1036,42 +1082,60 @@ const ChatApp = () => {
   };
 
   const handleNewChat = async () => {
-    abortBackgroundPostProcessing();
-    if (isGenerating) {
-      await stopActiveGenerationWithFeedback();
-    }
-
-    createSession();
-    navigateToPanel("chat");
+    await sessionCreationGate.run(
+      async () => {
+        abortBackgroundPostProcessing();
+        if (isGenerating) await stopActiveGenerationWithFeedback();
+      },
+      () => {
+        createSession();
+        navigateToPanel("chat");
+      },
+      showSessionCreationError,
+    );
   };
 
   const handleNewChatInWorkspace = async (workspace: Workspace) => {
-    abortBackgroundPostProcessing();
-    const sessionId = createSession(
-      workspace.systemPrompt,
-      "New Chat",
-      workspace.id,
-      workspace.files,
-      {
-        useSearch: workspace.enableSearch,
-        useReasoning: workspace.enableReasoning,
-        activePlugins: workspace.activePlugins,
-        activeSkills: workspace.activeSkills,
+    await sessionCreationGate.run(
+      async () => {
+        abortBackgroundPostProcessing();
       },
+      () => {
+        createSession(
+          workspace.systemPrompt,
+          "New Chat",
+          workspace.id,
+          workspace.files,
+          {
+            useSearch: workspace.enableSearch,
+            useReasoning: workspace.enableReasoning,
+            activePlugins: workspace.activePlugins,
+            activeSkills: workspace.activeSkills,
+          },
+        );
+        navigateToPanel("chat");
+      },
+      showSessionCreationError,
     );
-    await selectSession(sessionId);
-    navigateToPanel("chat");
   };
 
   const handleStartTemporaryChat = async () => {
-    abortBackgroundPostProcessing();
-    abortManualCompression();
-    if (isGenerating) await stopActiveGenerationWithFeedback();
-    useChatStore.getState().createTemporarySession();
-    navigateToPanel("chat");
+    await sessionCreationGate.run(
+      async () => {
+        abortBackgroundPostProcessing();
+        abortManualCompression();
+        if (isGenerating) await stopActiveGenerationWithFeedback();
+      },
+      () => {
+        useChatStore.getState().createTemporarySession();
+        navigateToPanel("chat");
+      },
+      showSessionCreationError,
+    );
   };
 
   const handleSelectSession = async (sessionId: string) => {
+    sessionCreationGate.cancel();
     abortBackgroundPostProcessing();
     await selectSession(sessionId);
   };
@@ -1154,72 +1218,74 @@ const ChatApp = () => {
       onError={showActionError}
       onNotice={showActionNotice}
     >
-      <ChatAppShell
-        actionError={actionError}
-        actionNotice={actionNotice}
-        sessions={sessions}
-        currentSessionId={currentSessionId}
-        currentSession={currentSession}
-        messages={messages}
-        activeMessageTree={activeMessageTree}
-        isGenerating={isGenerating}
-        isActiveSessionLoading={isActiveSessionLoading}
-        availableModels={availableModels}
-        isModelBootstrapReady={serverModelBootstrapReady}
-        selectedModel={selectedModel}
-        isSearchEnabled={chatConfig.useSearch}
-        viewMode={viewMode}
-        settingsTab={settingsTab}
-        researchTaskId={researchTaskId}
-        isSidebarOpen={isSidebarOpen}
-        isNonDesktopViewport={isNonDesktopViewport}
-        isSidebarDrawerOpen={isSidebarDrawerOpen}
-        mainInertProps={mainInertProps}
-        shouldShowChatTitleBar={shouldShowChatTitleBar}
-        welcomeState={welcomeState}
-        messageInputVariant={messageInputVariant}
-        messagesScrollRef={messagesScrollRef}
-        messageInputRef={messageInputRef}
-        setIsSidebarOpen={setIsSidebarOpen}
-        navigateToPanel={navigateToPanel}
-        handleSettingsTabChange={handleSettingsTabChange}
-        stopActiveGenerationWithFeedback={stopActiveGenerationWithFeedback}
-        selectSession={handleSelectSession}
-        handleNewChat={handleNewChat}
-        handleNewChatInWorkspace={handleNewChatInWorkspace}
-        handleStartTemporaryChat={handleStartTemporaryChat}
-        handleDeleteSession={handleDeleteSession}
-        updateSessionTitle={updateSessionTitle}
-        toggleSessionPin={toggleSessionPin}
-        handleDuplicateSession={handleDuplicateSession}
-        handleSmartRename={handleSmartRename}
-        handleAssistantSelect={handleAssistantSelect}
-        updateSessionInstruction={updateSessionInstruction}
-        handleEditMessage={handleEditMessage}
-        handleDeleteMessage={handleDeleteMessage}
-        handleSubmitUserMessageEdit={handleSubmitUserMessageEdit}
-        handleRetractMessage={handleRetractMessage}
-        handleRegenerate={handleRegenerate}
-        handleContinueGeneration={handleContinueGeneration}
-        handleVersionChange={handleVersionChange}
-        handleVersionSelect={handleVersionSelect}
-        handleSendMessage={handleSendMessage}
-        prepareComposerSkillParameters={(forced) =>
-          prepareComposerSkillParameters(currentSession, selectedModel, [
-            ...(forced?.skillIds || []),
-            ...(forced?.pendingSessionSkillIds || []),
-          ])
-        }
-        handleCompressContext={handleCompressContext}
-        handleSuggestionClick={handleSuggestionClick}
-        handleStopGeneration={handleStopGeneration}
-        setModel={setModel}
-        onToggleSearch={() =>
-          setChatConfig({ useSearch: !chatConfig.useSearch })
-        }
-        pendingToolConfirmations={pendingToolConfirmations}
-        onToolConfirmationDecision={decideToolConfirmation}
-        onRevokeToolSessionApproval={revokeToolSessionApproval}
+      <UiChatContext.Provider value={handleUiSendMessage}>
+        <ChatAppShell
+          actionError={actionError}
+          actionNotice={actionNotice}
+          sessions={sessions}
+          currentSessionId={currentSessionId}
+          currentSession={currentSession}
+          messages={messages}
+          activeMessageTree={activeMessageTree}
+          isGenerating={isGenerating}
+          isActiveSessionLoading={isActiveSessionLoading}
+          availableModels={availableModels}
+          isModelBootstrapReady={serverModelBootstrapReady}
+          selectedModel={selectedModel}
+          isSearchEnabled={chatConfig.useSearch}
+          viewMode={viewMode}
+          settingsTab={settingsTab}
+          researchTaskId={researchTaskId}
+          isSidebarOpen={isSidebarOpen}
+          isNonDesktopViewport={isNonDesktopViewport}
+          isSidebarDrawerOpen={isSidebarDrawerOpen}
+          mainInertProps={mainInertProps}
+          shouldShowChatTitleBar={shouldShowChatTitleBar}
+          welcomeState={welcomeState}
+          messageInputVariant={messageInputVariant}
+          messagesScrollRef={messagesScrollRef}
+          messageInputRef={messageInputRef}
+          setIsSidebarOpen={setIsSidebarOpen}
+          navigateToPanel={navigateToPanel}
+          handleSettingsTabChange={handleSettingsTabChange}
+          stopActiveGenerationWithFeedback={stopActiveGenerationWithFeedback}
+          selectSession={handleSelectSession}
+          handleNewChat={handleNewChat}
+          handleNewChatInWorkspace={handleNewChatInWorkspace}
+          handleStartTemporaryChat={handleStartTemporaryChat}
+          handleDeleteSession={handleDeleteSession}
+          updateSessionTitle={updateSessionTitle}
+          toggleSessionPin={toggleSessionPin}
+          handleDuplicateSession={handleDuplicateSession}
+          handleSmartRename={handleSmartRename}
+          handleAssistantSelect={handleAssistantSelect}
+          updateSessionInstruction={updateSessionInstruction}
+          handleEditMessage={handleEditMessage}
+          handleDeleteMessage={handleDeleteMessage}
+          handleSubmitUserMessageEdit={handleSubmitUserMessageEdit}
+          handleRetractMessage={handleRetractMessage}
+          handleRegenerate={handleRegenerate}
+          handleContinueGeneration={handleContinueGeneration}
+          handleVersionChange={handleVersionChange}
+          handleVersionSelect={handleVersionSelect}
+          handleSendMessage={handleSendMessage}
+          prepareComposerSkillParameters={prepareComposerSend}
+          handleCompressContext={handleCompressContext}
+          handleSuggestionClick={handleSuggestionClick}
+          handleStopGeneration={handleStopGeneration}
+          setModel={setModel}
+          onToggleSearch={() =>
+            setChatConfig({ useSearch: !chatConfig.useSearch })
+          }
+          pendingToolConfirmations={pendingToolConfirmations}
+          onToolConfirmationDecision={decideToolConfirmation}
+          onRevokeToolSessionApproval={revokeToolSessionApproval}
+        />
+      </UiChatContext.Provider>
+      <UiSendConfirmationDialog
+        proposal={uiSendProposal}
+        onConfirm={() => void confirmUiSend()}
+        onCancel={() => cancelUiSend()}
       />
       <SkillParameterDialog
         open={Boolean(skillParameterDialog)}

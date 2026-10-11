@@ -319,6 +319,7 @@ export const generateImage = async (
   prompt: string,
   options: { imageCount?: number; attachments?: Attachment[] } = {},
   signal?: AbortSignal,
+  beforeDispatch?: () => Promise<void>,
 ): Promise<{ images: Attachment[]; message: string }> => {
   const { providerId, modelName } = parseModelString(modelString);
 
@@ -346,7 +347,7 @@ export const generateImage = async (
     if (shouldUseDirectCall(provider)) {
       const [{ generateImage }, runtime, directProvider] = await Promise.all([
         import("@/lib/chat/generateImage"),
-        getBrowserImageRuntime(),
+        getBrowserImageRuntime(beforeDispatch),
         buildDirectProviderConfig(provider),
       ]);
       const directImages = await hydrateDirectProviderImageFiles(
@@ -357,6 +358,7 @@ export const generateImage = async (
 
       let result;
       try {
+        await beforeDispatch?.();
         result = await generateImage(
           {
             provider: directProvider,
@@ -395,12 +397,16 @@ export const generateImage = async (
         },
         { signal },
       );
-      return signedApiFetch("/api/chat/generate-image", {
-        method: "POST",
-        headers: request.headers,
-        body: request.body,
-        signal,
-      });
+      return signedApiFetch(
+        "/api/chat/generate-image",
+        {
+          method: "POST",
+          headers: request.headers,
+          body: request.body,
+          signal,
+        },
+        beforeDispatch,
+      );
     });
 
     if (!response.ok) {

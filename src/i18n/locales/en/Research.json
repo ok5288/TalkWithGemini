@@ -49,7 +49,9 @@
     "askEvidence": "Ask existing evidence",
     "continueResearch": "Continue research",
     "updateLatest": "Update latest",
-    "downloadReport": "Download"
+    "downloadReport": "Download",
+    "interactiveExplanation": "Explain interactively in chat",
+    "interactiveExplanationPrompt": "Use the attached report to create an interactive explanation in this chat. Keep the original report and evidence unchanged. Report: {title}; task: {taskId}; report: {reportId}; version: {version}."
   },
   "plan": {
     "title": "Research plan",

@@ -5,6 +5,7 @@ import {
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PLUGIN_EXECUTION_LIMITS } from "../config/limits";
 import type {
+  Message,
   MessageOutputBlock,
   ModelMetadata,
   Plugin,
@@ -68,14 +69,24 @@ vi.mock("../lib/api/client", async () => {
   const actual = await vi.importActual("../lib/api/client");
   return {
     ...actual,
-    signedApiFetch: vi.fn((input: RequestInfo | URL, init?: RequestInit) =>
-      fetch(input, init),
+    signedApiFetch: vi.fn(
+      async (
+        input: RequestInfo | URL,
+        init?: RequestInit,
+        beforeDispatch?: () => Promise<void>,
+      ) => {
+        await beforeDispatch?.();
+        return fetch(input, init);
+      },
     ),
   };
 });
 
 vi.mock("@/lib/plugin/resolve", () => ({
   getEnabledPluginFunctions: vi.fn((plugin: Plugin) => plugin.functions || []),
+  getModelCallablePluginFunctions: vi.fn(
+    (plugin: Plugin) => plugin.functions || [],
+  ),
   resolveEnabledPluginFunction: vi.fn(
     (plugins: Plugin[], functionName: string, allowedPluginIds?: string[]) => {
       const allowed = allowedPluginIds?.length
@@ -391,6 +402,265 @@ describe("chat service tool execution", () => {
     mocks.readWorkspaceText.mockReset();
     mocks.searchCompatibility = { enabled: true, mode: "native" };
     vi.mocked(createSearchProvider).mockReset();
+  });
+
+  async function sendUiHistory(
+    history: Message[],
+    intelligentUiSource?: import("@/services/api/chatService").StreamChatResponseOptions["intelligentUiSource"],
+    beforeDispatch?: () => Promise<void>,
+  ) {
+    const { streamChatResponse } = await import("../services/api/chatService");
+    const args: Parameters<typeof streamChatResponse> = [
+      "session-1",
+      "openai:gpt-test",
+      history,
+      "Current user question",
+      [],
+      { chatMode: "chat", useSearch: false },
+      () => {},
+    ];
+    args[17] = {
+      intelligentUiSource,
+      beforeDispatch,
+      disableTools: true,
+      disableImageGeneration: true,
+    };
+    return streamChatResponse(...args);
+  }
+
+  it("revalidates host authority after asynchronous request preparation and before fetch", async () => {
+    const { buildProviderRuntimeConfig } = await import("@/lib/byok/client");
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+    let resume!: () => void;
+    const barrier = new Promise<void>((resolve) => {
+      resume = resolve;
+    });
+    let started!: () => void;
+    const preparing = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    vi.mocked(buildProviderRuntimeConfig).mockImplementationOnce(
+      async (provider) => {
+        started();
+        await barrier;
+        return {
+          type: provider.type,
+          name: provider.name,
+          source: "server-default" as const,
+          apiKeySecret: undefined,
+        };
+      },
+    );
+    let allowed = true;
+    const guard = vi.fn(async () => {
+      if (!allowed) throw new Error("UI_SOURCE_STALE");
+    });
+    const sending = sendUiHistory([], undefined, guard);
+    const failure = expect(sending).rejects.toThrow("UI_SOURCE_STALE");
+    await preparing;
+    allowed = false;
+    resume();
+    await failure;
+    expect(guard).toHaveBeenCalledTimes(1);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("checks authority again on a BYOK replay without a second fetch", async () => {
+    const { fetchWithByokRetry } = await import("@/lib/byok/client");
+    let allowed = true;
+    vi.mocked(fetchWithByokRetry).mockImplementationOnce(async (request) => {
+      await request();
+      allowed = false;
+      return request();
+    });
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(sseResponse([{ type: "done" }]));
+    await expect(
+      sendUiHistory([], undefined, async () => {
+        if (!allowed) throw new Error("UI_SOURCE_STALE");
+      }),
+    ).rejects.toThrow("UI_SOURCE_STALE");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("passes final host authorization to image and image-planning requests", async () => {
+    const { generateImage } =
+      await import("@/services/api/chat/auxiliaryRequests");
+    const { streamGenerateContent } =
+      await import("@/services/api/chat/simpleGeneration");
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+    const guard = vi.fn(async () => {
+      throw new Error("UI_SOURCE_STALE");
+    });
+    await expect(
+      generateImage("openai:gpt-image", "frozen source", {}, undefined, guard),
+    ).rejects.toThrow("UI_SOURCE_STALE");
+    await expect(
+      streamGenerateContent(
+        "openai:gpt-test",
+        "frozen source",
+        () => {},
+        undefined,
+        guard,
+      ),
+    ).rejects.toThrow("UI_SOURCE_STALE");
+    expect(guard).toHaveBeenCalledTimes(2);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  async function uiHistoryFixture() {
+    const { parseIntelligentUiText } =
+      await import("@/lib/intelligentUi/parser");
+    const source =
+      '```intelligent-ui\n{"version":1,"title":"Form","summary":"Initial summary"}\n<div>Input</div>\n```';
+    const parsed = parseIntelligentUiText(source, {
+      idPrefix: "ui",
+      final: true,
+    })[0];
+    if (parsed.type !== "intelligent_ui") throw Error("fixture");
+    parsed.block.staticSnapshot = "PERSISTED_CURRENT_RESULT";
+    parsed.block.state = { hidden: "SECRET_STATE_VALUE" };
+    const message: Message = {
+      id: "ui-message",
+      role: "model",
+      timestamp: 1,
+      content: `Before\n${source}\nAfter`,
+      outputBlocks: [
+        { id: "before", type: "text", content: "Before" },
+        parsed.block,
+        { id: "after", type: "text", content: "After" },
+      ],
+    };
+    return { message, block: parsed.block };
+  }
+
+  it("sends persisted current UI results in provider history content", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(sseResponse([{ type: "done" }]));
+    const { message } = await uiHistoryFixture();
+    await sendUiHistory([message]);
+    const payload = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
+    const content = payload.history[0].content as string;
+    expect(content).toContain("PERSISTED_CURRENT_RESULT");
+    expect(content).not.toContain("SECRET_STATE_VALUE");
+    const { MessageSchema } = await import("@/lib/api/schemas");
+    const { prepareOpenAIHistory } = await import("@/lib/utils/history");
+    const providerHistory = prepareOpenAIHistory(
+      payload.history.map((item: unknown) => MessageSchema.parse(item)),
+    );
+    expect(JSON.stringify(providerHistory)).toContain(
+      "PERSISTED_CURRENT_RESULT",
+    );
+    expect(JSON.stringify(providerHistory)).not.toContain("SECRET_STATE_VALUE");
+    expect(content.indexOf("Before")).toBeLessThan(
+      content.indexOf("PERSISTED_CURRENT_RESULT"),
+    );
+    expect(content.indexOf("After")).toBeGreaterThan(
+      content.indexOf("PERSISTED_CURRENT_RESULT"),
+    );
+  });
+
+  it("sends frozen SDK source once as required current input even after history trimming", async () => {
+    mocks.settingsState.customModelMetadata = {
+      "openai:gpt-test": { limit: { context: 3500, output: 500 } },
+    };
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(sseResponse([{ type: "done" }]));
+    const { message, block } = await uiHistoryFixture();
+    const { projectUiBlock } = await import("@/lib/intelligentUi/projection");
+    const frozen = projectUiBlock(block, {
+      purpose: "model-continuation",
+      locale: "en",
+    });
+    block.staticSnapshot = "CHANGED_AFTER_REQUEST";
+    await sendUiHistory(
+      [
+        message,
+        {
+          id: "later-user",
+          role: "user",
+          timestamp: 2,
+          content: "u".repeat(20000),
+        },
+        {
+          id: "later-model",
+          role: "model",
+          timestamp: 3,
+          content: "m".repeat(20000),
+        },
+      ],
+      { messageId: message.id, blockId: block.id, content: frozen },
+    );
+    const payload = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
+    expect(payload.newMessage).toContain("Current user question");
+    expect(payload.newMessage).toContain("PERSISTED_CURRENT_RESULT");
+    expect(payload.newMessage).not.toContain("CHANGED_AFTER_REQUEST");
+    expect(
+      payload.history.some((item: Message) => item.id === message.id),
+    ).toBe(false);
+    expect(
+      payload.history.some((item: Message) =>
+        item.content.includes("PERSISTED_CURRENT_RESULT"),
+      ),
+    ).toBe(false);
+    expect(payload.newMessage.match(/PERSISTED_CURRENT_RESULT/g)).toHaveLength(
+      1,
+    );
+  });
+
+  it("does not duplicate SDK source when its surrounding history is retained", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(sseResponse([{ type: "done" }]));
+    const { message, block } = await uiHistoryFixture();
+    await sendUiHistory([message], {
+      messageId: message.id,
+      blockId: block.id,
+      content: "FROZEN_SOURCE",
+    });
+    const payload = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
+    expect(payload.history[0].content).toBe("Before\n\nAfter");
+    expect(payload.newMessage.match(/FROZEN_SOURCE/g)).toHaveLength(1);
+  });
+
+  it("rejects oversized required SDK context rather than silently dropping its result", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+    await expect(
+      sendUiHistory([], {
+        messageId: "ui-message",
+        blockId: "ui",
+        content: "x".repeat(300000),
+      }),
+    ).rejects.toMatchObject({ code: "CONTEXT_BUDGET_EXCEEDED" });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("uses imported explorer data without re-resolving its old source for model continuation", async () => {
+    const { EXPLORER_TRAVEL_EXAMPLE } =
+      await import("@/lib/intelligentUi/explorer");
+    const { resolveBlockUiProjectionData } =
+      await import("@/lib/intelligentUi/sourceContext");
+    const { block } = await uiHistoryFixture();
+    const definition = structuredClone(EXPLORER_TRAVEL_EXAMPLE);
+    if (definition.props.dataset.kind !== "inline") throw Error("fixture");
+    block.dataSnapshot = definition.props.dataset.data;
+    definition.props.dataset = {
+      kind: "context",
+      alias: "old-private-source",
+      version: "old",
+    };
+    block.definition = definition;
+    await expect(
+      resolveBlockUiProjectionData(
+        block,
+        "session-1",
+        "ui-message",
+        "model-continuation",
+      ),
+    ).resolves.toEqual({ sourceSummary: [] });
   });
 
   it("enforces text-only temporary requests despite inherited workflow, plugins and image events", async () => {

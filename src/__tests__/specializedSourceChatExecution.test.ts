@@ -67,6 +67,9 @@ vi.mock("../lib/api/client", async () => {
 
 vi.mock("@/lib/plugin/resolve", () => ({
   getEnabledPluginFunctions: vi.fn((plugin: Plugin) => plugin.functions || []),
+  getModelCallablePluginFunctions: vi.fn(
+    (plugin: Plugin) => plugin.functions || [],
+  ),
   resolveEnabledPluginFunction: vi.fn(
     (plugins: Plugin[], functionName: string, allowedPluginIds?: string[]) => {
       const allowed = allowedPluginIds?.length

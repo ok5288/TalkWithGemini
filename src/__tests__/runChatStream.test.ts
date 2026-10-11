@@ -245,3 +245,41 @@ describe("Gemini tool schema API version selection", () => {
     ]);
   });
 });
+
+it("checks host authorization after file upload before dispatching the model SDK", async () => {
+  const { runtime } = makeRuntime();
+  let allowed = true;
+  const remove = vi.fn(async () => undefined);
+  runtime.createOpenAIClient = () =>
+    ({
+      files: {
+        create: async () => {
+          allowed = false;
+          return { id: "uploaded" };
+        },
+        delete: remove,
+      },
+    }) as never;
+  const send = vi.fn();
+  const callsBefore = mocks.streamOpenAIResponses.mock.calls.length;
+  await expect(
+    runChatStream({
+      ...baseOptions("OpenAI"),
+      runtime,
+      send,
+      attachments: [
+        {
+          id: "image",
+          mimeType: "image/png",
+          file: new File(["image"], "image.png", { type: "image/png" }),
+        },
+      ],
+      beforeDispatch: async () => {
+        if (!allowed) throw new Error("UI_SOURCE_STALE");
+      },
+    }),
+  ).rejects.toThrow("UI_SOURCE_STALE");
+  expect(mocks.streamOpenAIResponses).toHaveBeenCalledTimes(callsBefore);
+  expect(send).not.toHaveBeenCalled();
+  expect(remove).toHaveBeenCalledWith("uploaded");
+});

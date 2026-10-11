@@ -396,6 +396,24 @@ const PluginFunctionSchema = z
       .or(z.enum(["get", "post", "put", "patch", "delete"]))
       .optional(),
     mcpToolName: z.string().min(1).max(256).optional(),
+    mcpVisibility: z
+      .array(z.enum(["model", "app"]))
+      .max(2)
+      .optional(),
+    mcpUi: z
+      .object({
+        resourceUri: z
+          .string()
+          .regex(/^ui:\/\/[^\s]+$/)
+          .max(8192),
+        visibility: z
+          .array(z.enum(["model", "app"]))
+          .min(1)
+          .max(2)
+          .optional(),
+      })
+      .strict()
+      .optional(),
     risk: z.enum(["read", "write", "destructive", "external"]).optional(),
   })
   .strict()
@@ -438,6 +456,7 @@ const PluginSchema = z
         serverVersion: z.string().max(120).optional(),
         headers: PluginHeaderMapSchema.optional(),
         toolNameMap: z.record(z.string(), z.string()).optional(),
+        toolMetadataVersion: z.literal(1).optional(),
       })
       .strict()
       .optional(),
@@ -499,6 +518,7 @@ export const PluginExecutionRequestSchema = z
     pluginId: z.string().min(1).max(200),
     functionName: z.string().min(1).max(128),
     expectedFingerprint: z.string().min(1).max(200).optional(),
+    enableMcpApps: z.boolean().optional(),
     args: z.record(z.string(), JsonLikeSchema).default({}),
     authConfig: PluginAuthConfigSchema,
     callId: z.string().max(200).optional(),
@@ -519,6 +539,7 @@ export const PluginInstallSchema = z
   .object({
     plugin: PluginSchema.partial().optional(),
     customInput: z.string().max(2_000_000).optional(),
+    enableMcpApps: z.boolean().optional(),
     authConfig: PluginAuthConfigSchema,
   })
   .strict();

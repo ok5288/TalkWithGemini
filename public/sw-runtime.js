@@ -31,6 +31,8 @@ function mustUseNetwork(request, url) {
   return (
     request.method !== "GET" ||
     url.origin !== self.location.origin ||
+    url.pathname === "/intelligent-ui/sandbox" ||
+    url.pathname === "/intelligent-ui/sandbox/" ||
     url.pathname.startsWith("/api/") ||
     url.pathname.startsWith("/share/") ||
     url.pathname.startsWith("/_next/image") ||

@@ -95,5 +95,6 @@
   "archiveAria": "压缩包：{title}",
   "archiveDownloadAria": "下载压缩包 {title}",
   "archiveEntryCount": "{count, plural, other {# 个文件}}",
-  "archiveMissing": "该压缩包已不可用。"
+  "archiveMissing": "该压缩包已不可用。",
+  "knowledgePrepareFailed": "无法准备此消息。请检查来源是否仍可用，然后重试。"
 }

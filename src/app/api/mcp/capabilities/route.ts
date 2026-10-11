@@ -15,13 +15,10 @@ import {
   listMcpResourceTemplates,
   readMcpResource,
 } from "@/lib/mcp/client";
+import { getMcpSandboxOrigin } from "@/lib/mcpApps/config";
 import { isPluginAuthRequired } from "@/lib/plugin/config";
-import {
-  getServerPlugin,
-  registerServerPlugin,
-} from "@/lib/plugin/serverRegistry";
+import { getServerPlugin } from "@/lib/plugin/serverRegistry";
 import { decryptOptionalSecret } from "@/lib/byok/server";
-import { getDeploymentMode } from "@/lib/security/deployment";
 import { safeServerLogError } from "@/lib/utils/safeServerLog";
 import type { Plugin } from "@/types";
 
@@ -57,6 +54,7 @@ const RequestSchema = z
       .default({}),
     authConfig: AuthSchema,
     localPlugin: z.unknown().optional(),
+    enableMcpApps: z.boolean().optional(),
   })
   .strict();
 
@@ -71,30 +69,10 @@ function getAuthType(plugin: Plugin, authConfig: z.infer<typeof AuthSchema>) {
     : undefined;
 }
 
-function isLocalMcpPlugin(value: unknown): value is Plugin {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
-  const plugin = value as Partial<Plugin>;
-  return (
-    typeof plugin.id === "string" &&
-    plugin.source === "mcp" &&
-    typeof plugin.mcp?.serverUrl === "string" &&
-    Array.isArray(plugin.functions)
-  );
-}
-
 export async function POST(request: NextRequest) {
   try {
     const body = RequestSchema.parse(await readJsonRequestBody(request));
-    let plugin = await getServerPlugin(body.pluginId);
-    if (
-      !plugin &&
-      getDeploymentMode() !== "hosted" &&
-      isLocalMcpPlugin(body.localPlugin) &&
-      body.localPlugin.id === body.pluginId
-    ) {
-      await registerServerPlugin(body.localPlugin);
-      plugin = body.localPlugin;
-    }
+    const plugin = await getServerPlugin(body.pluginId);
     if (!plugin || plugin.source !== "mcp" || !plugin.mcp?.serverUrl) {
       return NextResponse.json(
         {
@@ -128,6 +106,9 @@ export async function POST(request: NextRequest) {
         addTo: body.authConfig?.addTo || plugin.auth?.in,
       },
       signal: request.signal,
+      enableMcpApps:
+        body.enableMcpApps === true &&
+        !!getMcpSandboxOrigin(request.nextUrl.origin),
     };
     let result: unknown;
     switch (body.operation) {

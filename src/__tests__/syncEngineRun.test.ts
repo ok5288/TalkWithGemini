@@ -137,6 +137,34 @@ function captured(
   };
 }
 
+function capturedWithUnsupportedUi(): CapturedSyncSnapshot {
+  return {
+    ...captured([]),
+    exported: {
+      ...captured([]).exported,
+      data: {
+        sessionMessages: {
+          session: {
+            nodesById: {
+              message: {
+                message: {
+                  outputBlocks: [
+                    {
+                      type: "intelligent_ui",
+                      schemaVersion: 9,
+                      renderer: "future",
+                    },
+                  ],
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  };
+}
+
 function encryptedDocument(bytes: Uint8Array): Uint8Array {
   return new TextEncoder().encode(
     JSON.stringify({
@@ -198,6 +226,34 @@ describe("encrypted sync engine run", () => {
     expect(mocks.list.mock.invocationCallOrder[0]).toBeLessThan(
       mocks.put.mock.invocationCallOrder[0],
     );
+  });
+
+  it("does not write an unsupported Intelligent UI payload to sync", async () => {
+    const { runEncryptedSync } = await import("@/lib/sync/engine");
+    mocks.captureLocalSyncSnapshot.mockResolvedValueOnce(
+      capturedWithUnsupportedUi(),
+    );
+
+    await expect(runEncryptedSync(configuration)).rejects.toMatchObject({
+      code: "SYNC_UNSUPPORTED_INTELLIGENT_UI",
+      retryable: false,
+    });
+    expect(mocks.captureLocalSyncSnapshot).toHaveBeenCalledTimes(1);
+    expect(mocks.list).not.toHaveBeenCalled();
+    expect(mocks.put).not.toHaveBeenCalled();
+  });
+
+  it("checks the second local capture before uploading merged documents", async () => {
+    const { runEncryptedSync } = await import("@/lib/sync/engine");
+    mocks.captureLocalSyncSnapshot
+      .mockResolvedValueOnce(captured([]))
+      .mockResolvedValueOnce(capturedWithUnsupportedUi());
+
+    await expect(runEncryptedSync(configuration)).rejects.toMatchObject({
+      code: "SYNC_UNSUPPORTED_INTELLIGENT_UI",
+    });
+    expect(mocks.captureLocalSyncSnapshot).toHaveBeenCalledTimes(2);
+    expect(mocks.put).not.toHaveBeenCalled();
   });
 
   it("applies the latest capture once to a persisted local baseline", async () => {

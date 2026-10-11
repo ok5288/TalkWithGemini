@@ -11,6 +11,8 @@ import ResearchWorkbench from "./workbench";
 import { StatusLabel } from "./ui";
 import type { ResearchTaskViewModel } from "./types";
 import { openResearchTask } from "@/lib/research/navigation";
+import { requestComposerDraft } from "@/lib/chat/composerActions";
+import { useSettingsStore } from "@/store/core/settingsStore";
 import { useChatStore } from "@/store/core/chatStore";
 import { useResearchStore } from "@/store/core/researchStore";
 
@@ -210,6 +212,9 @@ export function ConnectedResearchWorkbench({
   const hydrated = useResearchStore((state) => state.hydrated);
   const actions = useTaskActions(taskId);
   const runtime = useResearchRuntime();
+  const intelligentUiEnabled = useSettingsStore(
+    (state) => state.system.enableIntelligentUi,
+  );
   const [printReport, setPrintReport] = useState<{
     title: string;
     markdown: string;
@@ -280,6 +285,56 @@ export function ConnectedResearchWorkbench({
         onClose={onClose}
         {...actions}
         onDownloadMarkdown={downloadMarkdown}
+        onInteractiveExplanation={
+          intelligentUiEnabled &&
+          task &&
+          (task.status === "completed" || task.status === "partial_completed")
+            ? (versionId) => {
+                const report = findReport(versionId);
+                const storedReport = task.reportVersions.find(
+                  (candidate) => candidate.id === versionId,
+                );
+                if (!report || !storedReport) return;
+                void (async () => {
+                  const store = useChatStore.getState();
+                  if (store.currentSessionId !== task.sessionId)
+                    await store.selectSession(task.sessionId);
+                  store.updateSessionConfig(task.sessionId, {
+                    chatMode: "chat",
+                    useAgentMode: false,
+                    useDeepResearch: false,
+                  });
+                  onClose();
+                  window.requestAnimationFrame(() =>
+                    requestComposerDraft({
+                      sessionId: task.sessionId,
+                      text: t("actions.interactiveExplanationPrompt", {
+                        title: report.title,
+                        taskId: task.id,
+                        reportId: report.id,
+                        version: report.version,
+                      }),
+                      attachments: [
+                        {
+                          id: `research-report-${report.id}`,
+                          mimeType: "text/markdown",
+                          url: storedReport.artifactId,
+                          fileName: `${report.title.replace(/[\\/]/g, "-")}.md`,
+                          intelligentUiSource: {
+                            kind: "report",
+                            taskId: task.id,
+                            reportId: storedReport.id,
+                            version: storedReport.version,
+                            artifactId: storedReport.artifactId,
+                          },
+                        },
+                      ],
+                    }),
+                  );
+                })();
+              }
+            : undefined
+        }
         onPrintPdf={(versionId) => {
           const report = findReport(versionId);
           if (report) {

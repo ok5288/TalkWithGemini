@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState } from "react";
 import dynamic from "next/dynamic";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import {
   Check,
   Copy,
@@ -19,6 +19,7 @@ import {
   X,
 } from "lucide-react";
 import type { Session } from "@/types";
+import { projectMessageUiForExport } from "@/lib/chat/intelligentUiPortability";
 import { readSessionForPresentation } from "./sessionPresentation";
 import { useChatStore } from "@/store/core/chatStore";
 import { useSettingsStore } from "@/store/core/settingsStore";
@@ -67,6 +68,7 @@ export function SessionActionsProvider({
   children,
   ...actions
 }: SessionActions & { children: React.ReactNode }) {
+  const locale = useLocale();
   const t = useTranslations("Sidebar");
   const common = useTranslations("Common");
   const [renaming, setRenaming] = useState<Session | null>(null);
@@ -82,14 +84,22 @@ export function SessionActionsProvider({
     run(async () => {
       const snapshot = await readSessionForPresentation(session);
       const temporary = isTemporarySession(session);
+      const sourceScope = temporary
+        ? await (
+            await import("@/lib/intelligentUi/sourceContext")
+          ).createFrozenUiSourceScope(snapshot, snapshot.messages)
+        : undefined;
       const body = temporary
-        ? snapshot.messages
-            .map(
-              (message) =>
-                `## ${message.role === "user" ? t("you") : t("assistant")}\n\n${message.content}`,
+        ? (
+            await Promise.all(
+              snapshot.messages.map(
+                async (message) =>
+                  `## ${message.role === "user" ? t("you") : t("assistant")}\n\n${await projectMessageUiForExport(message, session.id, { purpose: "static-original", locale, sourceScope })}`,
+              ),
             )
-            .join("\n\n")
+          ).join("\n\n")
         : JSON.stringify(snapshot, null, 2);
+      await sourceScope?.assertValid();
       const url = URL.createObjectURL(
         new Blob([body], {
           type: temporary

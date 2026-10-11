@@ -180,15 +180,19 @@ export async function directSimpleGenerator(): Promise<
 /**
  * 浏览器图片生成运行时（对应 /api/chat/generate-image 的服务端 runtime）
  */
-export async function getBrowserImageRuntime(): Promise<ImageGenerationRuntime> {
+export async function getBrowserImageRuntime(
+  beforeDispatch?: () => Promise<void>,
+): Promise<ImageGenerationRuntime> {
   const { createBrowserGoogleClient, assertDirectProviderUrl } =
     await loadBrowserClients();
 
   return {
+    beforeDispatch,
     assertOutboundAllowed: async () => undefined,
     createGoogleClient: createBrowserGoogleClient,
     fetchJson: async (url, init) => {
       assertDirectProviderUrl(url);
+      await beforeDispatch?.();
       const response = await fetch(url, init);
       let data: any;
       try {

@@ -67,6 +67,9 @@
   "autoCollapseCode": "コードの自動折りたたみ",
   "autoCollapseCodeDesc": "長いコードブロックを自動的に折りたたんで表示します",
   "autoCollapseCodeAria": "長いコードブロックの自動折りたたみ",
+  "intelligentUi": "インテリジェント UI",
+  "intelligentUiDesc": "対話型の回答は外部リソースと AI 送信ボタンを使用できます。ソースと表示結果はチャットに渡され、オフにすると静的に表示されます。",
+  "intelligentUiAria": "インテリジェント UI を有効にする",
   "htmlVisualPrompt": "HTML ビジュアルプロンプト",
   "htmlVisualPromptDesc": "有用な場合に、安全なインライン HTML でコンパクトな視覚構造を使うようモデルに促します",
   "htmlVisualPromptAria": "安全なインライン HTML を使うようモデルに促す",
@@ -163,5 +166,16 @@
   "clearAria": "すべてのデータを消去",
   "clearConfirmAria": "すべてのデータの消去を確認",
   "clearConfirmHint": "5秒以内に「消去を確認」をクリックすると、選択したローカルデータソースが完全に削除されます。",
-  "clearError": "すべてのデータの消去に失敗しました。もう一度お試しください。"
+  "clearError": "すべてのデータの消去に失敗しました。もう一度お試しください。",
+  "mcpApps": {
+    "title": "MCP アプリ画面を許可",
+    "description": "インストール済み MCP ツールのアプリを独立サンドボックスで表示します。既定では無効で、専用デプロイ設定が必要です。",
+    "source": "MCP アプリ · {source}",
+    "unavailable": "操作画面を利用できません。元のツール結果をご確認ください。",
+    "loading": "アプリのリソースを読み込み中…",
+    "initializing": "制限付きアプリを初期化中…",
+    "ready": "操作画面の準備が完了しました",
+    "failed": "アプリの起動に失敗しました。元のツール結果は引き続き確認できます。",
+    "retry": "再試行"
+  }
 }

@@ -1,4 +1,5 @@
-import { Plugin } from "@/types";
+import { resolvePluginAuthValue } from "@/lib/security/localSecretResolvers";
+import type { Plugin, PluginConfig } from "@/types";
 import { useSettingsStore } from "@/store/core/settingsStore";
 import { encryptSecret, fetchWithByokRetry } from "@/lib/byok/client";
 import { BYOK_CONTEXTS } from "@/lib/byok/shared";
@@ -12,6 +13,7 @@ import {
   MCP_REGISTRY_BASE_URL,
   normalizeMcpRegistryServers,
 } from "@/lib/mcp/registry";
+import { areMcpAppsEnabled } from "@/lib/mcpApps/config";
 import { DEFAULT_MCP_SERVER_LOGO_URL } from "@/lib/mcp/defaults";
 import { logDevError, logDevInfo, logDevWarn } from "@/lib/utils/devLogger";
 import { CACHE_CONFIG } from "@/config/api";
@@ -570,6 +572,10 @@ export const clearPluginsCache = (): void => {
 export const installPlugin = async (
   plugin: Plugin,
   authValue?: string,
+  authOverrides?: Pick<
+    NonNullable<PluginConfig["auth"]>,
+    "type" | "key" | "addTo"
+  >,
 ): Promise<Plugin> => {
   const normalizedAuthValue = authValue?.trim();
   const valueSecret = normalizedAuthValue
@@ -578,21 +584,24 @@ export const installPlugin = async (
         BYOK_CONTEXTS.pluginAuth(plugin.id),
       )
     : undefined;
-  const authConfig = valueSecret
-    ? {
-        type:
-          plugin.auth?.type === "apiKey"
-            ? ("apiKey" as const)
-            : plugin.auth?.type === "oauth2"
-              ? ("oauth2" as const)
-              : ("bearer" as const),
-        key:
-          plugin.auth?.name ||
-          (plugin.auth?.type === "apiKey" ? "X-API-Key" : "Authorization"),
-        addTo: plugin.auth?.in || ("header" as const),
-        valueSecret,
-      }
-    : undefined;
+  const authConfig =
+    valueSecret || authOverrides
+      ? {
+          type:
+            authOverrides?.type ??
+            (plugin.auth?.type === "apiKey"
+              ? ("apiKey" as const)
+              : plugin.auth?.type === "oauth2"
+                ? ("oauth2" as const)
+                : ("bearer" as const)),
+          key:
+            authOverrides?.key ??
+            (plugin.auth?.name ||
+              (plugin.auth?.type === "apiKey" ? "X-API-Key" : "Authorization")),
+          addTo: authOverrides?.addTo ?? plugin.auth?.in ?? ("header" as const),
+          valueSecret,
+        }
+      : undefined;
 
   try {
     const response = await signedApiFetch("/api/plugins/install", {
@@ -602,6 +611,13 @@ export const installPlugin = async (
       },
       body: JSON.stringify({
         plugin,
+        ...(plugin.source === "mcp" &&
+        areMcpAppsEnabled(
+          useSettingsStore.getState().system,
+          typeof window === "undefined" ? undefined : window.location.origin,
+        )
+          ? { enableMcpApps: true }
+          : {}),
         ...(authConfig ? { authConfig } : {}),
       }),
     });
@@ -678,6 +694,13 @@ export const installCustomMcpServer = async (
       },
       body: JSON.stringify({
         plugin,
+        ...(plugin.source === "mcp" &&
+        areMcpAppsEnabled(
+          useSettingsStore.getState().system,
+          typeof window === "undefined" ? undefined : window.location.origin,
+        )
+          ? { enableMcpApps: true }
+          : {}),
         ...(authConfig ? { authConfig } : {}),
       }),
     });
@@ -778,3 +801,27 @@ export const discoverMcpBridgeServers = async (
   );
   return parseBridgeDiscoveryResponse(data);
 };
+
+/** Explicit metadata refresh replaces only the definition after full server discovery. */
+export async function refreshMcpToolDefinition(
+  pluginId: string,
+): Promise<void> {
+  const state = useSettingsStore.getState();
+  const plugin = state.installedPlugins.find((item) => item.id === pluginId);
+  if (!plugin || plugin.source !== "mcp")
+    throw new Error("MCP server unavailable");
+  const auth = state.pluginConfigs[pluginId]?.auth;
+  const value = auth ? await resolvePluginAuthValue(pluginId, auth) : undefined;
+  const refreshed = await installPlugin(
+    { ...plugin, functions: [] },
+    value,
+    auth,
+  );
+  if (refreshed.mcp?.toolMetadataVersion !== 1)
+    throw new Error("MCP tool refresh incomplete");
+  useSettingsStore.setState((current) => ({
+    installedPlugins: current.installedPlugins.map((item) =>
+      item === plugin ? refreshed : item,
+    ),
+  }));
+}

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { renderHook } from "@testing-library/react";
+import { renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const chatStoreState = {
@@ -68,6 +68,22 @@ describe("message mutation flows", () => {
 
     expect(deps.updateMessageContent).not.toHaveBeenCalled();
     expect(deps.persistLongTextFilesForMessage).not.toHaveBeenCalled();
+  });
+
+  it("reports rejected branch persistence without an unhandled rejection", async () => {
+    const deps = createChatFlowDeps({
+      switchMessageVersion: vi.fn(async () => {
+        throw new Error("quota");
+      }),
+      selectMessageVersion: vi.fn(async () => {
+        throw new Error("quota");
+      }),
+    });
+    const branch = renderHook(() => useResponseBranchFlow(deps)).result.current;
+    branch.handleVersionChange("message-1", "next");
+    branch.handleVersionSelect("message-1", "message-2");
+    await waitFor(() => expect(deps.showActionError).toHaveBeenCalledTimes(2));
+    expect(deps.showActionError).toHaveBeenCalledWith("errSaveChanges");
   });
 
   it("mutates the message tree when the session is idle", async () => {

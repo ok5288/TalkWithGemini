@@ -65,6 +65,8 @@ export type WorkspaceWriteMode = "create" | "overwrite" | "append";
 export interface WorkspaceMutationOptions {
   expectedRevision?: string;
   source?: WorkspaceFileSource;
+  /** Ephemeral host authority check, evaluated after the queue immediately before writing. */
+  beforeWrite?: () => boolean;
 }
 
 const workspaceMutationQueues = new Map<string, Promise<void>>();
@@ -304,6 +306,7 @@ async function commitWrite(
   write: (url: string) => Promise<void>,
   entries?: WorkspaceFileEntry[],
   source: WorkspaceFileSource = "agent",
+  beforeWrite?: () => boolean,
 ): Promise<WorkspaceResult<WorkspaceFileEntry>> {
   const resolved = resolveWorkspaceUrl(sessionId, path);
   if (!resolved.ok) return resolved;
@@ -311,6 +314,13 @@ async function commitWrite(
   const known = entries ?? (await listEntries(sessionId));
   const quota = checkQuota(known, resolved.value.path, content.size);
   if (!quota.ok) return quota;
+
+  if (beforeWrite && !beforeWrite()) {
+    return workspaceFailure(
+      "WORKSPACE_REVISION_CONFLICT",
+      "The operation context changed before the workspace write.",
+    );
+  }
 
   try {
     await write(resolved.value.url);
@@ -415,6 +425,7 @@ async function writeWorkspaceTextUnlocked(
       (resolved.value.path.startsWith(`${WORKSPACE_UPLOADS_DIRECTORY}/`)
         ? "attachment"
         : "agent"),
+    options.beforeWrite,
   );
 }
 
@@ -465,6 +476,7 @@ export async function writeWorkspaceBlob(
         (resolved.value.path.startsWith(`${WORKSPACE_UPLOADS_DIRECTORY}/`)
           ? "attachment"
           : "agent"),
+      options.beforeWrite,
     );
   });
 }

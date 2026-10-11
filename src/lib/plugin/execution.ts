@@ -22,6 +22,7 @@ export interface PluginExecutionPayload {
 export interface PluginExecutionRequestPayload {
   pluginId: string;
   functionName: string;
+  enableMcpApps?: boolean;
   expectedFingerprint?: string;
   args: Record<string, unknown>;
   authConfig?: PluginExecutionAuthConfig;

@@ -52,6 +52,17 @@ describe("app export helpers", () => {
     vi.unstubAllGlobals();
   });
 
+  it("preserves own JSON property names without changing object prototypes", () => {
+    const state = JSON.parse(
+      '{"__proto__":{"value":1},"constructor":"saved","prototype":[2]}',
+    );
+    const scrubbed = scrubAppExportValue(state) as Record<string, unknown>;
+    expect(JSON.stringify(scrubbed)).toBe(JSON.stringify(state));
+    expect(Object.hasOwn(scrubbed, "__proto__")).toBe(true);
+    expect(Object.getPrototypeOf(scrubbed)).toBe(Object.prototype);
+    expect(Object.prototype).not.toHaveProperty("value");
+  });
+
   it("creates a versioned local-first export payload", () => {
     const payload = createAppExportPayload({
       exportedAt: "2026-07-01T00:00:00.000Z",

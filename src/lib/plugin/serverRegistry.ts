@@ -72,6 +72,7 @@ class UpstashServerPluginRegistryStore implements ServerPluginRegistryStore {
 }
 
 let configuredStore: ServerPluginRegistryStore | null = null;
+const registrationTails = new Map<string, Promise<void>>();
 const SHARED_PLUGIN_REGISTRY_ERROR =
   "PLUGIN_REGISTRY_STORE=upstash with UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN is required in hosted mode";
 
@@ -123,13 +124,33 @@ export async function registerServerPlugin(plugin: Plugin): Promise<void> {
     throw new Error(`Plugin id ${plugin.id} is a reserved built-in plugin id`);
   }
 
-  getRegistry().set(plugin.id, plugin);
+  const previous = registrationTails.get(plugin.id) ?? Promise.resolve();
+  const registration = previous
+    .catch(() => undefined)
+    .then(async () => {
+      try {
+        await getServerPluginRegistryStore().set(plugin);
+      } catch (error) {
+        if (!canUseMemoryFallback()) throw error;
+
+        // Local development historically kept a usable in-memory definition even
+        // when a custom store was unavailable. Preserve that fallback while
+        // keeping hosted publication atomic.
+        getRegistry().set(plugin.id, plugin);
+        return;
+      }
+
+      // Do not expose a hosted definition until the shared store has accepted it.
+      // This also leaves the previous cached definition intact when set() fails.
+      getRegistry().set(plugin.id, plugin);
+    });
+  registrationTails.set(plugin.id, registration);
+
   try {
-    await getServerPluginRegistryStore().set(plugin);
-  } catch (error) {
-    if (!canUseMemoryFallback()) {
-      getRegistry().delete(plugin.id);
-      throw error;
+    await registration;
+  } finally {
+    if (registrationTails.get(plugin.id) === registration) {
+      registrationTails.delete(plugin.id);
     }
   }
 }
@@ -157,4 +178,5 @@ export function clearServerPluginRegistryForTesting(): void {
   getRegistry().clear();
   configuredStore?.clear?.();
   configuredStore = null;
+  registrationTails.clear();
 }

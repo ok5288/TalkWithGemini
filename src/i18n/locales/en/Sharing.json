@@ -38,5 +38,10 @@
   "unavailableDescription": "The link may have expired or sharing has been cancelled.",
   "retryDescription": "Check your connection and try again.",
   "retry": "Try again",
-  "loading": "Loading shared conversation…"
+  "loading": "Loading shared conversation…",
+  "includeIntelligentUiState": "Include my Intelligent UI inputs and results",
+  "preview": "Share preview",
+  "confirmPublish": "Confirm and publish",
+  "previewDescription": "This is the exact content to be published. Interface snapshots are supplied by the interface and are shown as plain text.",
+  "previewStale": "The conversation or source permissions changed. Prepare a new preview."
 }

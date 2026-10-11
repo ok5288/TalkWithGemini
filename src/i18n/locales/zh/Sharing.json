@@ -38,5 +38,10 @@
   "unavailableDescription": "链接可能已到期，或分享已被取消。",
   "retryDescription": "请检查网络连接后重试。",
   "retry": "重试",
-  "loading": "正在加载分享会话…"
+  "loading": "正在加载分享会话…",
+  "includeIntelligentUiState": "包含我的智能界面输入与结果",
+  "preview": "分享预览",
+  "confirmPublish": "确认并发布",
+  "previewDescription": "以下是即将发布的确切内容。界面快照由界面提供，以纯文本展示。",
+  "previewStale": "对话或来源权限已变化，请重新准备预览。"
 }

@@ -49,7 +49,9 @@
     "askEvidence": "基于现有证据提问",
     "continueResearch": "继续研究",
     "updateLatest": "更新最新",
-    "downloadReport": "下载"
+    "downloadReport": "下载",
+    "interactiveExplanation": "在聊天中交互解释",
+    "interactiveExplanationPrompt": "请基于附件报告在当前聊天中生成交互解释，保留原报告与证据不变。报告：{title}；任务：{taskId}；报告 ID：{reportId}；版本：{version}。"
   },
   "plan": {
     "title": "研究计划",

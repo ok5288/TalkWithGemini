@@ -325,12 +325,15 @@ export function clearApiProofSessionCache(): void {
 export async function signedApiFetch(
   input: RequestInfo | URL,
   init?: RequestInit,
+  beforeDispatch?: () => Promise<void>,
 ): Promise<Response> {
   const url = resolveFetchUrl(input);
   const method = getFetchMethod(input, init);
   const signal =
     init?.signal ?? (input instanceof Request ? input.signal : undefined);
   if (!url || !isApiProofProtectedRoute(url.pathname, method)) {
+    if (beforeDispatch) await beforeDispatch();
+    throwIfAborted(signal);
     return fetch(input, init);
   }
 
@@ -360,6 +363,7 @@ export async function signedApiFetch(
       headers.set(key, value);
     }
 
+    if (beforeDispatch) await beforeDispatch();
     throwIfAborted(signal);
     const response = await fetch(attempt === 0 ? input : replayInput, {
       ...init,

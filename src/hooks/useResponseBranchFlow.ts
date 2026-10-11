@@ -1,4 +1,5 @@
 "use client";
+import { useLayoutEffect, useRef } from "react";
 import { isTemporarySessionId } from "@/lib/chat/sessionRetention";
 import { v7 as uuidv7 } from "uuid";
 import type { Message } from "@/types";
@@ -22,6 +23,7 @@ import type { StreamRenderScheduler } from "@/lib/chat/streamRenderScheduler";
 import { getSyncDeviceId } from "@/lib/sync/deviceIdentity";
 import { logDevError } from "@/lib/utils/devLogger";
 import { isForcedPluginInvocationError } from "@/lib/chat/forcedInvocation";
+import { waitForSessionMessageWrites } from "@/store/sessionMessagePersistence";
 import type { ChatFlowDeps, StreamRenderSnapshot } from "./chatFlowTypes";
 
 const logChatAppError = logDevError;
@@ -38,7 +40,6 @@ export function useResponseBranchFlow(deps: ChatFlowDeps) {
     showActionError,
     syncActiveSessionWithNotice,
     currentSessionId,
-    activeMessages,
     selectedModel,
     chatConfig,
     modelMetadata,
@@ -76,7 +77,41 @@ export function useResponseBranchFlow(deps: ChatFlowDeps) {
     skillBundleParameterValuesRef,
   } = deps;
 
-  const generateModelResponseBranch = async (
+  // Branch actions perform an asynchronous persistence barrier before they
+  // mutate the message tree. Keep the guard in a ref so two handlers from the
+  // same render cannot both pass the preflight while that barrier is pending.
+  const branchActionInFlight = useRef(false);
+  const currentModels = useRef(availableModels);
+  const currentGenerationState = useRef(isGenerating);
+  useLayoutEffect(() => {
+    currentModels.current = availableModels;
+    currentGenerationState.current = isGenerating;
+  }, [availableModels, isGenerating]);
+
+  const withBranchActionLock = async <T>(
+    action: () => Promise<T>,
+  ): Promise<T | undefined> => {
+    if (branchActionInFlight.current) return;
+    branchActionInFlight.current = true;
+    try {
+      return await action();
+    } finally {
+      branchActionInFlight.current = false;
+    }
+  };
+
+  const waitForBranchPersistence = async (sessionId: string) => {
+    try {
+      await waitForSessionMessageWrites(sessionId);
+      return true;
+    } catch (error) {
+      logChatAppError("Failed to flush branch message state", error);
+      showActionError(t("errSaveChanges"));
+      return false;
+    }
+  };
+
+  const runGenerateModelResponseBranch = async (
     messageId: string,
     {
       errorMessage,
@@ -100,7 +135,36 @@ export function useResponseBranchFlow(deps: ChatFlowDeps) {
       return;
     }
 
-    const sessionMessages = activeMessages;
+    const targetSessionId = currentSessionId;
+    if (!(await waitForBranchPersistence(targetSessionId))) {
+      return;
+    }
+
+    const liveState = useChatStore.getState();
+    if (
+      liveState.currentSessionId !== targetSessionId ||
+      liveState.isActiveSessionLoading ||
+      liveState.pendingSessionId !== null ||
+      currentGenerationState.current ||
+      liveState.activeMessages.some(
+        (message) => message.generation?.status === "streaming",
+      )
+    ) {
+      return;
+    }
+    if (!navigator.onLine) {
+      showActionError(t("offlineReadOnly"));
+      return;
+    }
+    if (!model && liveState.selectedModel !== undefined) {
+      if (liveState.selectedModel !== selectedModel) {
+        return;
+      }
+    }
+
+    // The runtime flush may have replaced the active message object. Never
+    // continue with the render-time snapshot captured before the barrier.
+    const sessionMessages = liveState.activeMessages;
     if (!sessionMessages) return;
 
     const msgIndex = sessionMessages.findIndex((m) => m.id === messageId);
@@ -119,11 +183,15 @@ export function useResponseBranchFlow(deps: ChatFlowDeps) {
     const promptAttachments = lastUserMsg.attachments || [];
     const generationModel = model || selectedModel;
 
-    const currentModelInfo = availableModels.find(
+    const currentModelInfo = currentModels.current.find(
       (m) => m.name === generationModel,
     );
     if (!currentModelInfo) {
       showActionError(t("errModelUnavailable"));
+      return;
+    }
+    if (!navigator.onLine) {
+      showActionError(t("offlineReadOnly"));
       return;
     }
     const modelDisplayName = currentModelInfo.displayName;
@@ -146,7 +214,7 @@ export function useResponseBranchFlow(deps: ChatFlowDeps) {
     }
 
     const branchMessageId = addMessageVersion(
-      currentSessionId,
+      targetSessionId,
       messageId,
       modelDisplayName,
     );
@@ -563,6 +631,10 @@ export function useResponseBranchFlow(deps: ChatFlowDeps) {
     }
   };
 
+  const generateModelResponseBranch = (
+    ...args: Parameters<typeof runGenerateModelResponseBranch>
+  ) => withBranchActionLock(() => runGenerateModelResponseBranch(...args));
+
   const handleRegenerate = async (messageId: string, model?: string) => {
     await generateModelResponseBranch(messageId, {
       errorMessage: t("errRegenerate"),
@@ -571,7 +643,7 @@ export function useResponseBranchFlow(deps: ChatFlowDeps) {
     });
   };
 
-  const handleContinueGeneration = async (messageId: string) => {
+  const runContinueGeneration = async (messageId: string) => {
     if (!navigator.onLine) {
       showActionError(t("offlineReadOnly"));
       return;
@@ -585,7 +657,30 @@ export function useResponseBranchFlow(deps: ChatFlowDeps) {
       return;
     }
 
-    const sessionMessages = useChatStore.getState().activeMessages;
+    if (!(await waitForBranchPersistence(sessionId))) {
+      return;
+    }
+
+    const liveState = useChatStore.getState();
+    if (
+      liveState.currentSessionId !== sessionId ||
+      liveState.isActiveSessionLoading ||
+      liveState.pendingSessionId !== null ||
+      currentGenerationState.current ||
+      liveState.activeMessages.some(
+        (message) => message.generation?.status === "streaming",
+      )
+    ) {
+      return;
+    }
+    if (!navigator.onLine) {
+      showActionError(t("offlineReadOnly"));
+      return;
+    }
+
+    // Re-read after the runtime ACK/save barrier. Continuation must never
+    // send history assembled from the render that started before the wait.
+    const sessionMessages = liveState.activeMessages;
     const messageIndex = sessionMessages.findIndex(
       (message) => message.id === messageId,
     );
@@ -603,7 +698,9 @@ export function useResponseBranchFlow(deps: ChatFlowDeps) {
     }
 
     const generationModel = interruptedMessage.generation.model;
-    if (!availableModels.some((model) => model.name === generationModel)) {
+    if (
+      !currentModels.current.some((model) => model.name === generationModel)
+    ) {
       showActionError(t("errModelUnavailable"));
       return;
     }
@@ -947,13 +1044,21 @@ export function useResponseBranchFlow(deps: ChatFlowDeps) {
     }
   };
 
+  const handleContinueGeneration = (messageId: string) =>
+    withBranchActionLock(() => runContinueGeneration(messageId));
+
   const handleVersionChange = (msgId: string, direction: "prev" | "next") => {
     if (
       currentSessionId &&
       !isGenerating &&
       !useChatStore.getState().isActiveSessionLoading
     ) {
-      switchMessageVersion(currentSessionId, msgId, direction);
+      void Promise.resolve(
+        switchMessageVersion(currentSessionId, msgId, direction),
+      ).catch((error) => {
+        logChatAppError("Failed to save conversation branch change", error);
+        showActionError(t("errSaveChanges"));
+      });
     }
   };
 
@@ -963,7 +1068,12 @@ export function useResponseBranchFlow(deps: ChatFlowDeps) {
       !isGenerating &&
       !useChatStore.getState().isActiveSessionLoading
     ) {
-      selectMessageVersion(currentSessionId, msgId, targetId);
+      void Promise.resolve(
+        selectMessageVersion(currentSessionId, msgId, targetId),
+      ).catch((error) => {
+        logChatAppError("Failed to save conversation branch selection", error);
+        showActionError(t("errSaveChanges"));
+      });
     }
   };
 

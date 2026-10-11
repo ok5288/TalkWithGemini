@@ -49,7 +49,9 @@
     "askEvidence": "既存の根拠に質問",
     "continueResearch": "調査を続ける",
     "updateLatest": "最新情報に更新",
-    "downloadReport": "ダウンロード"
+    "downloadReport": "ダウンロード",
+    "interactiveExplanation": "チャットで対話的に説明",
+    "interactiveExplanationPrompt": "添付のレポートを基に、このチャットで対話的な説明を作成してください。元のレポートと証拠は変更しないでください。レポート：{title}、タスク：{taskId}、レポート ID：{reportId}、バージョン：{version}。"
   },
   "plan": {
     "title": "調査計画",

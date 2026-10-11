@@ -1,3 +1,4 @@
+import { normalizeIntelligentUiBlock } from "@/lib/intelligentUi/schema";
 import {
   Message,
   MessageOutputBlock,
@@ -82,6 +83,25 @@ export function normalizeToolCall(toolCall: Partial<ToolCall>): ToolCall {
     pluginId: toolCall.pluginId,
     pluginTitle: toolCall.pluginTitle,
     functionFingerprint: toolCall.functionFingerprint,
+    ...(typeof toolCall.executionRecordId === "string"
+      ? { executionRecordId: toolCall.executionRecordId }
+      : {}),
+    // Preserve captured data across restore; adapters still validate descriptor versions,
+    // exact result hashes, execution IDs and current tool permissions before use.
+    ...(toolCall.intelligentUiResult &&
+    typeof toolCall.intelligentUiResult === "object" &&
+    !Array.isArray(toolCall.intelligentUiResult)
+      ? { intelligentUiResult: structuredClone(toolCall.intelligentUiResult) }
+      : {}),
+    ...(toolCall.intelligentUiState &&
+    typeof toolCall.intelligentUiState === "object" &&
+    !Array.isArray(toolCall.intelligentUiState)
+      ? { intelligentUiState: structuredClone(toolCall.intelligentUiState) }
+      : {}),
+    ...(Number.isSafeInteger(toolCall.intelligentUiStateRevision) &&
+    Number(toolCall.intelligentUiStateRevision) >= 0
+      ? { intelligentUiStateRevision: toolCall.intelligentUiStateRevision }
+      : {}),
     args: toolCall.args ?? {},
     status,
     result: interruptedConfirmation ? interruptedResult : toolCall.result,
@@ -128,6 +148,13 @@ export function normalizeMessage(message: Message): Message {
   if (Array.isArray(message.outputBlocks)) {
     normalizedBlocks = [];
     for (const block of message.outputBlocks) {
+      if (block.type === "intelligent_ui") {
+        const normalized = normalizeIntelligentUiBlock(block, {
+          interrupted: true,
+        });
+        if (normalized) normalizedBlocks.push(normalized);
+        continue;
+      }
       if (block.type === "text") {
         const presentation = normalizeLongTextPresentation(block.presentation);
         normalizedBlocks.push({

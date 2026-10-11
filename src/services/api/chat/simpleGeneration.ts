@@ -34,6 +34,7 @@ export const streamGenerateContent = async (
   prompt: string,
   onTextSnapshot: CumulativeTextHandler,
   signal?: AbortSignal,
+  beforeDispatch?: () => Promise<void>,
 ): Promise<string> => {
   const { providerId, modelName } = parseModelString(model);
 
@@ -53,7 +54,9 @@ export const streamGenerateContent = async (
         buildDirectProviderConfig(provider),
       ]);
 
+      await beforeDispatch?.();
       await runChatStream({
+        beforeDispatch,
         provider: directProvider,
         modelName,
         history: [],
@@ -83,18 +86,22 @@ export const streamGenerateContent = async (
   let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
   try {
     const response = await fetchWithByokRetry(async () =>
-      signedApiFetch("/api/chat/generate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      signedApiFetch(
+        "/api/chat/generate",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            provider: await buildProviderRuntimeConfig(provider, signal),
+            modelName,
+            prompt,
+          }),
+          signal,
         },
-        body: JSON.stringify({
-          provider: await buildProviderRuntimeConfig(provider, signal),
-          modelName,
-          prompt,
-        }),
-        signal,
-      }),
+        beforeDispatch,
+      ),
     );
 
     if (!response.ok) {

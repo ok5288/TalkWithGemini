@@ -1,3 +1,4 @@
+import IntelligentUi from "./en/IntelligentUi.json";
 import Sharing from "./en/Sharing.json";
 import Common from "./en/Common.json";
 import AccessPassword from "./en/AccessPassword.json";
@@ -41,6 +42,7 @@ import ResearchSteering from "./en/ResearchSteering.json";
 import EvidenceQuestions from "./en/EvidenceQuestions.json";
 
 const messages = {
+  IntelligentUi,
   Sharing,
   Common,
   AccessPassword,

@@ -45,9 +45,14 @@ import { useAttachmentDisplayUrl } from "@/lib/utils/useAttachmentDisplayUrl";
 import { useUIStore } from "@/store/core/uiStore";
 import SafeImage from "../ui/SafeImage";
 import { Button } from "@/components/ui/primitives";
+import ToolResultUi from "./intelligentUi/ToolResultUi";
+import ConnectedMcpAppCard from "./mcpApps/ConnectedMcpAppCard";
 
 interface ToolCallBlockProps {
   toolCalls: ToolCall[];
+  sessionId?: string;
+  messageId?: string;
+  readOnly?: boolean;
   onConfirmationDecision?: (
     toolCallId: string,
     decision: ToolConfirmationDecision,
@@ -177,6 +182,9 @@ const ToolResultImage: React.FC<{ image: Attachment }> = ({ image }) => {
 
 const ToolCallBlock: React.FC<ToolCallBlockProps> = ({
   toolCalls,
+  sessionId,
+  messageId,
+  readOnly,
   onConfirmationDecision,
   onRevokeSessionApproval,
 }) => {
@@ -610,6 +618,24 @@ const ToolCallBlock: React.FC<ToolCallBlockProps> = ({
 
                 {tc.workspacePresentation ? (
                   <WorkspaceResultCard snapshot={tc.workspacePresentation} />
+                ) : null}
+
+                {tc.intelligentUiResult ? (
+                  <ToolResultUi
+                    call={safeToolCalls.find((call) => call.id === tc.id)!}
+                    sessionId={sessionId}
+                    messageId={messageId}
+                    readOnly={readOnly}
+                  />
+                ) : null}
+
+                {sessionId && messageId ? (
+                  <ConnectedMcpAppCard
+                    toolCall={safeToolCalls.find((call) => call.id === tc.id)!}
+                    sessionId={sessionId}
+                    messageId={messageId}
+                    readOnly={readOnly}
+                  />
                 ) : null}
 
                 {tc.workspacePresentation ? (

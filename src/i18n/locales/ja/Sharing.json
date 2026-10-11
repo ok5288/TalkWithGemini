@@ -38,5 +38,10 @@
   "unavailableDescription": "リンクの期限が切れたか、共有が解除されました。",
   "retryDescription": "接続を確認して再試行してください。",
   "retry": "再試行",
-  "loading": "共有された会話を読み込み中…"
+  "loading": "共有された会話を読み込み中…",
+  "includeIntelligentUiState": "スマート UI の入力と結果を含める",
+  "preview": "共有プレビュー",
+  "confirmPublish": "確認して公開",
+  "previewDescription": "以下は実際に公開される内容です。インターフェースが提供するスナップショットはプレーンテキストで表示されます。",
+  "previewStale": "会話またはソースの権限が変更されました。プレビューを作り直してください。"
 }

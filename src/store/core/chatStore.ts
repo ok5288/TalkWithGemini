@@ -1,3 +1,14 @@
+import {
+  createHtmlRuntimeGuards,
+  HTML_RUNTIME_LIMITS,
+} from "@/lib/intelligentUi/runtimeLimits";
+import { flushHtmlRuntimeUpdates } from "@/lib/intelligentUi/runtimeFlush";
+import { isExplorerEnabled } from "@/lib/intelligentUi/featurePolicy";
+import { matchesUiStateTarget } from "@/lib/intelligentUi/instance";
+import { explorerDatasetSchema } from "@/lib/intelligentUi/explorer/schema";
+import type { ExplorerDataset } from "@/lib/intelligentUi/explorer/types";
+import type { UiSourceBinding } from "@/lib/intelligentUi/sources/types";
+import { normalizeToolResultUiState } from "@/lib/intelligentUi/toolResults/adapters";
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { v7 as uuidv7 } from "uuid";
@@ -30,6 +41,12 @@ import {
   normalizeWorkspace,
 } from "@/lib/chat/entities";
 import { DEFAULT_CHAT_CONFIG } from "@/config/defaults";
+import type { JsonObject } from "@/lib/intelligentUi/types";
+import { normalizeJsonState } from "@/lib/intelligentUi/schema";
+import {
+  mergeIntelligentUiState,
+  mergeToolResultUiState,
+} from "@/lib/intelligentUi/state";
 import {
   endTemporarySession,
   isTemporarySession,
@@ -84,6 +101,11 @@ import {
 } from "@/lib/chat/attachmentReferences";
 import {
   enqueueSessionMessageWrite,
+  enqueueSessionMessageTreeWrite,
+  deleteSessionMessageWrites,
+  reopenSessionMessageWrites,
+  type SessionMessageSaveMode,
+  type SessionMessageSavePolicy,
   waitForSessionMessageWrites,
 } from "../sessionMessagePersistence";
 
@@ -158,6 +180,12 @@ const replaceOutputBlockText = (
   content: string,
 ): MessageOutputBlock[] | undefined => {
   if (!outputBlocks?.length) return outputBlocks;
+
+  // UI source lives in the canonical content. Proportional text replacement
+  // would splice that source into neighbouring prose and destroy block order.
+  if (outputBlocks.some((block) => block.type === "intelligent_ui")) {
+    return outputBlocks;
+  }
 
   const textBlocks = outputBlocks.filter((block) => block.type === "text");
 
@@ -354,6 +382,26 @@ interface ChatState {
     updates: Partial<Message>,
   ) => void;
   setMessages: (sessionId: string, messages: Message[]) => void;
+  updateIntelligentUiState: (
+    sessionId: string,
+    messageId: string,
+    blockId: string,
+    definitionRevision: number,
+    state: JsonObject,
+    snapshot?: string,
+    hostUpdate?: {
+      dataset?: ExplorerDataset | null;
+      sourceBindings?: UiSourceBinding[];
+    },
+    persistenceMode?: SessionMessageSaveMode,
+  ) => Promise<boolean>;
+  updateToolResultUiState: (
+    sessionId: string,
+    messageId: string,
+    callId: string,
+    resultHash: string,
+    state: JsonObject,
+  ) => Promise<boolean>;
 
   // Workspace Actions
   createWorkspace: (workspace: Omit<Workspace, "createdAt">) => void;
@@ -364,6 +412,8 @@ interface ChatState {
   syncActiveSession: (
     sessionId?: string,
     messages?: Message[] | SessionMessageTree,
+    mode?: SessionMessageSaveMode,
+    policy?: SessionMessageSavePolicy,
   ) => Promise<void>;
 
   // Versioning Actions
@@ -382,12 +432,12 @@ interface ChatState {
     sessionId: string,
     messageId: string,
     direction: "prev" | "next",
-  ) => void;
+  ) => Promise<void>;
   selectMessageVersion: (
     sessionId: string,
     messageId: string,
     targetMessageId: string,
-  ) => void;
+  ) => Promise<void>;
 
   deleteMessage: (sessionId: string, messageId: string) => Promise<void>;
   deleteMessageAndSubsequent: (
@@ -635,24 +685,34 @@ export const useChatStore = create<ChatState>()(
         if (id === get().currentSessionId && isTemporarySessionId(id)) return;
         const session = get().sessions.find((candidate) => candidate.id === id);
         if (!session) return;
-        get().discardTemporarySession();
-
-        const requestId = selectSessionRequestId + 1;
+        let requestId = selectSessionRequestId + 1;
         selectSessionRequestId = requestId;
-        set({
-          isActiveSessionLoading: true,
-          pendingSessionId: id,
-          activeSessionLoadError: null,
-        });
 
+        // Flush while the leaving runtime still has an active source lease.
         // Fetch data first
         let messageTree: SessionMessageTree;
         try {
+          const leavingId = get().currentSessionId;
+          const leavingWrite =
+            leavingId && leavingId !== id
+              ? waitForSessionMessageWrites(leavingId)
+              : undefined;
+          if (leavingWrite) await leavingWrite;
+          if (requestId !== selectSessionRequestId) return;
           const pendingWrite = waitForSessionMessageWrites(id);
           if (pendingWrite) {
             await pendingWrite;
             if (requestId !== selectSessionRequestId) return;
           }
+          if (!get().sessions.some((candidate) => candidate.id === id)) return;
+          get().discardTemporarySession();
+          // Discarding a temporary session updates the selection epoch too.
+          requestId = selectSessionRequestId;
+          set({
+            isActiveSessionLoading: true,
+            pendingSessionId: id,
+            activeSessionLoadError: null,
+          });
           messageTree = normalizeStoredMessageTree(
             await appDb.getItem<Message[] | SessionMessageTree>(
               `session_messages_${id}`,
@@ -691,6 +751,8 @@ export const useChatStore = create<ChatState>()(
       },
 
       deleteSession: async (id) => {
+        const runtimeFlush = flushHtmlRuntimeUpdates(id);
+        if (runtimeFlush) await runtimeFlush;
         if (isTemporarySessionId(id)) {
           if (get().sessions.some((session) => session.id === id)) {
             get().discardTemporarySession();
@@ -734,7 +796,7 @@ export const useChatStore = create<ChatState>()(
         let deletedMessages: Message[] | null = wasActiveSession
           ? getAllMessagesFromTree(stateBeforeDelete.activeMessageTree)
           : null;
-        const removeMessagesPromise = enqueueSessionMessageWrite(
+        const removeMessagesPromise = deleteSessionMessageWrites(
           id,
           async () => {
             if (!wasActiveSession) {
@@ -949,15 +1011,26 @@ export const useChatStore = create<ChatState>()(
 
       duplicateSession: async (id, duplicateTitle) => {
         if (isTemporarySessionId(id)) return;
-        get().discardTemporarySession();
-        const requestId = selectSessionRequestId + 1;
+        let requestId = selectSessionRequestId + 1;
         selectSessionRequestId = requestId;
-        const state = get();
+        const leavingId = get().currentSessionId;
+        const runtimeFlush = leavingId
+          ? flushHtmlRuntimeUpdates(leavingId)
+          : undefined;
+        if (runtimeFlush) await runtimeFlush;
+        if (requestId === selectSessionRequestId) {
+          get().discardTemporarySession();
+          requestId = selectSessionRequestId;
+        }
+        let state = get();
         const original = state.sessions.find((s) => s.id === id);
         if (!original) return;
 
         const newId = uuidv7();
 
+        const originalWrite = waitForSessionMessageWrites(id);
+        if (originalWrite) await originalWrite;
+        state = get();
         // Load original messages after any queued persistence has settled.
         // The active tree is already the newest atomic snapshot.
         let originalMessageTree: SessionMessageTree;
@@ -978,9 +1051,11 @@ export const useChatStore = create<ChatState>()(
           return;
         }
 
+        const clonedMessageIds = new Map<string, string>();
         let newMessageTree = cloneMessageTreeWithNewIds(
           originalMessageTree,
           uuidv7,
+          clonedMessageIds,
         );
         const referencedResearchTaskIds =
           getReferencedResearchTaskIds(originalMessageTree);
@@ -1018,12 +1093,51 @@ export const useChatStore = create<ChatState>()(
                 tasks: preparedResearch.tasks,
                 artifactUrls: copiedArtifacts,
               })
-            : { taskIdMap: new Map<string, string>(), createdTaskIds: [] };
+            : {
+                taskIdMap: new Map<string, string>(),
+                createdTaskIds: [],
+                sourceRefMap: new Map<string, string>(),
+              };
           createdResearchTaskIds = duplicatedResearch.createdTaskIds;
           newMessageTree = remapResearchTaskBlocks(
             newMessageTree,
             duplicatedResearch.taskIdMap,
           );
+          const hasUiSources = Object.values(newMessageTree.nodesById).some(
+            ({ message }) =>
+              message.attachments?.some(
+                (attachment) => attachment.intelligentUiSource,
+              ) ||
+              message.outputBlocks?.some(
+                (block) =>
+                  block.type === "intelligent_ui" &&
+                  (!!block.sourceBindings?.length ||
+                    (block.definition &&
+                      "kind" in block.definition &&
+                      block.definition.kind === "explorer" &&
+                      block.definition.props.dataset.kind === "context")),
+              ),
+          );
+          if (hasUiSources) {
+            const { remapClonedUiSources } =
+              await import("@/lib/intelligentUi/sources/clone");
+            newMessageTree = await remapClonedUiSources({
+              originalSessionId: id,
+              targetSessionId: newId,
+              originalTree: originalMessageTree,
+              clonedTree: newMessageTree,
+              messageIdMap: clonedMessageIds,
+              taskIdMap: duplicatedResearch.taskIdMap,
+              sourceRefMap: duplicatedResearch.sourceRefMap,
+              originalTasks: preparedResearch.tasks,
+              targetTasks: duplicatedResearch.createdTaskIds.flatMap(
+                (taskId) => {
+                  const task = useResearchStore.getState().tasksById[taskId];
+                  return task ? [task] : [];
+                },
+              ),
+            });
+          }
         } catch (error) {
           await removeResearchTaskSnapshots(createdResearchTaskIds);
           await deleteSessionArtifacts(newId).catch((cleanupError) => {
@@ -1062,6 +1176,13 @@ export const useChatStore = create<ChatState>()(
           throw error;
         }
 
+        if (requestId === selectSessionRequestId) {
+          const leavingId = get().currentSessionId;
+          const leavingWrite = leavingId
+            ? waitForSessionMessageWrites(leavingId)
+            : undefined;
+          if (leavingWrite) await leavingWrite;
+        }
         const shouldActivateDuplicate = requestId === selectSessionRequestId;
 
         set((state) => ({
@@ -1079,6 +1200,8 @@ export const useChatStore = create<ChatState>()(
       },
 
       addMessage: async (sessionId, message) => {
+        if (get().sessions.some((session) => session.id === sessionId))
+          reopenSessionMessageWrites(sessionId);
         const normalizedMessage = normalizeMessage({ ...message });
 
         let sessionExists = false;
@@ -1181,7 +1304,11 @@ export const useChatStore = create<ChatState>()(
                 newMessage.reasoning = reasoning;
               }
               if (nextOutputBlocks !== undefined) {
-                newMessage.outputBlocks = nextOutputBlocks;
+                newMessage.outputBlocks = mergeIntelligentUiState(
+                  nextOutputBlocks,
+                  message.outputBlocks,
+                  message.toolCalls,
+                );
               }
               return newMessage;
             },
@@ -1204,7 +1331,29 @@ export const useChatStore = create<ChatState>()(
           const newMessageTree = updateMessageInTree(
             getMessageTreeFromState(state),
             messageId,
-            (message) => ({ ...message, ...updates }),
+            (message) => ({
+              ...message,
+              ...updates,
+              ...(updates.toolCalls
+                ? {
+                    toolCalls: mergeToolResultUiState(updates.toolCalls, [
+                      ...(message.toolCalls ?? []),
+                      ...(message.outputBlocks ?? []).flatMap((block) =>
+                        block.type === "tool_group" ? block.toolCalls : [],
+                      ),
+                    ]),
+                  }
+                : {}),
+              ...(updates.outputBlocks
+                ? {
+                    outputBlocks: mergeIntelligentUiState(
+                      updates.outputBlocks,
+                      message.outputBlocks,
+                      message.toolCalls,
+                    ),
+                  }
+                : {}),
+            }),
           );
 
           treeToPersist = newMessageTree;
@@ -1218,6 +1367,180 @@ export const useChatStore = create<ChatState>()(
         if (treeToPersist) {
           get().syncActiveSession(sessionId, treeToPersist);
         }
+      },
+
+      updateIntelligentUiState: async (
+        sessionId,
+        messageId,
+        blockId,
+        definitionRevision,
+        nextState,
+        snapshot,
+        hostUpdate,
+        persistenceMode = "immediate",
+      ) => {
+        const imported = hostUpdate?.dataset
+          ? explorerDatasetSchema.safeParse(hostUpdate.dataset)
+          : undefined;
+        if (imported && !imported.success) return false;
+        let accepted = false;
+        let treeToPersist: SessionMessageTree | null = null;
+        set((state) => {
+          if (
+            state.currentSessionId !== sessionId ||
+            state.isActiveSessionLoading ||
+            !!state.pendingSessionId ||
+            !state.activeMessages.some((message) => message.id === messageId)
+          )
+            return {};
+          const tree = updateMessageInTree(
+            getMessageTreeFromState(state),
+            messageId,
+            (message) => {
+              if (message.role !== "model") return message;
+              const outputBlocks = message.outputBlocks?.map((block) => {
+                if (
+                  block.type !== "intelligent_ui" ||
+                  !matchesUiStateTarget(block, blockId, definitionRevision)
+                )
+                  return block;
+                if (
+                  block.definition &&
+                  "kind" in block.definition &&
+                  block.definition.kind === "explorer" &&
+                  !isExplorerEnabled()
+                )
+                  return block;
+                if (
+                  hostUpdate?.dataset !== undefined &&
+                  (!block.definition ||
+                    !("kind" in block.definition) ||
+                    block.definition.kind !== "explorer")
+                )
+                  return block;
+                let normalizedState: JsonObject;
+                try {
+                  normalizedState =
+                    block.renderer === "html"
+                      ? (createHtmlRuntimeGuards(HTML_RUNTIME_LIMITS).state(
+                          nextState,
+                        ) as JsonObject)
+                      : normalizeJsonState(nextState);
+                } catch {
+                  return block;
+                }
+                accepted = true;
+                return {
+                  ...block,
+                  state: normalizedState,
+                  stateRevision: block.stateRevision + 1,
+                  ...(hostUpdate?.dataset !== undefined
+                    ? {
+                        dataSnapshot: imported?.success
+                          ? structuredClone(imported.data)
+                          : undefined,
+                      }
+                    : {}),
+                  ...(hostUpdate?.sourceBindings
+                    ? {
+                        sourceBindings: structuredClone(
+                          hostUpdate.sourceBindings,
+                        ),
+                      }
+                    : {}),
+                  ...(snapshot !== undefined
+                    ? { staticSnapshot: snapshot }
+                    : {}),
+                };
+              });
+              return accepted ? { ...message, outputBlocks } : message;
+            },
+          );
+          if (!accepted) return {};
+          treeToPersist = tree;
+          return {
+            activeMessageTree: tree,
+            activeMessages: getActiveMessagePath(tree),
+          };
+        });
+        if (treeToPersist)
+          await get().syncActiveSession(
+            sessionId,
+            treeToPersist,
+            persistenceMode,
+            { retainOnFailure: true },
+          );
+        return accepted;
+      },
+
+      updateToolResultUiState: async (
+        sessionId,
+        messageId,
+        callId,
+        resultHash,
+        nextState,
+      ) => {
+        let accepted = false;
+        let treeToPersist: SessionMessageTree | null = null;
+        set((state) => {
+          if (
+            state.currentSessionId !== sessionId ||
+            state.isActiveSessionLoading ||
+            !!state.pendingSessionId ||
+            !state.activeMessages.some((message) => message.id === messageId)
+          )
+            return {};
+          const tree = updateMessageInTree(
+            getMessageTreeFromState(state),
+            messageId,
+            (message) => {
+              if (message.role !== "model") return message;
+              const update = (
+                call: NonNullable<Message["toolCalls"]>[number],
+              ) => {
+                if (
+                  call.id !== callId ||
+                  call.status !== "success" ||
+                  call.isError ||
+                  call.intelligentUiResult?.resultHash !== resultHash
+                )
+                  return call;
+                const normalized = normalizeToolResultUiState(
+                  call,
+                  normalizeJsonState(nextState),
+                );
+                if (!normalized) return call;
+                accepted = true;
+                return {
+                  ...call,
+                  intelligentUiState: structuredClone(normalized),
+                  intelligentUiStateRevision:
+                    (call.intelligentUiStateRevision ?? 0) + 1,
+                };
+              };
+              const toolCalls = message.toolCalls?.map(update);
+              const outputBlocks = message.outputBlocks?.map((block) =>
+                block.type === "tool_group"
+                  ? { ...block, toolCalls: block.toolCalls.map(update) }
+                  : block,
+              );
+              return accepted
+                ? { ...message, toolCalls, outputBlocks }
+                : message;
+            },
+          );
+          if (!accepted) return {};
+          treeToPersist = tree;
+          return {
+            activeMessageTree: tree,
+            activeMessages: getActiveMessagePath(tree),
+          };
+        });
+        if (treeToPersist)
+          await get().syncActiveSession(sessionId, treeToPersist, "immediate", {
+            retainOnFailure: true,
+          });
+        return accepted;
       },
 
       setMessages: (sessionId, messages) => {
@@ -1249,7 +1572,12 @@ export const useChatStore = create<ChatState>()(
       },
 
       // Helper to explicitly save active messages to DB
-      syncActiveSession: async (sessionId, messages) => {
+      syncActiveSession: async (
+        sessionId,
+        messages,
+        mode = "immediate",
+        policy,
+      ) => {
         const { currentSessionId, activeMessageTree } = get();
         const targetSessionId = sessionId ?? currentSessionId;
         if (!targetSessionId) return;
@@ -1257,6 +1585,7 @@ export const useChatStore = create<ChatState>()(
         if (!get().sessions.some((session) => session.id === targetSessionId)) {
           return;
         }
+        reopenSessionMessageWrites(targetSessionId);
 
         const treeToSave = Array.isArray(messages)
           ? normalizeSessionMessageTree(normalizeMessages(messages))
@@ -1265,12 +1594,15 @@ export const useChatStore = create<ChatState>()(
 
         if (!treeToSave) return;
 
-        await enqueueSessionMessageWrite(targetSessionId, async () => {
-          await appDb.setItem(
-            `session_messages_${targetSessionId}`,
-            treeToSave,
-          );
-        });
+        await enqueueSessionMessageTreeWrite(
+          targetSessionId,
+          treeToSave,
+          async (tree) => {
+            await appDb.setItem(`session_messages_${targetSessionId}`, tree);
+          },
+          mode,
+          policy,
+        );
       },
 
       addMessageVersion: (sessionId, messageId, modelName) => {
@@ -1397,7 +1729,11 @@ export const useChatStore = create<ChatState>()(
         return result;
       },
 
-      switchMessageVersion: (sessionId, messageId, direction) => {
+      switchMessageVersion: async (sessionId, messageId, direction) => {
+        const requestId = selectSessionRequestId;
+        const pendingWrite = waitForSessionMessageWrites(sessionId);
+        if (pendingWrite) await pendingWrite;
+        if (requestId !== selectSessionRequestId) return;
         let treeToPersist: SessionMessageTree | null = null;
 
         set((state) => {
@@ -1434,11 +1770,15 @@ export const useChatStore = create<ChatState>()(
           };
         });
         if (treeToPersist) {
-          get().syncActiveSession(sessionId, treeToPersist);
+          await get().syncActiveSession(sessionId, treeToPersist);
         }
       },
 
-      selectMessageVersion: (sessionId, messageId, targetMessageId) => {
+      selectMessageVersion: async (sessionId, messageId, targetMessageId) => {
+        const requestId = selectSessionRequestId;
+        const pendingWrite = waitForSessionMessageWrites(sessionId);
+        if (pendingWrite) await pendingWrite;
+        if (requestId !== selectSessionRequestId) return;
         let treeToPersist: SessionMessageTree | null = null;
 
         set((state) => {
@@ -1475,7 +1815,7 @@ export const useChatStore = create<ChatState>()(
         });
 
         if (treeToPersist) {
-          get().syncActiveSession(sessionId, treeToPersist);
+          await get().syncActiveSession(sessionId, treeToPersist);
         }
       },
 

@@ -158,6 +158,7 @@ export function useChatRequestPreparation({
       systemPrompt: system.systemPrompt,
       personality: system.personality,
       enableHtmlVisualPrompt: system.enableHtmlVisualPrompt,
+      enableIntelligentUi: system.enableIntelligentUi,
       selectedModel: requestModel,
       provider,
       modelMetadata,
@@ -197,7 +198,10 @@ export function useChatRequestPreparation({
     session?: Session | null,
     requestModel = selectedModel,
     forcedSkillIds: readonly string[] = [],
+    isolated = false,
   ): Promise<ComposerSkillParameterValues | null> => {
+    const skillValues = isolated ? {} : skillParameterValuesRef.current;
+    const bundleValues = isolated ? {} : skillBundleParameterValuesRef.current;
     if (isTemporarySession(session))
       return { skillParameterValues: {}, skillBundleParameterValues: {} };
     const effectiveContext = getEffectiveContextForSession(
@@ -239,12 +243,7 @@ export function useChatRequestPreparation({
     const requests: SkillParameterRequest[] = [];
 
     for (const skill of activeManualSkills) {
-      if (
-        getMissingSkillParameters(
-          skill,
-          skillParameterValuesRef.current[skill.id],
-        ).length > 0
-      ) {
+      if (getMissingSkillParameters(skill, skillValues[skill.id]).length > 0) {
         requests.push({
           key: `skill:${skill.id}`,
           title: skill.title,
@@ -257,7 +256,7 @@ export function useChatRequestPreparation({
       if (
         getMissingSkillParameters(
           { id: bundle.id, parameters: bundle.parameters },
-          skillBundleParameterValuesRef.current[bundle.id],
+          bundleValues[bundle.id],
         ).length > 0
       ) {
         requests.push({
@@ -275,9 +274,7 @@ export function useChatRequestPreparation({
           const [kind, id] = request.key.split(":", 2);
           return [
             request.key,
-            kind === "bundle"
-              ? skillBundleParameterValuesRef.current[id] || {}
-              : skillParameterValuesRef.current[id] || {},
+            kind === "bundle" ? bundleValues[id] || {} : skillValues[id] || {},
           ];
         }),
       );
@@ -290,25 +287,22 @@ export function useChatRequestPreparation({
         const [kind, id] = key.split(":", 2);
         if (!id) continue;
         if (kind === "bundle") {
-          skillBundleParameterValuesRef.current[id] = values;
+          bundleValues[id] = values;
         } else if (kind === "skill") {
-          skillParameterValuesRef.current[id] = values;
+          skillValues[id] = values;
         }
       }
     }
 
     try {
       activeManualSkills.forEach((skill) =>
-        resolveSkillParameterValues(
-          skill,
-          skillParameterValuesRef.current[skill.id],
-        ),
+        resolveSkillParameterValues(skill, skillValues[skill.id]),
       );
       activeBundles.forEach((bundle) =>
         resolveSkillBundle({
           bundle,
           skills: installedSkills,
-          values: skillBundleParameterValuesRef.current[bundle.id],
+          values: bundleValues[bundle.id],
         }),
       );
     } catch (error) {
@@ -318,9 +312,9 @@ export function useChatRequestPreparation({
     }
 
     return {
-      skillParameterValues: { ...skillParameterValuesRef.current },
+      skillParameterValues: { ...skillValues },
       skillBundleParameterValues: {
-        ...skillBundleParameterValuesRef.current,
+        ...bundleValues,
       },
     };
   };

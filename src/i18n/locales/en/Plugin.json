@@ -116,5 +116,7 @@
   "prevPageAria": "Go to previous plugins page",
   "nextPageAria": "Go to next plugins page",
   "pageCurrent": "Page {currentPage}",
-  "pageOf": "Page {currentPage} of {totalPages}"
+  "pageOf": "Page {currentPage} of {totalPages}",
+  "mcpToolRefreshRequired": "Refresh tool definitions before allowing this MCP server to provide tools to the model.",
+  "refreshMcpToolDefinition": "Refresh tool definitions"
 }

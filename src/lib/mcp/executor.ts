@@ -12,6 +12,7 @@ export interface ExecuteMcpToolRequestOptions {
   staticHeaders?: Record<string, string>;
   timeoutMs?: number;
   signal?: AbortSignal;
+  enableMcpApps?: boolean;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -348,6 +349,7 @@ export async function executeMcpToolRequest(
     args: options.args,
     timeoutMs: options.timeoutMs,
     signal: options.signal,
+    enableMcpApps: options.enableMcpApps,
     staticHeaders: options.staticHeaders,
     authConfig: {
       ...options.authConfig,

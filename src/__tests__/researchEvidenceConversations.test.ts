@@ -384,6 +384,42 @@ describe("frozen report conversations", () => {
     ).toEqual(["last"]);
   });
 
+  it("returns exact mappings for historical evidence absent from the current task", async () => {
+    await setup();
+    const snapshot = (await repository.get<ResearchEvidenceSnapshot>(
+      "evidence_snapshot",
+      "report-1",
+    ))!;
+    const source = task();
+    source.evidence = [];
+    const target = {
+      ...source,
+      id: "history-copy",
+      sessionId: "copy-session",
+      evidence: [],
+      reportVersions: [
+        {
+          ...report,
+          id: "history-report-copy",
+          artifactId: "opfs://history-copy",
+          researchRunId: "run-copy",
+        },
+      ],
+    };
+    const mappings = await cloneResearchExtensions(source, target, repository);
+    const copied = (await repository.get<ResearchEvidenceSnapshot>(
+      "evidence_snapshot",
+      "history-report-copy",
+    ))!;
+    expect(
+      mappings.get(`evidence:${snapshot.id}:${snapshot.evidence[0].id}`),
+    ).toBe(`evidence:${copied.id}:${copied.evidence[0].id}`);
+    expect(copied.evidence[0].id).not.toBe(snapshot.evidence[0].id);
+    expect(copied.evidence[0].contentHash).toBe(
+      snapshot.evidence[0].contentHash,
+    );
+  });
+
   it("copies historical evidence and topics with new identities, then prunes only orphans", async () => {
     const source = task();
     const thread = await setup();

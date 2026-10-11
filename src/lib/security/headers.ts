@@ -1,3 +1,4 @@
+import { getMcpSandboxOrigin } from "../mcpApps/config";
 import type { DeploymentMode } from "./deployment";
 import { getDeploymentMode } from "./deployment";
 import { THEME_INIT_SCRIPT_SHA256 } from "../themeInitScript";
@@ -33,7 +34,7 @@ export function getContentSecurityPolicy(
     "media-src 'self' data: blob:",
     "font-src 'self' data:",
     `connect-src 'self' https: blob:${isHosted ? "" : " http:"}`,
-    "frame-src 'self' blob: data:",
+    `frame-src 'self' blob: data:${getMcpSandboxOrigin() ? ` ${getMcpSandboxOrigin()}` : ""}`,
     "worker-src 'self' blob:",
   ].join("; ");
 }

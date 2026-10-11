@@ -18,6 +18,10 @@ export function getReferencedResearchTaskIds(
 ): string[] {
   const taskIds = new Set<string>();
   for (const node of Object.values(messageTree.nodesById)) {
+    for (const attachment of node.message.attachments ?? []) {
+      if (attachment.intelligentUiSource?.kind === "report")
+        taskIds.add(attachment.intelligentUiSource.taskId);
+    }
     for (const block of node.message.outputBlocks || []) {
       if (block.type === "research_task") taskIds.add(block.taskId);
     }
@@ -316,18 +320,25 @@ export async function duplicateResearchTaskSnapshots({
   targetSessionId: string;
   tasks: ResearchTask[];
   artifactUrls: ReadonlyMap<string, string>;
-}): Promise<{ taskIdMap: Map<string, string>; createdTaskIds: string[] }> {
+}): Promise<{
+  taskIdMap: Map<string, string>;
+  createdTaskIds: string[];
+  sourceRefMap: Map<string, string>;
+}> {
   const taskIdMap = new Map<string, string>();
   const createdTaskIds: string[] = [];
+  const sourceRefMap = new Map<string, string>();
   try {
     for (const task of tasks) {
       const cloned = cloneResearchTask(task, targetSessionId, artifactUrls);
       await useResearchStore.getState().upsertTask(cloned);
       taskIdMap.set(task.id, cloned.id);
       createdTaskIds.push(cloned.id);
-      await cloneResearchExtensions(task, cloned);
+      const sourceRefs = await cloneResearchExtensions(task, cloned);
+      for (const [source, target] of sourceRefs)
+        sourceRefMap.set(source, target);
     }
-    return { taskIdMap, createdTaskIds };
+    return { taskIdMap, createdTaskIds, sourceRefMap };
   } catch (error) {
     await removeResearchTaskSnapshots(createdTaskIds);
     throw error;

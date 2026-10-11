@@ -1,3 +1,4 @@
+import { areMcpAppsEnabled } from "@/lib/mcpApps/config";
 import { useSettingsStore } from "@/store/core/settingsStore";
 import { signedApiFetch, readJsonResponseOrThrow } from "@/lib/api/client";
 import { encryptSecret, fetchWithByokRetry } from "@/lib/byok/client";
@@ -24,6 +25,7 @@ export async function executeMcpCapability(
   operation: McpCapabilityOperation,
   params: Record<string, unknown>,
   signal?: AbortSignal,
+  options?: { enableMcpApps: boolean },
 ): Promise<unknown> {
   const { installedPlugins, pluginConfigs } = useSettingsStore.getState();
   const plugin = installedPlugins.find(
@@ -50,8 +52,13 @@ export async function executeMcpCapability(
       body: JSON.stringify({
         pluginId,
         operation,
+        enableMcpApps:
+          options?.enableMcpApps !== false &&
+          areMcpAppsEnabled(
+            useSettingsStore.getState().system,
+            typeof window === "undefined" ? undefined : window.location.origin,
+          ),
         params,
-        localPlugin: plugin,
         ...(config?.auth || value
           ? {
               authConfig: {

@@ -28,6 +28,7 @@ const mock = vi.hoisted(() => ({
   renderer: vi.fn(),
   preview: vi.fn(),
   read: vi.fn(),
+  assertValid: vi.fn(),
 }));
 vi.mock("@/services/sharing/client", () => ({
   getSessionShare: mock.get,
@@ -40,6 +41,13 @@ vi.mock("@/services/sharing/public", () => ({
 }));
 vi.mock("@/services/sharing/snapshot", () => ({
   prepareSessionShare: mock.prepare,
+  assertPreparedSessionShareValid: mock.assertValid,
+}));
+vi.mock("@/lib/intelligentUi/sourceContext", () => ({
+  createFrozenUiSourceScope: vi.fn(async () => ({
+    load: vi.fn(),
+    assertValid: mock.assertValid,
+  })),
 }));
 vi.mock("@/components/chat/sessionPresentation", () => ({
   readSessionForPresentation: mock.read,
@@ -86,13 +94,26 @@ const prepared = {
   assets: [],
 };
 const withLocale = (children: React.ReactNode) => (
-  <NextIntlClientProvider locale="en" messages={{ Sharing, Common }}>
+  <NextIntlClientProvider
+    locale="en"
+    messages={{
+      Sharing: {
+        ...Sharing,
+        preview: "Share preview",
+        confirmPublish: "Confirm and publish",
+        previewDescription: "Exact content to publish",
+        previewStale: "Prepare a new preview",
+      },
+      Common,
+    }}
+  >
     {children}
   </NextIntlClientProvider>
 );
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mock.assertValid.mockResolvedValue(undefined);
   mock.get.mockResolvedValue(null);
   mock.publish.mockResolvedValue(metadata);
   mock.revoke.mockResolvedValue(undefined);
@@ -113,6 +134,10 @@ describe("share dialog", () => {
     ).toBeTruthy();
     expect(within(expiry).getAllByRole("button")).toHaveLength(4);
     fireEvent.click(create);
+    expect(mock.publish).not.toHaveBeenCalled();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Confirm and publish" }),
+    );
     await waitFor(() =>
       expect(mock.publish).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -133,6 +158,9 @@ describe("share dialog", () => {
     fireEvent.click(
       await screen.findByRole("button", { name: "Update snapshot" }),
     );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Confirm and publish" }),
+    );
     await waitFor(() => expect(mock.publish).toHaveBeenCalledTimes(1));
     expect(mock.publish.mock.calls[0][0]).not.toHaveProperty("expiresIn");
     await screen.findByRole("button", { name: "Update snapshot" });
@@ -141,6 +169,9 @@ describe("share dialog", () => {
       screen.getByRole("button", { name: "7 days", pressed: true }),
     ).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Update snapshot" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Confirm and publish" }),
+    );
     await waitFor(() => expect(mock.publish).toHaveBeenCalledTimes(2));
     expect(mock.publish.mock.calls[1][0]).toHaveProperty("expiresIn", "7d");
   });
@@ -155,6 +186,9 @@ describe("share dialog", () => {
     fireEvent.click(screen.getByRole("button", { name: "30 days" }));
     fireEvent.click(keep);
     fireEvent.click(screen.getByRole("button", { name: "Update snapshot" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Confirm and publish" }),
+    );
     await waitFor(() => expect(mock.publish).toHaveBeenCalledTimes(1));
     expect(mock.publish.mock.calls[0][0]).not.toHaveProperty("expiresIn");
   });
@@ -179,6 +213,51 @@ describe("share dialog", () => {
     choices.forEach((button) =>
       expect(button).toHaveProperty("disabled", true),
     );
+  });
+
+  it("keeps the exact preview payload for network retries and rechecks authority", async () => {
+    mock.publish.mockRejectedValueOnce(new Error("offline"));
+    render(withLocale(<ShareDialog sessionId="session" onClose={vi.fn()} />));
+    fireEvent.click(await screen.findByRole("button", { name: "Create link" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Confirm and publish" }),
+    );
+    await screen.findByRole("alert");
+    expect(mock.publish.mock.calls[0][0].snapshot).toBe(prepared.snapshot);
+    expect(mock.publish.mock.calls[0][0].assets).toBe(prepared.assets);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Confirm and publish" }),
+    );
+    await waitFor(() => expect(mock.publish).toHaveBeenCalledTimes(2));
+    expect(mock.prepare).toHaveBeenCalledTimes(1);
+    expect(mock.assertValid).toHaveBeenCalledTimes(2);
+    expect(mock.publish.mock.calls[1][0].snapshot).toBe(prepared.snapshot);
+  });
+
+  it("does not publish a preview after its source is revoked", async () => {
+    render(withLocale(<ShareDialog sessionId="session" onClose={vi.fn()} />));
+    fireEvent.click(await screen.findByRole("button", { name: "Create link" }));
+    const confirm = await screen.findByRole("button", {
+      name: "Confirm and publish",
+    });
+    mock.assertValid.mockRejectedValueOnce(new Error("UI_SOURCE_STALE"));
+    fireEvent.click(confirm);
+    await screen.findByRole("alert");
+    expect(mock.publish).not.toHaveBeenCalled();
+    expect(
+      screen.queryByRole("button", { name: "Confirm and publish" }),
+    ).toBeNull();
+  });
+
+  it("requires a new preview after output options change", async () => {
+    render(withLocale(<ShareDialog sessionId="session" onClose={vi.fn()} />));
+    fireEvent.click(await screen.findByRole("button", { name: "Create link" }));
+    await screen.findByRole("button", { name: "Confirm and publish" });
+    fireEvent.click(screen.getByRole("checkbox"));
+    expect(
+      screen.queryByRole("button", { name: "Confirm and publish" }),
+    ).toBeNull();
+    expect(mock.publish).not.toHaveBeenCalled();
   });
 
   it("keeps a usable link visible after revocation fails", async () => {

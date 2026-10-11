@@ -63,6 +63,41 @@ beforeEach(() => {
 });
 
 describe("private session share lifecycle", () => {
+  it("runs the host guard after delayed storage preparation and never serializes it", async () => {
+    const { appDb } = await import("@/store/storage/storageConfig");
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    vi.mocked(appDb.getItem).mockImplementationOnce(async () => {
+      await gate;
+      return null;
+    });
+    let allowed = true;
+    const network = vi.fn();
+    send.mockImplementation(async (_url, _options, guard) => {
+      await guard?.();
+      network();
+      return Response.json({});
+    });
+    const guard = vi.fn(async () => {
+      if (!allowed) throw new Error("UI_SOURCE_STALE");
+    });
+    const pending = publishSessionShare({
+      sessionId: "guarded",
+      ...prepared,
+      beforeDispatch: guard,
+    });
+    const rejected = expect(pending).rejects.toThrow("UI_SOURCE_STALE");
+    allowed = false;
+    release();
+    await rejected;
+    expect(network).not.toHaveBeenCalled();
+    expect(guard).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls[0][2]).toBe(guard);
+    expect(send.mock.calls[0][1].body).not.toContain("beforeDispatch");
+  });
+
   it("releases an expired pending ID and uses a new link on the next explicit publish", async () => {
     send.mockRejectedValueOnce(new TypeError("response lost"));
     await expect(

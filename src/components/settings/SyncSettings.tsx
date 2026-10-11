@@ -345,7 +345,10 @@ const SyncSettings: React.FC = () => {
               aria-hidden="true"
             />
             <span className="min-w-0 break-words">
-              {operationError || store.error}
+              {(operationError || store.error) ===
+              "SYNC_UNSUPPORTED_INTELLIGENT_UI"
+                ? t("unsupportedIntelligentUi")
+                : operationError || store.error}
             </span>
           </div>
         ) : null}

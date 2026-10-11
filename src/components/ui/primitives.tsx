@@ -130,14 +130,17 @@ export function InlineStatus({
   tone = "neutral",
   live = false,
   className,
+  id,
 }: {
   children: React.ReactNode;
   tone?: "neutral" | "success" | "warning" | "danger";
   live?: boolean;
   className?: string;
+  id?: string;
 }) {
   return (
     <p
+      id={id}
       aria-live={live ? "polite" : undefined}
       className={cx(
         "min-w-0 break-words rounded-md border px-3 py-2 text-sm",
@@ -164,6 +167,7 @@ export function Field({
   error,
   htmlFor,
   className,
+  errorId,
 }: {
   label: React.ReactNode;
   children: React.ReactNode;
@@ -171,9 +175,24 @@ export function Field({
   error?: React.ReactNode;
   htmlFor?: string;
   className?: string;
+  /** Stable target for aria-describedby when the field reports an error. */
+  errorId?: string;
 }) {
   const fallbackId = useId();
   const fieldId = htmlFor || fallbackId;
+  const resolvedErrorId = errorId || `${fieldId}-error`;
+  const describedChildren = error
+    ? React.Children.map(children, (child) => {
+        if (!React.isValidElement<{ "aria-describedby"?: string }>(child))
+          return child;
+        const existing = child.props["aria-describedby"];
+        return React.cloneElement(child, {
+          "aria-describedby": [existing, resolvedErrorId]
+            .filter(Boolean)
+            .join(" "),
+        });
+      })
+    : children;
 
   return (
     <div className={cx("min-w-0 space-y-1.5", className)}>
@@ -188,9 +207,9 @@ export function Field({
           {description}
         </p>
       ) : null}
-      {children}
+      {describedChildren}
       {error ? (
-        <InlineStatus tone="danger" live>
+        <InlineStatus id={resolvedErrorId} tone="danger" live>
           {error}
         </InlineStatus>
       ) : null}

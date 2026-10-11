@@ -88,6 +88,12 @@ export interface McpToolAnnotations {
   openWorldHint?: boolean;
 }
 
+export interface McpUiDescriptor {
+  resourceUri: string;
+  /** Legacy read compatibility only; new discovery writes mcpVisibility. */
+  visibility?: ("model" | "app")[];
+}
+
 export interface PluginFunction {
   name: string;
   description: string;
@@ -101,10 +107,13 @@ export interface PluginFunction {
   path?: string;
   method?: string;
   mcpToolName?: string;
+  mcpUi?: McpUiDescriptor;
+  mcpVisibility?: ("model" | "app")[];
   risk?: PluginFunctionRisk;
 }
 
 export interface PluginMcpMetadata {
+  toolMetadataVersion?: 1;
   transport: McpTransport;
   source?: "registry" | "custom" | "bridge";
   serverUrl: string;

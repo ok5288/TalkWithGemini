@@ -82,3 +82,25 @@ describe("provider image files", () => {
     });
   });
 });
+
+it("stops later file uploads after authorization is revoked and cleans completed uploads", async () => {
+  let allowed = true;
+  const create = vi.fn(async () => {
+    allowed = false;
+    return { id: "first" };
+  });
+  const remove = vi.fn(async () => undefined);
+  await expect(
+    uploadOpenAIImageFiles(
+      { files: { create, delete: remove } },
+      [],
+      [fileAttachment(), fileAttachment()],
+      undefined,
+      async () => {
+        if (!allowed) throw new Error("UI_SOURCE_STALE");
+      },
+    ),
+  ).rejects.toThrow("UI_SOURCE_STALE");
+  expect(create).toHaveBeenCalledTimes(1);
+  expect(remove).toHaveBeenCalledWith("first");
+});

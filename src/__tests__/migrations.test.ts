@@ -582,3 +582,27 @@ describe("storage migrations", () => {
     );
   });
 });
+
+it("preserves tool UI data and execution identity across private JSON restore", () => {
+  const input = {
+    id: "ui-tool",
+    name: "web_search",
+    status: "success" as const,
+    args: {},
+    result: { sources: [] },
+    executionRecordId: "run-1",
+    intelligentUiResult: {
+      version: 2,
+      adapter: "future-view",
+      callId: "ui-tool",
+    },
+    intelligentUiState: { selected: ["row-1"] },
+    intelligentUiStateRevision: 7,
+  };
+  const restored = normalizeToolCall(JSON.parse(JSON.stringify(input)));
+  expect(restored.executionRecordId).toBe("run-1");
+  expect(restored.intelligentUiResult).toEqual(input.intelligentUiResult);
+  expect(restored.intelligentUiState).toEqual(input.intelligentUiState);
+  expect(restored.intelligentUiStateRevision).toBe(7);
+  expect(normalizeToolCall(restored)).toEqual(restored);
+});

@@ -22,6 +22,7 @@ describe("MCP executor", () => {
     const result = await executeMcpToolRequest({
       serverUrl: "https://mcp.example.com/mcp",
       transport: "sse",
+      enableMcpApps: true,
       toolName: "private-search",
       args: {},
     });
@@ -32,7 +33,7 @@ describe("MCP executor", () => {
       error: "No access",
     });
     expect(callMcpToolMock).toHaveBeenCalledWith(
-      expect.objectContaining({ transport: "sse" }),
+      expect.objectContaining({ transport: "sse", enableMcpApps: true }),
     );
   });
 

@@ -244,3 +244,17 @@ the session already contains an explicit reasoning choice.
 `DEFAULT_ENABLE_HTML_VISUAL_PROMPT` changes model instructions only. Message
 rendering still sanitizes inline HTML and blocks scripts, event handlers,
 iframes, unsafe URLs, and full HTML documents.
+
+## Intelligent UI expansion
+
+| Variable                                     | Purpose                                                                                                                                                                                                           |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_ENABLE_INTELLIGENT_UI_EXPLORER` | Build-time, default `true`. Set `false` to suppress new explorer instructions and render saved explorer blocks statically, without disabling the other native kinds.                                              |
+| `NEXT_PUBLIC_MCP_APPS_SANDBOX_ORIGIN`        | Build-time exact independent HTTPS origin for the experimental MCP Apps sandbox. No path, query, userinfo or wildcards. Empty or same-origin configuration disables mounting. The user setting also defaults off. |
+| `MCP_APPS_HOST_ORIGIN`                       | Set only on the separately deployed sandbox Worker: exact allowed main application HTTPS origin. Do not configure this as a general proxy or deploy the sandbox on the chat origin.                               |
+
+See [Intelligent UI](intelligent-ui.md) and the
+[independent sandbox deployment](../deploy/mcp-app-sandbox/README.md) for the
+restricted capability profile and outstanding browser/deployment acceptance.
+These settings do not weaken the existing `intelligent-ui` HTML sandbox or replace the
+Intelligent UI user setting. Rebuild when changing `NEXT_PUBLIC_*` values.

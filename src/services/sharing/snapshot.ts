@@ -1,3 +1,5 @@
+import { prepareMessageUiForStatic } from "@/lib/chat/intelligentUiPortability";
+import type { FrozenUiSourceScope } from "@/lib/intelligentUi/sourceContext";
 import type { Attachment, Message, Session, Source } from "@/types";
 import { getMessageOutputBlocks } from "@/lib/chat/messageOutputBlocks";
 import { getSafeWebHref } from "@/lib/security/clientUrl";
@@ -139,7 +141,17 @@ export async function prepareSessionShare(
     session,
     messages,
     signal,
-  }: { session: Session; messages: readonly Message[]; signal?: AbortSignal },
+    includeIntelligentUiState = false,
+    locale = "en",
+    sourceScope,
+  }: {
+    session: Session;
+    messages: readonly Message[];
+    signal?: AbortSignal;
+    includeIntelligentUiState?: boolean;
+    locale?: string;
+    sourceScope?: FrozenUiSourceScope;
+  },
   dependencies: SnapshotDependencies = {},
 ): Promise<PreparedSessionShare> {
   const frozenSession = structuredClone(session);
@@ -150,6 +162,26 @@ export async function prepareSessionShare(
     );
   }
   const frozenMessages = structuredClone([...messages]);
+  const needsSources = frozenMessages.some((message) =>
+    getMessageOutputBlocks(message).some(
+      (block) =>
+        (block.type === "tool_group" &&
+          block.toolCalls.some((call) => !!call.intelligentUiResult)) ||
+        (block.type === "intelligent_ui" &&
+          (block.sourceBindings?.length ||
+            (block.definition &&
+              "kind" in block.definition &&
+              block.definition.kind === "explorer" &&
+              block.definition.props.dataset.kind === "context"))),
+    ),
+  );
+  const scope =
+    sourceScope ??
+    (needsSources
+      ? await (
+          await import("@/lib/intelligentUi/sourceContext")
+        ).createFrozenUiSourceScope(frozenSession, frozenMessages)
+      : undefined);
   if (
     frozenMessages.some((message) => message.generation?.status === "streaming")
   )
@@ -157,6 +189,8 @@ export async function prepareSessionShare(
       "SHARE_GENERATING",
       "Wait for the current response to finish before sharing.",
     );
+  const validations: (() => Promise<void>)[] = [];
+  if (scope) validations.push(scope.assertValid);
   const assets = new Map<string, ShareAsset>();
   const imageReads = new Map<string, Promise<string>>();
   const registeredImages = new Map<string, Attachment>();
@@ -347,7 +381,18 @@ export async function prepareSessionShare(
     },
     assets: [],
   };
-  for (const message of frozenMessages) {
+  for (const originalMessage of frozenMessages) {
+    const message = await prepareMessageUiForStatic(
+      originalMessage,
+      frozenSession.id,
+      {
+        purpose: includeIntelligentUiState
+          ? "static-current"
+          : "static-original",
+        locale,
+        sourceScope: scope ?? null,
+      },
+    );
     signal?.throwIfAborted();
     const blocks: SharedBlock[] = [];
     for (const attachment of message.attachments || []) {
@@ -431,6 +476,30 @@ export async function prepareSessionShare(
           title: task.goal,
           content: await rewriteImages(artifact.markdown),
         });
+        const reportIdentity = JSON.stringify(report);
+        validations.push(async () => {
+          const currentTask = await (
+            dependencies.loadResearchTask ||
+            ((id: string) => getResearchTaskRepository().get(id))
+          )(block.taskId);
+          const currentReport = currentTask?.reportVersions.find(
+            (candidate) =>
+              candidate.id === report.id &&
+              candidate.version === report.version &&
+              candidate.artifactId === report.artifactId,
+          );
+          if (
+            !currentTask ||
+            currentTask.sessionId !== frozenSession.id ||
+            JSON.stringify(currentReport) !== reportIdentity
+          )
+            throw new Error("UI_SOURCE_STALE");
+          const currentArtifact = await (
+            dependencies.readReport || readResearchReportArtifact
+          )(report.artifactId);
+          if (currentArtifact?.markdown !== artifact.markdown)
+            throw new Error("UI_SOURCE_STALE");
+        });
         // Pin illustration metadata to this report version, never to a later run.
         for (const image of report.imageSources || []) {
           const sourceUrl = getSafeWebHref(image.sourceUrl);
@@ -469,5 +538,18 @@ export async function prepareSessionShare(
   }
   output.snapshot = parsed.data;
   assertShareSize(output);
+  const assertValid = async () => {
+    for (const validate of validations) await validate();
+  };
+  await assertValid();
+  shareValidity.set(output, assertValid);
   return output;
+}
+
+// Host-only validation is deliberately kept out of the public payload.
+const shareValidity = new WeakMap<PreparedSessionShare, () => Promise<void>>();
+export async function assertPreparedSessionShareValid(
+  prepared: PreparedSessionShare,
+): Promise<void> {
+  await shareValidity.get(prepared)?.();
 }

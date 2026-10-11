@@ -875,9 +875,10 @@ export function getToolReplayDecision(
 
   if (
     record.status === "running" &&
-    record.policy.effects.some((effect) =>
-      UNCERTAIN_IN_FLIGHT_EFFECTS.has(effect),
-    )
+    (record.definitionFingerprint === "ui-workspace-draft:create:v1" ||
+      record.policy.effects.some((effect) =>
+        UNCERTAIN_IN_FLIGHT_EFFECTS.has(effect),
+      ))
   ) {
     return { action: "block", reason: "in_flight_effect_unconfirmed" };
   }
