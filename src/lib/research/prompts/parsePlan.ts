@@ -14,7 +14,13 @@ export function parseResearchPlan(
 ): ParsedResearchPlan {
   const objects = parseJsonObjects(text);
   const parsedCandidates = objects.map((object) =>
-    planDraftSchema.safeParse(object),
+    planDraftSchema.safeParse(
+      object.kind === "plan"
+        ? object.plan
+        : object.kind === undefined
+          ? object
+          : undefined,
+    ),
   );
   const validCandidate = [...parsedCandidates]
     .reverse()

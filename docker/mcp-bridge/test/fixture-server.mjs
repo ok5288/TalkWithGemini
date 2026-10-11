@@ -21,9 +21,13 @@ server.registerTool(
   "large-output",
   {
     description: "Return a deliberately oversized result",
-    inputSchema: {},
+    inputSchema: {
+      bytes: z.number().int().min(0).max(10_485_760).optional(),
+    },
   },
-  async () => ({ content: [{ type: "text", text: "x".repeat(4096) }] }),
+  async ({ bytes }) => ({
+    content: [{ type: "text", text: "x".repeat(bytes ?? 4096) }],
+  }),
 );
 
 server.registerTool(

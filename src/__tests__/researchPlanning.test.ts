@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   task: null as ResearchTask | null,
   snapshot: {} as ResearchSourceSnapshot,
   snapshotError: null as Error | null,
+  saveError: null as Error | null,
   sourceContext: vi.fn(),
 }));
 vi.mock("@/services/api/chatService", () => ({
@@ -28,8 +29,11 @@ vi.mock("@/store/core/researchStore", () => ({
       updateTask: async (
         _id: string,
         update: (task: ResearchTask) => ResearchTask,
+        options?: { persistence: string },
       ) => {
         mocks.task = update(mocks.task!);
+        if (mocks.saveError && options?.persistence !== "best-effort")
+          throw mocks.saveError;
         return mocks.task;
       },
     }),
@@ -63,6 +67,7 @@ vi.mock("@/lib/research/runtime/sourceSnapshot", () => ({
 }));
 
 import { prepareResearchPlan } from "@/lib/research/runtime/preparePlan";
+import { parseResearchPlan } from "@/lib/research/prompts/parsePlan";
 import { parseResearchPlanningResponse } from "@/lib/research/prompts/planningResponse";
 import { reconSchema } from "@/services/research/taskRepository/schema/primitives";
 import { ResearchModelUnavailableError } from "@/lib/research/runtime/dependencyErrors";
@@ -425,4 +430,104 @@ it("accepts legacy raw plans but rejects ambiguous or invalid context requests",
       JSON.stringify({ ...request, queries: [""] }),
     ),
   ).toBeNull();
+});
+
+describe("plan repair regressions", () => {
+  const oversized = {
+    ...plan,
+    steps: Array.from({ length: 9 }, (_, index) => ({
+      ...plan.steps[0],
+      id: `step-${index + 1}`,
+      queryTopics: [`Topic ${index + 1}`],
+    })),
+  };
+
+  it.each(["bare", "envelope"])(
+    "repairs an oversized envelope with a %s plan",
+    async (shape) => {
+      mocks.stream
+        .mockResolvedValueOnce(
+          JSON.stringify({ kind: "plan", plan: oversized }),
+        )
+        .mockResolvedValue(
+          shape === "bare" ? JSON.stringify(plan) : planOutput,
+        );
+      await execute();
+      expect(mocks.task!.status).toBe("plan_ready");
+      expect(mocks.stream).toHaveBeenCalledTimes(2);
+      const repair = mocks.stream.mock.calls[1];
+      expect(repair[3]).toContain(
+        "steps: Too big: expected array to have <=8 items",
+      );
+      expect(repair[3]).not.toContain("received undefined");
+      expect(repair[3]).toContain("2-8");
+      expect(repair[3]).toContain("Preserve all research questions");
+      expect(repair[17]).toMatchObject({ disableTools: true });
+    },
+  );
+
+  it("accepts eight steps without spending a repair round", async () => {
+    mocks.stream.mockResolvedValue(
+      JSON.stringify({
+        kind: "plan",
+        plan: { ...oversized, steps: oversized.steps.slice(0, 8) },
+      }),
+    );
+    await execute();
+    expect(mocks.task!.status).toBe("plan_ready");
+    expect(mocks.task!.planVersions[0].steps).toHaveLength(8);
+    expect(mocks.stream).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([1, 9])(
+    "keeps %i-step failures bounded and localized without saving a truncated plan",
+    async (count) => {
+      mocks.stream.mockResolvedValue(
+        JSON.stringify({
+          kind: "plan",
+          plan: { ...oversized, steps: oversized.steps.slice(0, count) },
+        }),
+      );
+      await execute();
+      expect(mocks.stream).toHaveBeenCalledTimes(3);
+      expect(mocks.task).toMatchObject({
+        status: "failed",
+        error: {
+          code: "RESEARCH_PLAN_INVALID",
+          message: "runtime.error.planInvalid",
+          recoverable: true,
+        },
+      });
+      expect(mocks.task!.planVersions).toHaveLength(0);
+    },
+  );
+});
+
+it("does not accept a context request or unknown response kind as a repaired plan", () => {
+  for (const kind of ["needs_context", "unexpected"]) {
+    expect(parseResearchPlan(JSON.stringify({ ...plan, kind })).valid).toBe(
+      false,
+    );
+    expect(parseResearchPlan(JSON.stringify({ kind, plan })).valid).toBe(false);
+  }
+});
+
+it("records a recoverable planning failure even when its failure-state save cannot persist", async () => {
+  const onError = vi.fn();
+  mocks.saveError = new Error("storage failed");
+  await expect(
+    prepareResearchPlan({
+      taskId: "task",
+      controller: new AbortController(),
+      t: ((key: string) => key) as ResearchTranslate,
+      localizedRuntimeError: () => "Storage unavailable",
+      onError,
+    }),
+  ).resolves.toBeUndefined();
+  expect(mocks.task).toMatchObject({
+    status: "failed",
+    error: { message: "Storage unavailable", recoverable: true },
+  });
+  expect(onError).toHaveBeenCalledOnce();
+  expect(mocks.stream).not.toHaveBeenCalled();
 });

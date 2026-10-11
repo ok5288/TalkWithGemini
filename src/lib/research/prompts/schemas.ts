@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { RESEARCH_PLAN_STEP_LIMITS } from "./types";
+
 import { RESEARCH_STRATEGY_LIMITS } from "../orchestration";
 import {
   RESEARCH_WAVE_SOURCE_KEY_PATTERN,
@@ -144,7 +146,10 @@ export const planDraftSchema = z
     assumptions: boundedTextList(20, 1_000),
     deliverable: deliverableSchema,
     strategy: strategySchema,
-    steps: z.array(planStepSchema).min(2).max(8),
+    steps: z
+      .array(planStepSchema)
+      .min(RESEARCH_PLAN_STEP_LIMITS.min)
+      .max(RESEARCH_PLAN_STEP_LIMITS.max),
     completionCriteria: boundedTextList(12, 1_000).min(1),
   })
   .superRefine((plan, context) => {

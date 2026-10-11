@@ -55,19 +55,32 @@ export function buildActivities(
       const source = run.evidence.find(
         (item) => item.toolCallId === execution.callId,
       );
-      const status = getToolActivityStatus(
-        execution.status,
-        task.status,
-        run.status,
-      );
+      const failedSearch =
+        execution.status === "failed" &&
+        (execution.toolName === "web_search" ||
+          execution.toolName === "search_web");
+      const errorCode = execution.error?.code;
+      const duplicate =
+        failedSearch && errorCode === "RESEARCH_QUERY_DUPLICATE";
+      // Only host-defined summaries are rendered; provider messages and arguments
+      // may contain private queries, credentials, or arbitrary external text.
+      const errorDetail = failedSearch
+        ? errorCode && Object.hasOwn(text.searchErrorDetails, errorCode)
+          ? text.searchErrorDetails[errorCode]
+          : text.searchFailedDetail
+        : undefined;
+      const status = duplicate
+        ? "info"
+        : getToolActivityStatus(execution.status, task.status, run.status);
       return {
         id: execution.id,
         createdAt:
           execution.endedAt || execution.startedAt || execution.preparedAt,
         phase: "researching",
         status,
-        title:
-          status === "committed"
+        title: duplicate
+          ? text.toolSkippedTitle(execution.toolName)
+          : status === "committed"
             ? text.toolCommittedTitle(execution.toolName)
             : status === "failed"
               ? text.toolFailedTitle(execution.toolName)
@@ -76,13 +89,16 @@ export function buildActivities(
                 : status === "interrupted"
                   ? text.toolInterruptedTitle(execution.toolName)
                   : text.toolRunningTitle(execution.toolName),
-        detail: source
-          ? text.toolSourceDetail(
-              source.url.startsWith("workspace:///tool-results/")
-                ? text.internalToolResultSource
-                : source.title || source.sourceId,
-            )
-          : text.toolSafeDetail,
+        detail: duplicate
+          ? text.duplicateSkippedDetail
+          : (errorDetail ??
+            (source
+              ? text.toolSourceDetail(
+                  source.url.startsWith("workspace:///tool-results/")
+                    ? text.internalToolResultSource
+                    : source.title || source.sourceId,
+                )
+              : text.toolSafeDetail)),
       };
     });
   });

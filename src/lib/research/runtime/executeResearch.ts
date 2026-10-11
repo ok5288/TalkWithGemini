@@ -105,30 +105,43 @@ export async function executeResearchRun({
             !isTerminalResearchStatus(task.status)
           ) {
             const failedAt = Date.now();
-            await store.updateTask(taskId, (current) => {
-              const active = getActiveResearchReportRun(current);
-              const withRun = active
-                ? upsertResearchReportRun(
-                    current,
-                    finalizeResearchReportRun(active, "failed", failedAt),
-                  )
-                : current;
-              return {
-                ...transitionResearchTask(withRun, "failed", { now: failedAt }),
-                usage: aggregateTaskUsage(withRun),
-                error: {
-                  code: "RESEARCH_EXECUTION_FAILED",
-                  message: localizedRuntimeError(error, "executionFallback"),
-                  recoverable: true,
-                },
-              };
-            });
+            await store.updateTask(
+              taskId,
+              (current) => {
+                const active = getActiveResearchReportRun(current);
+                const withRun = active
+                  ? upsertResearchReportRun(
+                      current,
+                      finalizeResearchReportRun(active, "failed", failedAt),
+                    )
+                  : current;
+                return {
+                  ...transitionResearchTask(withRun, "failed", {
+                    now: failedAt,
+                  }),
+                  usage: aggregateTaskUsage(withRun),
+                  error: {
+                    code: "RESEARCH_EXECUTION_FAILED",
+                    message: localizedRuntimeError(error, "executionFallback"),
+                    recoverable: true,
+                  },
+                };
+              },
+              { persistence: "best-effort" },
+            );
             store.setActiveTask(null);
             onError?.(t("runtime.error.report"));
           }
         }
       } finally {
-        const task = ctx?.store.tasksById[taskId];
+        const store = useResearchStore.getState();
+        const task = store.tasksById[taskId];
+        if (
+          store.activeTaskId === taskId &&
+          task &&
+          (task.status === "paused" || isTerminalResearchStatus(task.status))
+        )
+          store.setActiveTask(null);
         if (
           ctx &&
           task &&

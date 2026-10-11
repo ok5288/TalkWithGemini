@@ -1,3 +1,4 @@
+import { ResearchPersistenceError } from "@/services/research/taskRepository/errors";
 import {
   isCommittedCheckpointToolCall,
   redactCheckpointText,
@@ -32,7 +33,6 @@ export function persistWaveCheckpoint(wave: ResearchWaveContext) {
       : {}),
   };
   wave.checkpointQueue = wave.checkpointQueue
-    .catch(() => undefined)
     .then(async () => {
       const written = await writeWorkspaceText(
         ctx.task.sessionId,
@@ -40,7 +40,7 @@ export function persistWaveCheckpoint(wave: ResearchWaveContext) {
         JSON.stringify(payload),
         "overwrite",
       );
-      if (!written.ok) throw new Error(written.error.message);
+      if (!written.ok) throw new ResearchPersistenceError("checkpoint");
       const agentRun = useAgentRunStore.getState().runsById[wave.agentRunId];
       const runCheckpoint = {
         createdAt: Date.now(),
@@ -77,6 +77,11 @@ export function persistWaveCheckpoint(wave: ResearchWaveContext) {
           historyPath: wave.checkpointPath,
         },
       }));
+    })
+    .catch((error) => {
+      throw error instanceof ResearchPersistenceError
+        ? error
+        : new ResearchPersistenceError("checkpoint");
     });
   return wave.checkpointQueue;
 }

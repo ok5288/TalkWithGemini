@@ -1,3 +1,4 @@
+import { ResearchPersistenceError } from "@/services/research/taskRepository/errors";
 import {
   applyResearchRunUserStop,
   finalizeResearchReportRun,
@@ -53,19 +54,23 @@ export async function handleExecutionFailure(
       researchRunId: pausedRun.id,
     };
     const message = ctx.dependencyText.sourceUnavailable("workspace");
-    await ctx.store.updateTask(ctx.taskId, (latest) => ({
-      ...transitionResearchTask(
-        upsertResearchReportRun(latest, pausedRun),
-        "paused",
-        { checkpoint },
-      ),
-      checkpoint,
-      error: {
-        code: "RESEARCH_WORKSPACE_UNAVAILABLE",
-        message,
-        recoverable: true,
-      },
-    }));
+    await ctx.store.updateTask(
+      ctx.taskId,
+      (latest) => ({
+        ...transitionResearchTask(
+          upsertResearchReportRun(latest, pausedRun),
+          "paused",
+          { checkpoint },
+        ),
+        checkpoint,
+        error: {
+          code: "RESEARCH_WORKSPACE_UNAVAILABLE",
+          message,
+          recoverable: true,
+        },
+      }),
+      { persistence: "best-effort" },
+    );
     ctx.store.setActiveTask(null);
     ctx.onNotice?.(message);
     return;
@@ -99,17 +104,24 @@ export async function handleExecutionFailure(
         : {}),
       researchRunId: pausedRun.id,
     };
-    await ctx.store.updateTask(ctx.taskId, (latest) => {
-      if (latest.status === "cancelled") return latest;
-      const withRun = upsertResearchReportRun(latest, pausedRun);
-      return latest.status === "paused"
-        ? { ...withRun, checkpoint }
-        : transitionResearchTask(withRun, "paused", { checkpoint });
-    });
+    await ctx.store.updateTask(
+      ctx.taskId,
+      (latest) => {
+        if (latest.status === "cancelled") return latest;
+        const withRun = upsertResearchReportRun(latest, pausedRun);
+        return latest.status === "paused"
+          ? { ...withRun, checkpoint }
+          : transitionResearchTask(withRun, "paused", { checkpoint });
+      },
+      { persistence: "best-effort" },
+    );
     ctx.store.setActiveTask(null);
     return;
   }
-  if (!(error instanceof ResearchReportDeliveryError)) {
+  if (
+    !(error instanceof ResearchReportDeliveryError) &&
+    !(error instanceof ResearchPersistenceError)
+  ) {
     try {
       await deliverResearchReport(ctx, { interruption: error });
       return;
@@ -121,22 +133,26 @@ export async function handleExecutionFailure(
     }
   }
   const failedAt = Date.now();
-  await ctx.store.updateTask(ctx.taskId, (latest) => {
-    const activeRun = getActiveResearchReportRun(latest) ?? ctx.run;
-    const withRun = upsertResearchReportRun(
-      latest,
-      finalizeResearchReportRun(activeRun, "failed", failedAt),
-    );
-    return {
-      ...transitionResearchTask(withRun, "failed", { now: failedAt }),
-      usage: aggregateTaskUsage(withRun),
-      error: {
-        code: "RESEARCH_EXECUTION_FAILED",
-        message: ctx.localizedRuntimeError(error, "executionFallback"),
-        recoverable: true,
-      },
-    };
-  });
+  await ctx.store.updateTask(
+    ctx.taskId,
+    (latest) => {
+      const activeRun = getActiveResearchReportRun(latest) ?? ctx.run;
+      const withRun = upsertResearchReportRun(
+        latest,
+        finalizeResearchReportRun(activeRun, "failed", failedAt),
+      );
+      return {
+        ...transitionResearchTask(withRun, "failed", { now: failedAt }),
+        usage: aggregateTaskUsage(withRun),
+        error: {
+          code: "RESEARCH_EXECUTION_FAILED",
+          message: ctx.localizedRuntimeError(error, "executionFallback"),
+          recoverable: true,
+        },
+      };
+    },
+    { persistence: "best-effort" },
+  );
   ctx.store.setActiveTask(null);
   onError?.(ctx.t("runtime.error.report"));
 }

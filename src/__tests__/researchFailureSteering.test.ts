@@ -59,3 +59,50 @@ it("keeps accepted unanswered questions in a salvage report's gaps", async () =>
     }),
   );
 });
+
+it("treats a checkpoint-triggered stream abort as a storage failure without salvage or a user pause", async () => {
+  const { createResearchTask } = await import("@/lib/research/task");
+  const { ResearchPersistenceError } =
+    await import("@/services/research/taskRepository/errors");
+  let task = {
+    ...createResearchTask({
+      id: "task",
+      sessionId: "session",
+      goal: "Research",
+      now: 100,
+    }),
+    status: "researching" as const,
+  } as import("@/lib/research").ResearchTask;
+  const updateTask = vi.fn(
+    async (_id: string, update: (current: typeof task) => typeof task) => {
+      task = update(task);
+      return task;
+    },
+  );
+  const setActiveTask = vi.fn();
+  const onError = vi.fn();
+  const publishedBefore = publish.mock.calls.length;
+  const ctx = {
+    taskId: "task",
+    controller: new AbortController(),
+    run: { id: "run" },
+    store: { tasksById: { task }, updateTask, setActiveTask },
+    localizedRuntimeError: () => "Storage full",
+    t: (key: string) => key,
+  } as unknown as ResearchExecutionContext;
+  await handleExecutionFailure(
+    ctx,
+    new ResearchPersistenceError("quota"),
+    onError,
+  );
+  expect(task).toMatchObject({
+    status: "failed",
+    error: { message: "Storage full", recoverable: true },
+  });
+  expect(updateTask).toHaveBeenCalledWith("task", expect.any(Function), {
+    persistence: "best-effort",
+  });
+  expect(setActiveTask).toHaveBeenCalledWith(null);
+  expect(onError).toHaveBeenCalledOnce();
+  expect(publish).toHaveBeenCalledTimes(publishedBefore);
+});

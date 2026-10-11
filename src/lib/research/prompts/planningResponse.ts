@@ -40,9 +40,7 @@ export function parseResearchPlanningResponse(
         Array.isArray(candidate.plan))
     )
       continue;
-    const plan = parseResearchPlan(
-      JSON.stringify(candidate.kind === "plan" ? candidate.plan : object),
-    );
+    const plan = parseResearchPlan(JSON.stringify(object));
     if (plan.valid) return { kind: "plan", plan: plan.data };
   }
   return null;

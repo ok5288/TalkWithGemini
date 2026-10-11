@@ -1,3 +1,4 @@
+import { ResearchPersistenceError } from "@/services/research/taskRepository/errors";
 import { useCallback, useMemo } from "react";
 import { useTranslations } from "next-intl";
 
@@ -19,10 +20,19 @@ export function useResearchRuntimeText(): {
 } {
   const t = useTranslations("Research");
   const localizedRuntimeError = useCallback<ResearchRuntimeErrorText>(
-    (error, fallbackKey) =>
-      error instanceof Error && error.message === t("runtime.error.persistence")
-        ? error.message
-        : t(`runtime.error.${fallbackKey}`),
+    (error, fallbackKey) => {
+      if (
+        error instanceof Error &&
+        error.cause instanceof ResearchPersistenceError
+      )
+        error = error.cause;
+      return error instanceof ResearchPersistenceError
+        ? t(`runtime.error.storage.${error.reason}`)
+        : error instanceof Error &&
+            error.message === t("runtime.error.persistence")
+          ? error.message
+          : t(`runtime.error.${fallbackKey}`);
+    },
     [t],
   );
   const dependencyText = useMemo(

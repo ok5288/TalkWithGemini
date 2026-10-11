@@ -17,9 +17,10 @@ const data = vi.hoisted(() => ({
 }));
 const repository = vi.hoisted(() => ({
   getStatus: () => ({ durable: true, mode: "persistent" }),
+  recover: vi.fn<(task: ResearchTask) => Promise<void>>(async () => {}),
   get: vi.fn(async (id: string) => structuredClone(data.tasks.get(id) ?? null)),
   save: async (task: ResearchTask) => {
-    data.saves(structuredClone(task));
+    await data.saves(structuredClone(task));
     data.tasks.set(task.id, structuredClone(task));
   },
   list: async (sessionId?: string) =>
@@ -182,7 +183,8 @@ function deferred() {
 }
 beforeEach(() => {
   data.tasks.clear();
-  data.saves.mockClear();
+  data.saves.mockReset();
+  repository.recover.mockReset().mockResolvedValue(undefined);
   data.list.mockReset();
   data.capture.mockReset().mockResolvedValue([]);
   data.resolveModel.mockReset().mockResolvedValue("provider:model");
@@ -207,6 +209,106 @@ afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
   setResearchExtensionRepositoryForTests(undefined);
+});
+
+it("recovers the retained local task under its lease before refreshing or launching", async () => {
+  const retained = {
+    ...task("failed"),
+    error: {
+      code: "RESEARCH_PLAN_FAILED",
+      message: "Unsaved",
+      recoverable: true,
+    },
+  };
+  hydrateLocal(retained);
+  data.tasks.set("task", task("clarifying"));
+  repository.recover.mockImplementationOnce(async (local) => {
+    expect(isResearchTaskLocallyLocked(local.id)).toBe(true);
+    expect(local).toEqual(retained);
+    data.tasks.set(local.id, local);
+  });
+  const action = vi.fn(async (current: ResearchTask) => {
+    expect(current).toEqual(retained);
+  });
+  await runResearchTaskAction("task", action);
+  expect(action).toHaveBeenCalledOnce();
+});
+
+it("keeps recovery conflicts local and never starts the action or writes over the other tab", async () => {
+  const { ResearchPersistenceError } =
+    await import("@/services/research/taskRepository/errors");
+  hydrateLocal(task("failed"));
+  repository.recover.mockRejectedValueOnce(
+    new ResearchPersistenceError("conflict"),
+  );
+  const action = vi.fn();
+  const failureLocks: boolean[] = [];
+  const unsubscribe = useResearchStore.subscribe((state) => {
+    if (state.tasksById.task.error?.code === "RESEARCH_STORAGE_conflict")
+      failureLocks.push(isResearchTaskLocallyLocked("task"));
+  });
+  try {
+    await expect(runResearchTaskAction("task", action)).rejects.toMatchObject({
+      reason: "conflict",
+    });
+  } finally {
+    unsubscribe();
+  }
+  expect(failureLocks).toEqual([true]);
+  expect(action).not.toHaveBeenCalled();
+  expect(data.saves).not.toHaveBeenCalled();
+  expect(useResearchStore.getState().tasksById.task.error?.code).toBe(
+    "RESEARCH_STORAGE_conflict",
+  );
+});
+
+it("pauses an optimistic execution transition when saving fails before the continuation starts", async () => {
+  const { ResearchPersistenceError } =
+    await import("@/services/research/taskRepository/errors");
+  const ready = task("plan_ready");
+  hydrateLocal(ready);
+  data.tasks.set("task", ready);
+  data.saves.mockRejectedValueOnce(new ResearchPersistenceError("quota"));
+  useResearchStore.getState().setActiveTask("task");
+  const launch = vi.fn();
+  await expect(
+    runResearchTaskAction("task", async () => {
+      await useResearchStore.getState().updateTask("task", (current) => ({
+        ...current,
+        status: "researching",
+        checkpoint: undefined,
+      }));
+      return { run: launch };
+    }),
+  ).rejects.toMatchObject({ reason: "quota" });
+  expect(launch).not.toHaveBeenCalled();
+  expect(useResearchStore.getState().activeTaskId).toBeNull();
+  expect(useResearchStore.getState().tasksById.task).toMatchObject({
+    status: "paused",
+    checkpoint: { resumeStatus: "researching" },
+    error: { code: "RESEARCH_STORAGE_quota", recoverable: true },
+  });
+});
+
+it("allows a local failed task to be cancelled while persistence recovery remains unavailable", async () => {
+  const { ResearchPersistenceError } =
+    await import("@/services/research/taskRepository/errors");
+  const failed = task("failed");
+  hydrateLocal(failed);
+  data.tasks.set("task", failed);
+  repository.recover.mockRejectedValue(new ResearchPersistenceError("quota"));
+  data.saves.mockRejectedValue(new ResearchPersistenceError("quota"));
+  const { result } = renderHook(() =>
+    useResearchOperations({
+      userInputController: { requestInput: vi.fn() },
+      t: ((key: string) => key) as Parameters<
+        typeof useResearchOperations
+      >[0]["t"],
+    }),
+  );
+  await act(() => result.current.cancelTask("task"));
+  expect(repository.recover).not.toHaveBeenCalled();
+  expect(useResearchStore.getState().tasksById.task.status).toBe("cancelled");
 });
 
 describe("fresh task ownership across tabs", () => {
@@ -359,37 +461,42 @@ describe("fresh task ownership across tabs", () => {
       expect(isResearchTaskLocallyLocked("task")).toBe(false),
     );
   });
-  it("pauses plan confirmation when the approved workspace cannot be read", async () => {
-    const saved = task("plan_ready");
-    data.tasks.set("task", saved);
-    hydrateLocal(saved);
-    data.capture.mockRejectedValue(
-      new ResearchWorkspaceUnavailableError("OPFS unavailable"),
-    );
-    const deps = {
-      ...dependencies(),
-      dependencyText: {
-        modelUnavailable: "Model unavailable",
-        sourceUnavailable: (source: string) => `${source} unavailable`,
-      } as Parameters<typeof usePlanActions>[0]["dependencyText"],
-      pauseTask: vi.fn(async () => {}),
-      t: ((key: string) => key) as Parameters<typeof usePlanActions>[0]["t"],
-    };
-    const { result } = renderHook(() => usePlanActions(deps));
+  it.each([false, true])(
+    "pauses plan confirmation despite workspace failure (save also fails: %s)",
+    async (saveFails) => {
+      if (saveFails)
+        data.saves.mockRejectedValueOnce(new Error("storage failed"));
+      const saved = task("plan_ready");
+      data.tasks.set("task", saved);
+      hydrateLocal(saved);
+      data.capture.mockRejectedValue(
+        new ResearchWorkspaceUnavailableError("OPFS unavailable"),
+      );
+      const deps = {
+        ...dependencies(),
+        dependencyText: {
+          modelUnavailable: "Model unavailable",
+          sourceUnavailable: (source: string) => `${source} unavailable`,
+        } as Parameters<typeof usePlanActions>[0]["dependencyText"],
+        pauseTask: vi.fn(async () => {}),
+        t: ((key: string) => key) as Parameters<typeof usePlanActions>[0]["t"],
+      };
+      const { result } = renderHook(() => usePlanActions(deps));
 
-    await act(() => result.current.confirmPlan("task"));
+      await act(() => result.current.confirmPlan("task"));
 
-    expect(data.tasks.get("task")).toMatchObject({
-      status: "paused",
-      error: {
-        code: "RESEARCH_WORKSPACE_UNAVAILABLE",
-        message: "workspace unavailable",
-        recoverable: true,
-      },
-    });
-    expect(deps.launchResearch).not.toHaveBeenCalled();
-    expect(deps.onNotice).toHaveBeenCalledWith("workspace unavailable");
-  });
+      expect(useResearchStore.getState().tasksById.task).toMatchObject({
+        status: "paused",
+        error: {
+          code: "RESEARCH_WORKSPACE_UNAVAILABLE",
+          message: "workspace unavailable",
+          recoverable: true,
+        },
+      });
+      expect(deps.launchResearch).not.toHaveBeenCalled();
+      expect(deps.onNotice).toHaveBeenCalledWith("workspace unavailable");
+    },
+  );
   it("restores a legacy plan's model from the linked original generation", async () => {
     const saved = task("plan_ready");
     delete saved.sourceSnapshot!.model;

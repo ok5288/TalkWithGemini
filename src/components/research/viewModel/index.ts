@@ -73,6 +73,22 @@ export async function createResearchTaskViewModel(
   runsById: Record<string, AgentRun> = {},
   text: ResearchViewModelText = DEFAULT_TEXT,
 ): Promise<ResearchTaskViewModel> {
+  const storageErrorCode = task.error?.code;
+  if (
+    task.error &&
+    storageErrorCode &&
+    Object.hasOwn(text.storageErrorDetails, storageErrorCode)
+  ) {
+    // Translate recoverable storage errors at the display boundary without
+    // rewriting persisted tasks or exposing lower-level exception messages.
+    task = {
+      ...task,
+      error: {
+        ...task.error,
+        message: text.storageErrorDetails[storageErrorCode],
+      },
+    };
+  }
   const plan = getActivePlan(task);
   const report = getActiveReport(task);
   const activeResearchRun = getActiveResearchRun(task, plan);

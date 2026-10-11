@@ -31,20 +31,23 @@ export async function recordResearchModuleLoadFailure({
           : ["researching", "verifying", "synthesizing"];
       if (signal.aborted || !task || !allowed.includes(task.status))
         return false;
-      await store.updateTask(taskId, (current) =>
-        signal.aborted || !allowed.includes(current.status)
-          ? current
-          : {
-              ...transitionResearchTask(current, "failed"),
-              error: {
-                code:
-                  phase === "planning"
-                    ? "RESEARCH_PLAN_FAILED"
-                    : "RESEARCH_EXECUTION_FAILED",
-                message,
-                recoverable: true,
+      await store.updateTask(
+        taskId,
+        (current) =>
+          signal.aborted || !allowed.includes(current.status)
+            ? current
+            : {
+                ...transitionResearchTask(current, "failed"),
+                error: {
+                  code:
+                    phase === "planning"
+                      ? "RESEARCH_PLAN_FAILED"
+                      : "RESEARCH_EXECUTION_FAILED",
+                  message,
+                  recoverable: true,
+                },
               },
-            },
+        { persistence: "best-effort" },
       );
       if (signal.aborted) return false;
       if (useResearchStore.getState().activeTaskId === taskId)

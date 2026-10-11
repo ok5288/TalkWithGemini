@@ -83,10 +83,14 @@ export async function prepareResearchExecution({
       code: "RESEARCH_MODEL_UNAVAILABLE",
       message: dependencyText.modelUnavailable,
     };
-    await store.updateTask(taskId, (current) => ({
-      ...transitionResearchTask(current, "paused"),
-      error: { ...modelError, recoverable: true },
-    }));
+    await store.updateTask(
+      taskId,
+      (current) => ({
+        ...transitionResearchTask(current, "paused"),
+        error: { ...modelError, recoverable: true },
+      }),
+      { persistence: "best-effort" },
+    );
     store.setActiveTask(null);
     onNotice?.(modelError.message);
     return null;
@@ -105,10 +109,14 @@ export async function prepareResearchExecution({
   }
   const dependencyError = getResearchDependencyError(task, dependencyText);
   if (dependencyError) {
-    await store.updateTask(taskId, (current) => ({
-      ...transitionResearchTask(current, "paused"),
-      error: { ...dependencyError, recoverable: true },
-    }));
+    await store.updateTask(
+      taskId,
+      (current) => ({
+        ...transitionResearchTask(current, "paused"),
+        error: { ...dependencyError, recoverable: true },
+      }),
+      { persistence: "best-effort" },
+    );
     store.setActiveTask(null);
     onNotice?.(dependencyError.message);
     return null;
@@ -122,10 +130,14 @@ export async function prepareResearchExecution({
       code: "RESEARCH_SOURCE_REVOKED",
       message: dependencyText.sourceUnavailable(invalidWorkspaceSource),
     };
-    await store.updateTask(taskId, (current) => ({
-      ...transitionResearchTask(current, "paused"),
-      error: { ...workspaceError, recoverable: true },
-    }));
+    await store.updateTask(
+      taskId,
+      (current) => ({
+        ...transitionResearchTask(current, "paused"),
+        error: { ...workspaceError, recoverable: true },
+      }),
+      { persistence: "best-effort" },
+    );
     store.setActiveTask(null);
     onNotice?.(workspaceError.message);
     return null;
@@ -148,10 +160,14 @@ export async function prepareResearchExecution({
       code: "RESEARCH_SOURCE_REVOKED",
       message: dependencyText.sourceUnavailable(missingAttachment),
     };
-    await store.updateTask(taskId, (current) => ({
-      ...transitionResearchTask(current, "paused"),
-      error: { ...missingSourceError, recoverable: true },
-    }));
+    await store.updateTask(
+      taskId,
+      (current) => ({
+        ...transitionResearchTask(current, "paused"),
+        error: { ...missingSourceError, recoverable: true },
+      }),
+      { persistence: "best-effort" },
+    );
     store.setActiveTask(null);
     onNotice?.(missingSourceError.message);
     return null;

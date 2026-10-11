@@ -57,6 +57,38 @@ export function useResearchTaskViewModel(taskId: string | null) {
       toolSourceDetail: (source) => t("activity.toolSource", { source }),
       internalToolResultSource: t("evidence.internalResult"),
       toolSafeDetail: t("activity.toolSafeDetail"),
+      storageErrorDetails: {
+        RESEARCH_STORAGE_checkpoint: t("runtime.error.storage.checkpoint"),
+        RESEARCH_STORAGE_indexeddb_unavailable: t(
+          "runtime.error.storage.indexeddb_unavailable",
+        ),
+        RESEARCH_STORAGE_indexeddb_operation_failed: t(
+          "runtime.error.storage.indexeddb_operation_failed",
+        ),
+        RESEARCH_STORAGE_quota: t("runtime.error.storage.quota"),
+        RESEARCH_STORAGE_blocked: t("runtime.error.storage.blocked"),
+        RESEARCH_STORAGE_validation: t("runtime.error.storage.validation"),
+        RESEARCH_STORAGE_conflict: t("runtime.error.storage.conflict"),
+        RESEARCH_STORAGE_report_verification: t(
+          "runtime.error.storage.report_verification",
+        ),
+      },
+      searchFailedDetail: t("activity.searchFailedDetail"),
+      searchErrorDetails: {
+        SEARCH_RATE_LIMITED: t("activity.searchErrors.rateLimited"),
+        RESEARCH_SEARCH_TIMEOUT: t("activity.searchErrors.requestTimeout"),
+        RESPONSE_TIMEOUT: t("activity.searchErrors.requestTimeout"),
+        RESEARCH_RECON_TIMEOUT: t("activity.searchErrors.deadlineExceeded"),
+        RESEARCH_QUERY_BUDGET_EXHAUSTED: t(
+          "activity.searchErrors.budgetExhausted",
+        ),
+        RESEARCH_QUERY_NOT_ALLOWED: t("activity.searchErrors.outOfScope"),
+        RESEARCH_SEARCH_SCOPE_CONFLICT: t(
+          "activity.searchErrors.scopeConflict",
+        ),
+        SEARCH_UPSTREAM_ERROR: t("activity.searchErrors.upstream"),
+        WEB_SEARCH_INVALID_QUERY: t("activity.searchErrors.invalidQuery"),
+      },
       degradedWaveTitle: (wave) => t("activity.degradedWaveTitle", { wave }),
       degradedWaveDetail: (count) =>
         t("activity.degradedWaveDetail", { count }),

@@ -7,7 +7,7 @@ import {
 } from "@/lib/research";
 
 const repository = vi.hoisted(() => ({
-  getStatus: () => ({ durable: true, mode: "persistent" }),
+  getStatus: vi.fn(() => ({ durable: true, mode: "persistent" })),
   save: vi.fn(async () => undefined),
   list: vi.fn<() => Promise<ResearchTask[]>>(async () => []),
   get: vi.fn<(taskId: string) => Promise<ResearchTask | null>>(
@@ -32,7 +32,8 @@ import { useResearchStore } from "@/store/core/researchStore";
 
 describe("researchStore", () => {
   beforeEach(() => {
-    repository.save.mockClear();
+    repository.save.mockReset();
+    repository.getStatus.mockReturnValue({ durable: true, mode: "persistent" });
     repository.list.mockReset();
     repository.list.mockResolvedValue([]);
     repository.get.mockClear();
@@ -60,6 +61,42 @@ describe("researchStore", () => {
     expect(useResearchStore.getState().tasksById[task.id]).toEqual(task);
     await pending;
     expect(repository.save).toHaveBeenCalledWith(task);
+  });
+
+  it("propagates save rejection while retaining the local task and allows explicit failure-state writes", async () => {
+    const task = createResearchTask({
+      id: "task",
+      sessionId: "session",
+      goal: "Research",
+      now: 100,
+    });
+    const failure = new Error("schema validation failed");
+    repository.save.mockRejectedValue(failure);
+    await expect(useResearchStore.getState().upsertTask(task)).rejects.toBe(
+      failure,
+    );
+    expect(useResearchStore.getState().tasksById.task).toEqual(task);
+    await expect(
+      useResearchStore
+        .getState()
+        .updateTask("task", (current) => ({ ...current, status: "failed" }), {
+          persistence: "best-effort",
+        }),
+    ).resolves.toMatchObject({ status: "failed" });
+    expect(useResearchStore.getState().tasksById.task.status).toBe("failed");
+  });
+
+  it("does not acknowledge memory-only persistence as a successful checkpoint", async () => {
+    const task = createResearchTask({
+      id: "task",
+      sessionId: "session",
+      goal: "Research",
+      now: 100,
+    });
+    repository.getStatus.mockReturnValue({ durable: false, mode: "memory" });
+    await expect(
+      useResearchStore.getState().upsertTask(task),
+    ).rejects.toMatchObject({ reason: "indexeddb_operation_failed" });
   });
 
   it("hydrates all tasks and pauses non-terminal work", async () => {

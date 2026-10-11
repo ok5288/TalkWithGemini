@@ -42,25 +42,25 @@ describe("package manager configuration", () => {
       '"@hono/node-server": 1.19.15',
       '"baseline-browser-mapping@>=2.0.0 <2.11.0": 2.11.22',
       "browserslist: 4.28.7",
-      '"brace-expansion@<1.1.18": 1.1.18',
-      '"brace-expansion@>=2.0.0 <2.1.4": 2.1.4',
-      '"brace-expansion@>=4.0.0 <5.0.9": 5.0.9',
-      "dompurify: 3.4.14",
-      "fast-uri: 3.1.6",
+      '"brace-expansion@<1.1.21": 1.1.21',
+      '"brace-expansion@>=2.0.0 <2.1.7": 2.1.7',
+      '"brace-expansion@>=4.0.0 <5.0.12": 5.0.12',
+      "dompurify: 3.4.16",
+      "fast-uri: 3.1.8",
       "hono: 4.13.7",
-      "ip-address: 10.7.0",
+      "ip-address: 10.7.1",
       '"js-yaml@>=4.0.0 <4.3.2": 4.3.2',
       "protobufjs: 7.6.5",
       "qs: 6.16.0",
-      '"sharp@<0.35.4": 0.35.4',
+      '"sharp@<0.35.5": 0.35.5',
     ]) {
       expect(workspaceYaml).toContain(override);
     }
     for (const override of [
       '"@hono/node-server": 1.19.15',
-      "fast-uri: 3.1.6",
+      "fast-uri: 3.1.8",
       "hono: 4.13.7",
-      "ip-address: 10.7.0",
+      "ip-address: 10.7.1",
       "qs: 6.16.0",
     ]) {
       expect(bridgeWorkspaceYaml).toContain(override);

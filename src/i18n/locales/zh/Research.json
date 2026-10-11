@@ -274,6 +274,17 @@
     "toolEffectUnknown": "无法确认 {tool} 的结果",
     "toolInterrupted": "{tool} 已中断",
     "toolSource": "只读来源：{source}",
+    "searchFailedDetail": "搜索未能完成。请检查搜索服务后重试。",
+    "searchErrors": {
+      "rateLimited": "搜索服务已限流，请等待后再重试。",
+      "requestTimeout": "本次搜索请求超时，请稍后重试。",
+      "deadlineExceeded": "本轮研究搜索的时限已到，其中包含排队等待时间。",
+      "budgetExhausted": "已用尽批准的查询预算，没有发送额外搜索请求。",
+      "outOfScope": "该查询不在批准的搜索范围内，没有发送搜索请求。",
+      "scopeConflict": "搜索筛选条件与批准的范围冲突，没有发送搜索请求。",
+      "upstream": "搜索服务提供方未能完成请求，请稍后重试。",
+      "invalidQuery": "搜索查询无效，没有发送搜索请求。"
+    },
     "toolSafeDetail": "只读操作；原始参数与完整结果已隐藏。",
     "degradedWaveTitle": "第 {wave} 轮已带证据缺口归档",
     "degradedWaveDetail": "{count} 个研究节点未生成有效学习包。已保留的证据仍可使用，报告会继续生成并明确标注缺口。",
@@ -454,9 +465,11 @@
       "planReady": "深度研究计划已生成，等待确认。",
       "reportReady": "深度研究报告已生成。",
       "reportPartial": "深度研究已完成，但仍存在证据缺口。",
-      "evidenceAnswer": "已仅基于现有证据在研究会话中添加回答。"
+      "evidenceAnswer": "已仅基于现有证据在研究会话中添加回答。",
+      "steeringUnavailable": "研究调整功能暂不可用，当前研究将继续。"
     },
     "error": {
+      "planInvalid": "研究计划经两次修复后仍未通过校验。请重试或调整研究范围。",
       "plan": "无法生成深度研究计划。",
       "report": "深度研究无法完成报告。",
       "planFallback": "研究计划生成失败。",
@@ -465,7 +478,17 @@
       "activeTaskKept": "已保留当前深度研究任务，因此没有创建新任务。",
       "chatMissing": "该深度研究任务所属的聊天已不存在。",
       "taskMissing": "此聊天中找不到该深度研究任务。",
-      "persistence": "浏览器持久化存储不可用，深度研究无法继续。"
+      "persistence": "浏览器持久化存储不可用，深度研究无法继续。",
+      "storage": {
+        "checkpoint": "研究检查点保存失败，研究已停止。请在存储恢复可用后重试。",
+        "indexeddb_unavailable": "浏览器存储不可用，请恢复存储访问后重试。",
+        "indexeddb_operation_failed": "研究进度未能保存，请重试以重新连接浏览器存储。",
+        "quota": "浏览器存储空间不足，请释放空间后重试。",
+        "blocked": "浏览器存储被其他页面阻塞，请关闭旧标签页后重试。",
+        "validation": "研究进度未通过保存校验，任务已停止。",
+        "conflict": "其他标签页已修改此研究任务。本地进度已保留，请重新加载任务后继续。",
+        "report_verification": "未能验证已保存的报告，研究尚未标记为完成。"
+      }
     },
     "gaps": {
       "noEvidence": "没有提交可检索的正式来源证据。",

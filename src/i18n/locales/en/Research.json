@@ -274,6 +274,17 @@
     "toolEffectUnknown": "{tool} result could not be confirmed",
     "toolInterrupted": "{tool} was interrupted",
     "toolSource": "Read-only source: {source}",
+    "searchFailedDetail": "Search could not complete. Please check the search service and try again.",
+    "searchErrors": {
+      "rateLimited": "The search service rate limit was reached. Wait before retrying.",
+      "requestTimeout": "The search request timed out. Please try again later.",
+      "deadlineExceeded": "The research search deadline was reached, including time spent waiting in the queue.",
+      "budgetExhausted": "The approved query budget is exhausted. No additional search request was sent.",
+      "outOfScope": "This query is outside the approved search scope. No search request was sent.",
+      "scopeConflict": "The search filters conflict with the approved search scope. No search request was sent.",
+      "upstream": "The search provider could not complete the request. Please try again later.",
+      "invalidQuery": "The search query is invalid. No search request was sent."
+    },
     "toolSafeDetail": "Read-only operation; raw arguments and results are hidden.",
     "degradedWaveTitle": "Round {wave} archived with evidence gaps",
     "degradedWaveDetail": "{count} research nodes produced no valid learning packet. Preserved evidence remains available and the report will continue with explicit gaps.",
@@ -454,9 +465,11 @@
       "planReady": "Deep Research plan is ready for approval.",
       "reportReady": "Deep Research report is ready.",
       "reportPartial": "Deep Research finished with evidence gaps.",
-      "evidenceAnswer": "Answer added to the research chat using stored evidence only."
+      "evidenceAnswer": "Answer added to the research chat using stored evidence only.",
+      "steeringUnavailable": "Research adjustments are unavailable. The current research will continue."
     },
     "error": {
+      "planInvalid": "The research plan could not be validated after two repair attempts. Please retry or refine the research scope.",
       "plan": "Failed to prepare the Deep Research plan.",
       "report": "Deep Research could not finish the report.",
       "planFallback": "Failed to prepare the research plan.",
@@ -465,7 +478,17 @@
       "activeTaskKept": "The current Deep Research task was kept, so no new task was created.",
       "chatMissing": "The chat for this Deep Research task is no longer available.",
       "taskMissing": "The Deep Research task is unavailable in this chat.",
-      "persistence": "Deep Research cannot continue because durable browser storage is unavailable."
+      "persistence": "Deep Research cannot continue because durable browser storage is unavailable.",
+      "storage": {
+        "checkpoint": "The research checkpoint could not be saved. Research has stopped; retry after storage is available.",
+        "indexeddb_unavailable": "Browser storage is unavailable. Research cannot continue until storage access is restored.",
+        "indexeddb_operation_failed": "Research progress could not be saved. Retry to reconnect to browser storage.",
+        "quota": "Browser storage is full. Free space and retry.",
+        "blocked": "Browser storage is blocked by another page. Close older tabs and retry.",
+        "validation": "Research progress could not be validated for saving. The task has been stopped.",
+        "conflict": "Another tab changed this research task. Local progress has been retained; reload the task before continuing.",
+        "report_verification": "The saved report could not be verified. Research has not been marked complete."
+      }
     },
     "gaps": {
       "noEvidence": "No retrievable source evidence was committed.",

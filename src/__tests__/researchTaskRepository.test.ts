@@ -544,14 +544,16 @@ describe("ResearchTask repository", () => {
     const repository = createResearchTaskRepository({
       indexedDb: { open } as unknown as IDBFactory,
     });
-    await repository.save(
-      createResearchTask({
-        id: "research-1",
-        sessionId: "session-1",
-        goal: "Research",
-        now: 100,
-      }),
-    );
+    await expect(
+      repository.save(
+        createResearchTask({
+          id: "research-1",
+          sessionId: "session-1",
+          goal: "Research",
+          now: 100,
+        }),
+      ),
+    ).rejects.toMatchObject({ reason: "indexeddb_operation_failed" });
     expect(open).toHaveBeenCalledOnce();
     expect(repository.getStatus()).toEqual({
       mode: "memory",

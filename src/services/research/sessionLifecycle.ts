@@ -331,9 +331,9 @@ export async function duplicateResearchTaskSnapshots({
   try {
     for (const task of tasks) {
       const cloned = cloneResearchTask(task, targetSessionId, artifactUrls);
+      createdTaskIds.push(cloned.id);
       await useResearchStore.getState().upsertTask(cloned);
       taskIdMap.set(task.id, cloned.id);
-      createdTaskIds.push(cloned.id);
       const sourceRefs = await cloneResearchExtensions(task, cloned);
       for (const [source, target] of sourceRefs)
         sourceRefMap.set(source, target);

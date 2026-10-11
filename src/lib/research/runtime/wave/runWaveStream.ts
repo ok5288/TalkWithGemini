@@ -28,6 +28,21 @@ export async function runWaveStream(
     effective,
     settings,
   } = ctx;
+  // A checkpoint failure stops the in-flight multi-round stream immediately,
+  // without marking the user's task controller as a pause/cancel request.
+  await wave.checkpointQueue;
+  const checkpointController = new AbortController();
+  const streamSignal = AbortSignal.any([
+    controller.signal,
+    checkpointController.signal,
+  ]);
+  let checkpointFailure: unknown;
+  const saveCheckpoint = () => {
+    void persistWaveCheckpoint(wave).catch((error: unknown) => {
+      checkpointFailure ??= error;
+      checkpointController.abort(error);
+    });
+  };
   const result = await streamChatResponse(
     ctx.task.sessionId,
     ctx.researchModel,
@@ -66,16 +81,16 @@ export async function runWaveStream(
           ctx.imageSources ?? [],
           nextImages,
         );
-        void persistWaveCheckpoint(wave);
+        saveCheckpoint();
       }
     },
     (toolCalls) => {
       wave.latestToolCalls = toolCalls;
-      void persistWaveCheckpoint(wave);
+      saveCheckpoint();
     },
     undefined,
     undefined,
-    controller.signal,
+    streamSignal,
     snapshot.pluginIds,
     undefined,
     undefined,
@@ -137,10 +152,13 @@ export async function runWaveStream(
       memoryScopes: snapshot.memoryScopes,
       memoryScopeIds: snapshot.memoryScopeIds,
     },
-  );
+  ).catch((error: unknown) => {
+    throw checkpointFailure ?? error;
+  });
+  if (checkpointFailure) throw checkpointFailure;
   wave.latestContent = result || wave.latestContent;
   controller.signal.throwIfAborted();
-  await wave.checkpointQueue.catch(() => undefined);
+  await wave.checkpointQueue;
   const currentTaskAfterWave = ctx.store.tasksById[ctx.taskId];
   const firstNode = wave.activeRun.nodes.find((node) =>
     nodeIds.includes(node.id),

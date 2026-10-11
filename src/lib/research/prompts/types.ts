@@ -7,6 +7,8 @@ import type {
   ResearchStrategy,
 } from "../types";
 
+export const RESEARCH_PLAN_STEP_LIMITS = { min: 2, max: 8 } as const;
+
 export interface ResearchPlanDraftV2 {
   title: string;
   summary: string;

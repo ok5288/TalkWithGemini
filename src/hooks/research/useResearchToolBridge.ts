@@ -1,3 +1,4 @@
+import { ResearchPersistenceError } from "@/services/research/taskRepository/errors";
 import { useEffect } from "react";
 
 import {
@@ -88,17 +89,23 @@ export function useResearchToolBridge({
         const withRun = context.agentRunId
           ? { ...task, agentRunIds: [context.agentRunId] }
           : task;
-        await useResearchStore.getState().upsertTask(withRun);
-        if (!getResearchTaskRepository().getStatus().durable) {
+        try {
+          await useResearchStore.getState().upsertTask(withRun);
+        } catch (error) {
           const failed = {
             ...transitionResearchTask(withRun, "failed"),
             error: {
               code: "RESEARCH_PERSISTENCE_UNAVAILABLE",
-              message: t("runtime.error.persistence"),
+              message:
+                error instanceof ResearchPersistenceError
+                  ? t(`runtime.error.storage.${error.reason}`)
+                  : t("runtime.error.persistence"),
               recoverable: true,
             },
           };
-          await useResearchStore.getState().upsertTask(failed);
+          await useResearchStore
+            .getState()
+            .upsertTask(failed, { persistence: "best-effort" });
           return { taskId: failed.id, status: failed.status };
         }
         try {
@@ -117,7 +124,9 @@ export function useResearchToolBridge({
               recoverable: true,
             },
           };
-          await useResearchStore.getState().upsertTask(failed);
+          await useResearchStore
+            .getState()
+            .upsertTask(failed, { persistence: "best-effort" });
           return { taskId: failed.id, status: failed.status };
         }
         void preparePlan(withRun.id, undefined, context.model);

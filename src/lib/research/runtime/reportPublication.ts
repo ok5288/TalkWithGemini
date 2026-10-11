@@ -1,3 +1,4 @@
+import { ResearchPersistenceError } from "@/services/research/taskRepository/errors";
 import type { ReportSectionLabels } from "@/lib/research/reportSections";
 import { v7 as uuidv7 } from "uuid";
 
@@ -54,7 +55,7 @@ async function verifyPublishedVersion(
         version.artifactId === report.artifactId,
     )
   ) {
-    throw new Error(persistenceError);
+    throw new ResearchPersistenceError("report_verification", persistenceError);
   }
   const artifact = await resolveOPFSBlob(report.artifactId);
   const markdown = artifact ? await artifact.text() : "";
@@ -62,7 +63,7 @@ async function verifyPublishedVersion(
     !markdown ||
     (expectedMarkdown !== undefined && markdown !== expectedMarkdown)
   ) {
-    throw new Error(persistenceError);
+    throw new ResearchPersistenceError("report_verification", persistenceError);
   }
 }
 
@@ -218,7 +219,7 @@ export async function publishResearchReportVersion({
   }));
   assertRunning();
   if (!getResearchTaskRepository().getStatus().durable) {
-    throw new Error(persistenceError);
+    throw new ResearchPersistenceError("report_verification", persistenceError);
   }
   const task = useResearchStore.getState().tasksById[taskId];
   if (!task) throw new Error("Research task was not found.");
@@ -280,7 +281,7 @@ export async function publishResearchReportVersion({
   assertRunning();
   const artifact = await resolveOPFSBlob(published.value.url);
   if (!artifact || (await artifact.text()) !== publicationMarkdown) {
-    throw new Error(persistenceError);
+    throw new ResearchPersistenceError("report_verification", persistenceError);
   }
   assertRunning();
   const report: ResearchReportVersion = {

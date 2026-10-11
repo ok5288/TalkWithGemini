@@ -369,8 +369,16 @@ describe("research steering persistence and concurrency", () => {
     vi.spyOn(repository, "update").mockRejectedValueOnce(
       new Error("storage denied"),
     );
-    await initializeResearchSteering(ctx);
-    expect(ctx.steeringRecord).toBeUndefined();
+    const optional = {
+      ...ctx,
+      onNotice: vi.fn(),
+      t: ((key: string) => key) as ResearchExecutionContext["t"],
+    };
+    await initializeResearchSteering(optional);
+    expect(optional.steeringRecord).toBeUndefined();
+    expect(optional.onNotice).toHaveBeenCalledWith(
+      "runtime.notice.steeringUnavailable",
+    );
   });
 
   it("allows another tab to queue without mutating the active run, and serializes sequence numbers", async () => {

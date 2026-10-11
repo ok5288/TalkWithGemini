@@ -3,7 +3,7 @@ import type { ResearchTask } from "@/lib/research/types";
 import type { RESEARCH_TASK_STORAGE_VERSION } from "./constants";
 
 export type ResearchTaskRepositoryFallbackReason =
-  "indexeddb_unavailable" | "indexeddb_operation_failed";
+  "indexeddb_unavailable" | "indexeddb_operation_failed" | "quota" | "blocked";
 
 export interface ResearchTaskRepositoryStatus {
   mode: "persistent" | "memory";
@@ -14,6 +14,8 @@ export interface ResearchTaskRepositoryStatus {
 export interface ResearchTaskRepository {
   getStatus(): ResearchTaskRepositoryStatus;
   save(task: ResearchTask): Promise<void>;
+  /** Retry only this task while its caller holds the execution lease. */
+  recover?(task: ResearchTask): Promise<void>;
   get(taskId: string): Promise<ResearchTask | null>;
   list(sessionId?: string): Promise<ResearchTask[]>;
   remove(taskId: string): Promise<void>;

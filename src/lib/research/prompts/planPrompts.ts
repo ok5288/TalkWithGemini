@@ -1,4 +1,6 @@
 import { resolveResearchStrategy } from "../orchestration";
+import { RESEARCH_RECON_LIMITS } from "../orchestration/strategy";
+import { RESEARCH_PLAN_STEP_LIMITS } from "./types";
 import type { ResearchScope, ResearchStrategy, ResearchTask } from "../types";
 import type { ResearchTemplate } from "../templates";
 import type { ResearchPlanningContextRequest } from "./planningResponse";
@@ -45,6 +47,8 @@ const PLAN_JSON_SHAPE = `{
   "completionCriteria": ["observable completion criterion"]
 }`;
 
+const PLAN_STEP_RULE = `Use ${RESEARCH_PLAN_STEP_LIMITS.min}-${RESEARCH_PLAN_STEP_LIMITS.max} non-overlapping steps with stable unique IDs. Make query topics distinct, state the evidence threshold for each step, and never claim research has begun.`;
+
 const PLAN_TIME_RANGE_RULE =
   "`scope.timeRange` is optional. Include it only when the goal states or requires a meaningful time bound. When present, `start` and `end` must use YYYY-MM-DD; put prose only in `description`. Use any non-empty subset of those fields. Otherwise omit `scope.timeRange` entirely. Never emit empty strings, null, or placeholder words for time-range fields.";
 const PLAN_DOMAIN_RULE =
@@ -80,7 +84,7 @@ export function buildResearchPlanPrompt({
       : stage === "knowledge"
         ? "The research subject needs clarification. Search only the selected knowledge scope with search_knowledge, at most two queries and five passages per query. Once the subject is clear, draft the plan without further searches."
         : stage === "web"
-          ? "Selected knowledge was insufficient or unavailable. You may call web_search at most twice for public summaries, at most five results per query and thirty seconds total. Use only the exact host-listed queries, fixed before private knowledge was read. Do not fetch source bodies. Then draft the plan with explicit assumptions about anything still unknown."
+          ? `Selected knowledge was insufficient or unavailable. You may call web_search at most twice for public summaries, at most five results per query and ${RESEARCH_RECON_LIMITS.timeoutMs / 1_000} seconds total. Use only the exact host-listed queries, fixed before private knowledge was read. Do not fetch source bodies. Then draft the plan with explicit assumptions about anything still unknown.`
           : "All planning retrieval is finished or unavailable. All tools are disabled. Draft the most useful plan from available context and record unresolved concepts as explicit assumptions; do not request more context.",
     "Source feasibility remains unverified unless an actual lookup confirmed it. Understanding a concept is not evidence that research has been completed.",
     "Do not ask the user questions in this call. Where the request is genuinely ambiguous, choose the most useful reading and record it in `assumptions`; the user reviews and confirms the plan afterwards.",
@@ -91,7 +95,7 @@ export function buildResearchPlanPrompt({
       : "Return a plan even if retrieval failed or returned no results. Record limits in assumptions instead of inventing facts.",
     PLAN_TIME_RANGE_RULE,
     PLAN_DOMAIN_RULE,
-    "Use 2-8 non-overlapping steps with stable unique IDs. Make query topics distinct, state the evidence threshold for each step, and never claim research has begun.",
+    PLAN_STEP_RULE,
     `Use this approved strategy exactly: ${JSON.stringify(strategy)}. Do not increase source permissions or budgets.`,
     `Allowed source types for this task: ${(allowedSourceTypes?.length ? allowedSourceTypes : ["web"]).join(", ")}. Include no other types.`,
     preserveInitialContract && template
@@ -149,7 +153,9 @@ export function buildResearchPlanRepairPrompt({
   return [
     "Repair the invalid Deep Research v2 plan. Do not use tools.",
     "Return exactly one JSON object with no prose or Markdown fence.",
-    PLAN_JSON_SHAPE,
+    `{"kind":"plan","plan":${PLAN_JSON_SHAPE}}`,
+    PLAN_STEP_RULE,
+    "If there are too many steps, merge related steps. Preserve all research questions and required deliverables; never fix the count by silently dropping scope.",
     PLAN_TIME_RANGE_RULE,
     PLAN_DOMAIN_RULE,
     `Research goal:\n${task.goal}`,

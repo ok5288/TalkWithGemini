@@ -62,6 +62,12 @@ plan. Planning cannot fetch pages, read ordinary attachments or workspace
 files, call Plugins or MCP, load Skills, or use Memory. After the plan appears,
 the source-free clarification surface can adjust or approve it.
 
+Plans contain 2–8 steps. Initial generation and the two bounded, closed-book
+repair attempts accept the same plan JSON envelope. Repairs receive the actual
+field-validation issues and must merge related steps without discarding research
+questions or required deliverables. An invalid plan is never silently truncated
+or saved for execution; the task offers a localized retry message.
+
 The versioned plan records the objective, audience, time scope, preferred and
 excluded domains, assumptions, deliverable contract, stable steps, query
 topics, source priorities, evidence criteria, strategy, completion criteria,
@@ -146,7 +152,11 @@ are shown as skipped. A batch retains successful results; it fails as a whole
 only when every query fails. HTTP 429 starts a cooldown from `Retry-After` (or
 60 seconds when absent), and neither 429 nor 504 is immediately replayed.
 Pause or cancellation aborts queue waits and active requests. The queue does
-not coordinate other tabs or devices.
+not coordinate other tabs or devices. Search activities distinguish rate limits,
+request timeouts, the overall search deadline, exhausted query budgets, and
+scope restrictions using safe localized summaries. Duplicate queries appear as
+skipped. Raw provider messages, queries, and tool payloads remain hidden; unknown
+or legacy errors use a generic search-failure summary.
 
 Research search uses the optional `research_summary` profile for summaries and
 image descriptions; raw page bodies come from separate read tools. Results
@@ -185,6 +195,17 @@ a reason, and late, duplicate, scheduled, terminal, or limit-exceeding
 commands are rejected explicitly. An accepted question prevents a soft
 early-stop until its node is attempted, subject to budget, errors, and
 cancellation.
+
+Core task saves must succeed before execution can acknowledge a checkpoint.
+A storage failure retains the visible local task but stops further research;
+optimistic UI updates are not durable save acknowledgments. Explicit retry
+reopens storage under the task execution lock, compares against the last
+confirmed task snapshot, and verifies the saved record by reading it back.
+Only that task is recovered. A conflicting change from another tab prevents
+overwriting its progress, and the local unsaved task is retained. Storage
+unavailability, quota limits, blocked access, invalid task data, checkpoint
+failures, and report verification failures have distinct messages. An optional
+steering initialization failure disables adjustments while research continues.
 
 Research is foreground-only. One browser tab can own at most one active task.
 A read already in flight may finish and commit before a safe pause, but the

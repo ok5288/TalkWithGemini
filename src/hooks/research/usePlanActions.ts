@@ -103,10 +103,14 @@ export function usePlanActions({
                 ? dependencyText.sourceUnavailable("workspace")
                 : dependencyText.modelUnavailable,
             };
-            await store.updateTask(taskId, (current) => ({
-              ...transitionResearchTask(current, "paused"),
-              error: { ...dependencyError, recoverable: true },
-            }));
+            await store.updateTask(
+              taskId,
+              (current) => ({
+                ...transitionResearchTask(current, "paused"),
+                error: { ...dependencyError, recoverable: true },
+              }),
+              { persistence: "best-effort" },
+            );
             onNotice?.(dependencyError.message);
             return;
           }
@@ -115,11 +119,15 @@ export function usePlanActions({
             dependencyText,
           );
           if (dependencyError) {
-            await store.updateTask(taskId, (current) => ({
-              ...transitionResearchTask(current, "paused"),
-              sourceSnapshot,
-              error: { ...dependencyError, recoverable: true },
-            }));
+            await store.updateTask(
+              taskId,
+              (current) => ({
+                ...transitionResearchTask(current, "paused"),
+                sourceSnapshot,
+                error: { ...dependencyError, recoverable: true },
+              }),
+              { persistence: "best-effort" },
+            );
             onNotice?.(dependencyError.message);
             return;
           }

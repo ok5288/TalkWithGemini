@@ -1,3 +1,4 @@
+import { ResearchPersistenceError } from "./errors";
 import type { ResearchTask } from "@/lib/research/types";
 
 import { RESEARCH_TASK_STORAGE_VERSION } from "./constants";
@@ -120,7 +121,12 @@ export function toPersistedResearchTask(task: ResearchTask): ResearchTask {
 export function createStoredRecord(
   task: ResearchTask,
 ): StoredResearchTaskRecord {
-  const persistedTask = toPersistedResearchTask(task);
+  let persistedTask: ResearchTask;
+  try {
+    persistedTask = toPersistedResearchTask(task);
+  } catch {
+    throw new ResearchPersistenceError("validation");
+  }
   const parsed = storedRecordSchema.safeParse({
     storageVersion: RESEARCH_TASK_STORAGE_VERSION,
     taskId: persistedTask.id,
@@ -128,8 +134,7 @@ export function createStoredRecord(
     updatedAt: persistedTask.updatedAt,
     task: persistedTask,
   });
-  if (!parsed.success)
-    throw new Error("Research task is not valid for local persistence.");
+  if (!parsed.success) throw new ResearchPersistenceError("validation");
   return parsed.data as StoredResearchTaskRecord;
 }
 

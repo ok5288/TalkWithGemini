@@ -456,10 +456,7 @@ export async function prepareResearchPlan({
               ...transitionResearchTask(current, "failed"),
               error: {
                 code: "RESEARCH_PLAN_INVALID",
-                message: [
-                  `The research plan remained invalid after ${PLAN_REPAIR_ATTEMPTS} repairs.`,
-                  ...evaluated.issues.slice(0, 8),
-                ].join(" "),
+                message: t("runtime.error.planInvalid"),
                 recoverable: true,
               },
             },
@@ -516,58 +513,70 @@ export async function prepareResearchPlan({
     onNotice?.(t("runtime.notice.planReady"));
   } catch (error) {
     if (isAbortError(error) || controller.signal.aborted) {
-      await store.updateTask(taskId, (current) =>
-        current.status === "cancelled" || current.status === "paused"
-          ? current
-          : transitionResearchTask(current, "paused"),
+      await store.updateTask(
+        taskId,
+        (current) =>
+          current.status === "cancelled" || current.status === "paused"
+            ? current
+            : transitionResearchTask(current, "paused"),
+        { persistence: "best-effort" },
       );
       return;
     }
     if (error instanceof AgentRunLeaseConflictError) {
       const message = t("runtime.dependency.leaseConflict");
-      await store.updateTask(taskId, (current) =>
-        current.status === "cancelled"
-          ? current
-          : {
-              ...current,
-              error: {
-                code: "AGENT_RUN_LEASE_CONFLICT",
-                message,
-                recoverable: true,
+      await store.updateTask(
+        taskId,
+        (current) =>
+          current.status === "cancelled"
+            ? current
+            : {
+                ...current,
+                error: {
+                  code: "AGENT_RUN_LEASE_CONFLICT",
+                  message,
+                  recoverable: true,
+                },
               },
-            },
+        { persistence: "best-effort" },
       );
       onError?.(message);
       return;
     }
     if (error instanceof ResearchModelUnavailableError) {
       const message = t("runtime.dependency.modelUnavailable");
-      await store.updateTask(taskId, (current) =>
-        current.status === "cancelled"
-          ? current
-          : {
-              ...transitionResearchTask(current, "paused"),
-              error: {
-                code: error.code,
-                message,
-                recoverable: true,
+      await store.updateTask(
+        taskId,
+        (current) =>
+          current.status === "cancelled"
+            ? current
+            : {
+                ...transitionResearchTask(current, "paused"),
+                error: {
+                  code: error.code,
+                  message,
+                  recoverable: true,
+                },
               },
-            },
+        { persistence: "best-effort" },
       );
       onError?.(message);
       return;
     }
-    await store.updateTask(taskId, (current) =>
-      current.status === "cancelled"
-        ? current
-        : {
-            ...transitionResearchTask(current, "failed"),
-            error: {
-              code: "RESEARCH_PLAN_FAILED",
-              message: localizedRuntimeError(error, "planFallback"),
-              recoverable: true,
+    await store.updateTask(
+      taskId,
+      (current) =>
+        current.status === "cancelled"
+          ? current
+          : {
+              ...transitionResearchTask(current, "failed"),
+              error: {
+                code: "RESEARCH_PLAN_FAILED",
+                message: localizedRuntimeError(error, "planFallback"),
+                recoverable: true,
+              },
             },
-          },
+      { persistence: "best-effort" },
     );
     onError?.(t("runtime.error.plan"));
   }

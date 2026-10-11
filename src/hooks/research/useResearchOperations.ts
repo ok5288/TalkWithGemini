@@ -76,17 +76,26 @@ export function useResearchOperations({
     if (!task || isTerminalResearchStatus(task.status)) return;
     const operation = operationsRef.current.get(taskId);
     if (!operation || !isResearchTaskLocallyLocked(taskId)) {
-      await runResearchTaskAction(taskId, async (current) => {
-        if (
-          !isTerminalResearchStatus(current.status) &&
-          current.status !== "paused"
-        )
-          await useResearchStore
-            .getState()
-            .updateTask(taskId, (latest) =>
-              transitionResearchTask(latest, "paused"),
-            );
-      });
+      await runResearchTaskAction(
+        taskId,
+        async (current) => {
+          if (
+            !isTerminalResearchStatus(current.status) &&
+            current.status !== "paused"
+          )
+            await useResearchStore
+              .getState()
+              .updateTask(
+                taskId,
+                (latest) => transitionResearchTask(latest, "paused"),
+                { persistence: "best-effort" },
+              );
+        },
+        undefined,
+        { requirePersistence: false },
+      );
+      if (useResearchStore.getState().activeTaskId === taskId)
+        store.setActiveTask(null);
       return;
     }
     if (
@@ -99,14 +108,17 @@ export function useResearchOperations({
         createAbortError("Research paused by the user."),
       );
     }
-    await store.updateTask(taskId, (current) =>
-      current.status === "paused" || isTerminalResearchStatus(current.status)
-        ? current
-        : transitionResearchTask(current, "paused"),
-    );
-    if (store.activeTaskId === taskId) store.setActiveTask(null);
-    await operation?.promise.catch(() => undefined);
-    await waitForLocalResearchTaskExecution(taskId);
+    try {
+      await store.updateTask(taskId, (current) =>
+        current.status === "paused" || isTerminalResearchStatus(current.status)
+          ? current
+          : transitionResearchTask(current, "paused"),
+      );
+    } finally {
+      if (store.activeTaskId === taskId) store.setActiveTask(null);
+      await operation?.promise.catch(() => undefined);
+      await waitForLocalResearchTaskExecution(taskId);
+    }
   }, []);
 
   const cancelTask = useCallback(async (taskId: string) => {
@@ -122,46 +134,60 @@ export function useResearchOperations({
     }
     const operation = operationsRef.current.get(taskId);
     if (!operation || !isResearchTaskLocallyLocked(taskId)) {
-      await runResearchTaskAction(taskId, async (current) => {
-        if (
-          ["completed", "partial_completed", "cancelled"].includes(
-            current.status,
+      await runResearchTaskAction(
+        taskId,
+        async (current) => {
+          if (
+            ["completed", "partial_completed", "cancelled"].includes(
+              current.status,
+            )
           )
-        )
-          return;
-        await useResearchStore.getState().updateTask(taskId, (latest) => ({
-          ...transitionResearchTask(latest, "cancelled"),
-          reportRuns: latest.reportRuns.map((run) =>
-            run.id === latest.activeReportRunId
-              ? applyResearchRunUserStop(run, "cancel")
-              : run,
-          ),
-          checkpoint: undefined,
-        }));
-      });
+            return;
+          await useResearchStore.getState().updateTask(
+            taskId,
+            (latest) => ({
+              ...transitionResearchTask(latest, "cancelled"),
+              reportRuns: latest.reportRuns.map((run) =>
+                run.id === latest.activeReportRunId
+                  ? applyResearchRunUserStop(run, "cancel")
+                  : run,
+              ),
+              checkpoint: undefined,
+            }),
+            { persistence: "best-effort" },
+          );
+        },
+        undefined,
+        { requirePersistence: false },
+      );
+      if (useResearchStore.getState().activeTaskId === taskId)
+        store.setActiveTask(null);
       return;
     }
     operation?.controller.abort(
       createAbortError("Research cancelled by the user."),
     );
-    await store.updateTask(taskId, (current) =>
-      current.status === "completed" ||
-      current.status === "partial_completed" ||
-      current.status === "cancelled"
-        ? current
-        : {
-            ...transitionResearchTask(current, "cancelled"),
-            reportRuns: current.reportRuns.map((run) =>
-              run.id === current.activeReportRunId
-                ? applyResearchRunUserStop(run, "cancel")
-                : run,
-            ),
-            checkpoint: undefined,
-          },
-    );
-    if (store.activeTaskId === taskId) store.setActiveTask(null);
-    await operation?.promise.catch(() => undefined);
-    await waitForLocalResearchTaskExecution(taskId);
+    try {
+      await store.updateTask(taskId, (current) =>
+        current.status === "completed" ||
+        current.status === "partial_completed" ||
+        current.status === "cancelled"
+          ? current
+          : {
+              ...transitionResearchTask(current, "cancelled"),
+              reportRuns: current.reportRuns.map((run) =>
+                run.id === current.activeReportRunId
+                  ? applyResearchRunUserStop(run, "cancel")
+                  : run,
+              ),
+              checkpoint: undefined,
+            },
+      );
+    } finally {
+      if (store.activeTaskId === taskId) store.setActiveTask(null);
+      await operation?.promise.catch(() => undefined);
+      await waitForLocalResearchTaskExecution(taskId);
+    }
   }, []);
 
   const claimActiveSlot = useCallback(

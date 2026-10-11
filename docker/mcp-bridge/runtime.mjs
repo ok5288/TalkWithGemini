@@ -1,5 +1,6 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { STDIO_DEFAULT_MAX_BUFFER_SIZE } from "@modelcontextprotocol/sdk/shared/stdio.js";
 import { ErrorCode } from "@modelcontextprotocol/sdk/types.js";
 
 import { buildChildEnvironment } from "./config.mjs";
@@ -11,8 +12,16 @@ const MAX_JSON_RPC_ENVELOPE_BYTES = 64 * 1024;
 // The fixture test for an unterminated frame is the upgrade gate for this hook.
 class BoundedStdioClientTransport extends StdioClientTransport {
   constructor(server, maxResultBytes) {
-    super(server);
-    this.maxFrameBytes = maxResultBytes + MAX_JSON_RPC_ENVELOPE_BYTES;
+    const maxFrameBytes = maxResultBytes + MAX_JSON_RPC_ENVELOPE_BYTES;
+    super({
+      ...server,
+      // A read can include a frame's delimiter and bytes from the next frame.
+      maxBufferSize: Math.max(
+        STDIO_DEFAULT_MAX_BUFFER_SIZE,
+        2 * (maxFrameBytes + 1),
+      ),
+    });
+    this.maxFrameBytes = maxFrameBytes;
     this.frameLimitExceeded = false;
   }
 

@@ -1,3 +1,4 @@
+import { ResearchPersistenceError } from "@/services/research/taskRepository/errors";
 import {
   withResearchTaskExecutionLock,
   isResearchTaskLocallyLocked,
@@ -14,16 +15,24 @@ import {
   getResearchTaskRepository,
 } from "@/services/research";
 
+interface PersistenceOptions {
+  persistence: "best-effort";
+}
+
 interface ResearchState {
   tasksById: Record<string, ResearchTask>;
   loadedSessionIds: Record<string, true>;
   hydrated: boolean;
   activeTaskId: string | null;
   setActiveTask: (taskId: string | null) => void;
-  upsertTask: (task: ResearchTask) => Promise<void>;
+  upsertTask: (
+    task: ResearchTask,
+    options?: PersistenceOptions,
+  ) => Promise<void>;
   updateTask: (
     taskId: string,
     update: (task: ResearchTask) => ResearchTask,
+    options?: PersistenceOptions,
   ) => Promise<ResearchTask | null>;
   /** Refresh the local view without writing it back; callers own any execution lease. */
   refreshTask: (taskId: string) => Promise<ResearchTask | null>;
@@ -84,22 +93,28 @@ export const useResearchStore = create<ResearchState>((set, get) => ({
 
   setActiveTask: (taskId) => set({ activeTaskId: taskId }),
 
-  upsertTask: async (task) => {
+  upsertTask: async (task, options) => {
     set((state) => ({
       tasksById: { ...state.tasksById, [task.id]: task },
     }));
     try {
-      await getResearchTaskRepository().save(task);
+      const repository = getResearchTaskRepository();
+      await repository.save(task);
+      if (!repository.getStatus().durable)
+        throw new ResearchPersistenceError(
+          repository.getStatus().fallbackReason ?? "indexeddb_operation_failed",
+        );
     } catch (error) {
-      logDevError("Failed to persist research task", error);
+      if (options?.persistence !== "best-effort") throw error;
+      logDevError("Failed to persist research task failure state", error);
     }
   },
 
-  updateTask: async (taskId, update) => {
+  updateTask: async (taskId, update, options) => {
     const current = get().tasksById[taskId];
     if (!current) return null;
     const next = update(current);
-    await get().upsertTask(next);
+    await get().upsertTask(next, options);
     return next;
   },
 

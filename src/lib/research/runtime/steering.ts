@@ -89,7 +89,7 @@ export async function initializeResearchSteering(
   ctx: ResearchExecutionContext,
 ): Promise<void> {
   if (!ctx.steeringLockHeld) return;
-  // Ordinary research keeps working without durable storage; steering does not.
+  // Steering also requires durable extension storage.
   if (
     !getResearchTaskRepository().getStatus().durable ||
     !getResearchExtensionRepository().getStatus().durable
@@ -125,7 +125,7 @@ export async function initializeResearchSteering(
     // A resumed run may already contain durable steering intent: fail closed.
     if (ctx.run.waves.length > 0) throw error;
     ctx.steeringRecord = undefined;
-    ctx.onNotice?.(ctx.t("runtime.error.persistence"));
+    ctx.onNotice?.(ctx.t("runtime.notice.steeringUnavailable"));
   }
 }
 

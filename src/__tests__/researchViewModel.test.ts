@@ -798,3 +798,33 @@ describe("research task view model", () => {
     expect(viewModel.error).toEqual(task.error);
   });
 });
+
+it("localizes recovery errors in the card and activity without rewriting the task", async () => {
+  const { DEFAULT_TEXT } = await import("@/components/research/viewModel/text");
+  const task = {
+    ...createResearchTask({
+      id: "storage-task",
+      sessionId: "session",
+      goal: "Research",
+      now: 100,
+    }),
+    status: "failed" as const,
+    error: {
+      code: "RESEARCH_STORAGE_conflict",
+      message: "Previous safe message",
+      recoverable: true,
+    },
+  };
+  const localized = "另一标签页已修改此任务，未覆盖其进度。";
+  const view = await createResearchTaskViewModel(
+    task,
+    {},
+    {
+      ...DEFAULT_TEXT,
+      storageErrorDetails: { RESEARCH_STORAGE_conflict: localized },
+    },
+  );
+  expect(view.error?.message).toBe(localized);
+  expect(view.activities.at(-1)?.title).toBe(localized);
+  expect(task.error.message).toBe("Previous safe message");
+});

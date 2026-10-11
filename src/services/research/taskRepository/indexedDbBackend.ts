@@ -1,3 +1,5 @@
+import { ResearchPersistenceError } from "./errors";
+import { createStoredRecord, parseStoredResearchTask } from "./persistedTask";
 import {
   RESEARCH_TASK_STORAGE_VERSION,
   SESSION_INDEX,
@@ -51,8 +53,13 @@ export class IndexedDbResearchTaskBackend implements ResearchTaskBackend {
           store.createIndex(SESSION_INDEX, SESSION_INDEX, { unique: false });
         }
       };
+      let abandoned = false;
       request.onsuccess = () => {
         const database = request.result;
+        if (abandoned) {
+          database.close();
+          return;
+        }
         database.onversionchange = () => {
           database.close();
           this.databasePromise = null;
@@ -64,8 +71,9 @@ export class IndexedDbResearchTaskBackend implements ResearchTaskBackend {
         reject(request.error || new Error("IndexedDB open failed."));
       };
       request.onblocked = () => {
+        abandoned = true;
         this.databasePromise = null;
-        reject(new Error("IndexedDB open was blocked."));
+        reject(new ResearchPersistenceError("blocked"));
       };
     });
     return this.databasePromise;
@@ -76,6 +84,37 @@ export class IndexedDbResearchTaskBackend implements ResearchTaskBackend {
     const transaction = database.transaction(STORE_NAME, "readwrite");
     transaction.objectStore(STORE_NAME).put(record);
     await transactionToPromise(transaction);
+  }
+
+  async compareAndPut(
+    record: StoredResearchTaskRecord,
+    expected: string,
+  ): Promise<void> {
+    const database = await this.open();
+    const transaction = database.transaction(STORE_NAME, "readwrite");
+    const store = transaction.objectStore(STORE_NAME);
+    const completion = transactionToPromise(transaction);
+    let conflict = false;
+    const request = store.get(record.taskId);
+    request.onsuccess = () => {
+      const task = parseStoredResearchTask(request.result);
+      const actual =
+        request.result === undefined
+          ? "absent"
+          : task
+            ? JSON.stringify(createStoredRecord(task))
+            : "invalid";
+      if (actual !== expected) {
+        conflict = true;
+        transaction.abort();
+      } else store.put(record);
+    };
+    try {
+      await completion;
+    } catch (error) {
+      if (conflict) throw new ResearchPersistenceError("conflict");
+      throw error;
+    }
   }
 
   async get(taskId: string): Promise<unknown> {
