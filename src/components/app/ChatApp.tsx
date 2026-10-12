@@ -1,6 +1,5 @@
 "use client";
 import dynamic from "next/dynamic";
-import UiSendConfirmationDialog from "@/components/content/intelligentUi/UiSendConfirmationDialog";
 import { UiChatContext } from "@/components/content/intelligentUi/UiChatContext";
 import {
   endTemporarySession,
@@ -867,14 +866,8 @@ const ChatApp = () => {
     skillBundleParameterValuesRef,
   };
 
-  const {
-    handleSendMessage,
-    handleUiSendMessage,
-    prepareComposerSend,
-    uiSendProposal,
-    confirmUiSend,
-    cancelUiSend,
-  } = useSendMessageFlow(chatFlowDeps);
+  const { handleSendMessage, handleUiSendMessage, prepareComposerSend } =
+    useSendMessageFlow(chatFlowDeps);
 
   const {
     handleRegenerate,
@@ -1282,11 +1275,6 @@ const ChatApp = () => {
           onRevokeToolSessionApproval={revokeToolSessionApproval}
         />
       </UiChatContext.Provider>
-      <UiSendConfirmationDialog
-        proposal={uiSendProposal}
-        onConfirm={() => void confirmUiSend()}
-        onCancel={() => cancelUiSend()}
-      />
       <SkillParameterDialog
         open={Boolean(skillParameterDialog)}
         requests={skillParameterDialog?.requests || []}

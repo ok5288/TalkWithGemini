@@ -232,15 +232,6 @@
     "resultFinite": "结果超出支持的数值范围。",
     "unsafeNumber": "输入值或中间结果超出安全数值范围。"
   },
-  "sendConfirmation": {
-    "title": "发送到对话？",
-    "message": "待发送的消息",
-    "context": "随消息发送的结果上下文",
-    "confirm": "确认并发送",
-    "cancel": "取消",
-    "saving": "正在保存…",
-    "saveFailed": "更改未能保存，请重试后再发送。"
-  },
   "retrySave": "重试保存",
   "chartData": "保留的图表数据",
   "chartNoData": "没有可读取的内联数据，原始定义已保留。",

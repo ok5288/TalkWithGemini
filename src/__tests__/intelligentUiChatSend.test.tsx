@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
-import { act, renderHook, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Message } from "@/types";
 import type { UiChatSource } from "@/components/content/intelligentUi/UiChatContext";
 import { createChatFlowDeps } from "./support/chatFlowDeps";
+import type { ComposerDraftRequest } from "@/lib/chat/composerActions";
 
 const state = vi.hoisted(() => ({
   syncActiveSession: vi.fn(async () => undefined),
@@ -24,6 +25,12 @@ const prepareHistory = vi.hoisted(() => vi.fn(async () => []));
 const resolveSkills = vi.hoisted(() =>
   vi.fn(async () => ({ context: "", invocations: [], skippedSkillIds: [] })),
 );
+const stageDraft = vi.hoisted(() =>
+  vi.fn<(request: ComposerDraftRequest) => void>(),
+);
+vi.mock("@/lib/chat/composerActions", () => ({
+  requestComposerDraft: stageDraft,
+}));
 vi.mock("@/store/core/chatStore", () => ({
   useChatStore: { getState: () => state },
 }));
@@ -56,6 +63,24 @@ vi.mock("@/store/sessionMessagePersistence", () => ({
 import { useSendMessageFlow } from "@/hooks/useSendMessageFlow";
 import { waitForSessionMessageWrites } from "@/store/sessionMessagePersistence";
 import { parseIntelligentUiText } from "@/lib/intelligentUi/parser";
+import { projectUiBlock } from "@/lib/intelligentUi/projection";
+import { API_INPUT_LIMITS } from "@/config/limits";
+
+afterEach(cleanup);
+
+function sendDraft(
+  hook: { current: ReturnType<typeof useSendMessageFlow> },
+  text = "Ask",
+) {
+  return hook.current.handleSendMessage(
+    text,
+    [],
+    undefined,
+    undefined,
+    undefined,
+    stageDraft.mock.lastCall![0].intelligentUiSend!.id,
+  );
+}
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -89,6 +114,7 @@ async function approve(
 ) {
   let result!: Promise<import("@/lib/intelligentUi/bridgeTypes").UiSendResult>;
   let settled = false;
+  const staged = stageDraft.mock.calls.length;
   act(() => {
     result = hook.current.handleUiSendMessage("Ask", source);
   });
@@ -96,16 +122,19 @@ async function approve(
     settled = true;
   });
   await waitFor(() =>
-    expect(settled || !!hook.current.uiSendProposal).toBe(true),
+    expect(settled || stageDraft.mock.calls.length > staged).toBe(true),
   );
   if (!settled)
     act(() => {
-      void hook.current.confirmUiSend();
+      void sendDraft(hook);
     });
   return result;
 }
 
 beforeEach(() => {
+  stageDraft.mockClear();
+  vi.mocked(waitForSessionMessageWrites).mockReset();
+  vi.mocked(waitForSessionMessageWrites).mockResolvedValue(undefined);
   const parsed = parseIntelligentUiText(
     '```intelligent-ui\n{"version":1,"title":"Form","summary":"Input"}\n<div>Input</div>\n```',
     { idPrefix: "ui", final: true },
@@ -137,14 +166,14 @@ beforeEach(() => {
 });
 
 describe("host-owned intelligent UI sends", () => {
-  it("requires host confirmation, rejects duplicates, and preserves composer refs on cancel", async () => {
+  it("stages only a composer draft, rejects duplicates, and preserves composer refs on cancel", async () => {
     const { deps, source, hook } = setup();
     deps.skillParameterValuesRef.current = { draft: { value: "untouched" } };
     let first!: Promise<unknown>;
     act(() => {
       first = hook.current.handleUiSendMessage("Ask", source);
     });
-    await waitFor(() => expect(hook.current.uiSendProposal).not.toBeNull());
+    await waitFor(() => expect(stageDraft).toHaveBeenCalledOnce());
     expect(await hook.current.handleUiSendMessage("Again", source)).toEqual({
       ok: false,
       code: "busy",
@@ -152,20 +181,149 @@ describe("host-owned intelligent UI sends", () => {
     expect(deps.processPromptForModel).not.toHaveBeenCalled();
     expect(deps.addMessage).not.toHaveBeenCalled();
     expect(stream).not.toHaveBeenCalled();
-    act(() => hook.current.cancelUiSend());
+    expect(stageDraft.mock.lastCall![0]).toMatchObject({
+      sessionId: source.sessionId,
+      text: "Ask",
+      intelligentUiSend: {
+        id: expect.any(String),
+        cancel: expect.any(Function),
+      },
+    });
+    act(() => stageDraft.mock.lastCall![0].intelligentUiSend!.cancel());
     expect(await first).toEqual({ ok: false, code: "cancelled" });
     expect(deps.skillParameterValuesRef.current).toEqual({
       draft: { value: "untouched" },
     });
   });
 
-  it("leaves the composer unlocked and invalidates its pending proposal on composer send", async () => {
+  it("sends edited text, attachments and forced references with the frozen UI context", async () => {
+    const { deps, source, hook } = setup();
+    let receipt!: Promise<unknown>;
+    act(() => {
+      receipt = hook.current.handleUiSendMessage("Original question", source);
+    });
+    await waitFor(() => expect(stageDraft).toHaveBeenCalledOnce());
+    const attachment = {
+      id: "attachment",
+      mimeType: "text/plain",
+      fileName: "notes.txt",
+      url: "opfs://notes.txt",
+    };
+    const forced = { skillIds: ["skill"], pluginIds: ["plugin"] };
+    await act(() =>
+      hook.current.handleSendMessage(
+        "Edited question",
+        [attachment],
+        undefined,
+        undefined,
+        forced,
+        stageDraft.mock.lastCall![0].intelligentUiSend!.id,
+      ),
+    );
+    expect(await receipt).toEqual({ ok: true, messageId: "user-1" });
+    expect(deps.processPromptForModel).toHaveBeenCalledWith(
+      expect.anything(),
+      "Edited question",
+      [attachment],
+      expect.anything(),
+      undefined,
+      undefined,
+      state.selectedModel,
+    );
+    await waitFor(() => expect(stream).toHaveBeenCalledOnce());
+    expect(stream.mock.calls[0][17]).toMatchObject({
+      intelligentUiSource: {
+        messageId: source.messageId,
+        blockId: source.blockId,
+      },
+    });
+  });
+
+  it("does not send an expired draft through the ordinary chat path", async () => {
+    const { deps, source, hook } = setup();
+    let receipt!: Promise<unknown>;
+    act(() => {
+      receipt = hook.current.handleUiSendMessage("Ask", source);
+    });
+    await waitFor(() => expect(stageDraft).toHaveBeenCalledOnce());
+    source.isActive = () => false;
+    await waitFor(() => expect(receipt).resolves.toMatchObject({ ok: false }));
+    await act(async () => expect(await sendDraft(hook)).toBe(false));
+    expect(deps.processPromptForModel).not.toHaveBeenCalled();
+    expect(deps.addMessage).not.toHaveBeenCalled();
+    expect(stream).not.toHaveBeenCalled();
+  });
+
+  it("retains a draft when edited text exceeds the chat input limit", async () => {
+    const { deps, source, hook } = setup();
+    act(() => {
+      void hook.current.handleUiSendMessage("Ask", source);
+    });
+    await waitFor(() => expect(stageDraft).toHaveBeenCalledOnce());
+    await act(async () =>
+      expect(
+        await sendDraft(
+          hook,
+          "x".repeat(API_INPUT_LIMITS.maxChatTextChars + 1),
+        ),
+      ).toBe(false),
+    );
+    expect(deps.addMessage).not.toHaveBeenCalled();
+    expect(stream).not.toHaveBeenCalled();
+    expect(deps.showActionError).toHaveBeenCalledWith(
+      "intelligentUiInvalidMessage",
+    );
+    await act(async () =>
+      expect(await sendDraft(hook, "Short question")).toBe(true),
+    );
+  });
+
+  it("cancels during asynchronous preparation without reviving the draft", async () => {
+    const { deps, source, hook } = setup();
+    const prepared = deferred<void>();
+    const process = vi
+      .mocked(deps.processPromptForModel)
+      .getMockImplementation()!;
+    vi.mocked(deps.processPromptForModel).mockImplementationOnce(
+      async (...args) => {
+        await prepared.promise;
+        return process(...args);
+      },
+    );
+    let receipt!: Promise<unknown>;
+    act(() => {
+      receipt = hook.current.handleUiSendMessage("Ask", source);
+    });
+    await waitFor(() => expect(stageDraft).toHaveBeenCalledOnce());
+    let attempt!: Promise<boolean | void>;
+    act(() => {
+      attempt = sendDraft(hook);
+    });
+    await waitFor(() =>
+      expect(deps.processPromptForModel).toHaveBeenCalledOnce(),
+    );
+    act(() => stageDraft.mock.lastCall![0].intelligentUiSend!.cancel());
+    await act(async () => {
+      prepared.resolve();
+      expect(await attempt).toBe(false);
+    });
+    expect(await receipt).toEqual({ ok: false, code: "cancelled" });
+    expect(deps.addMessage).not.toHaveBeenCalled();
+    expect(stream).not.toHaveBeenCalled();
+    await Promise.resolve();
+    act(() => {
+      void hook.current.handleUiSendMessage("New draft", source);
+    });
+    await waitFor(() => expect(stageDraft).toHaveBeenCalledTimes(2));
+  });
+
+  it("invalidates a pending draft when an unrelated composer send replaces it", async () => {
     const { deps, source, hook } = setup();
     let pending!: Promise<unknown>;
     act(() => {
       pending = hook.current.handleUiSendMessage("Frame request", source);
     });
-    await waitFor(() => expect(hook.current.uiSendProposal).not.toBeNull());
+    await waitFor(() => expect(stageDraft).toHaveBeenCalledOnce());
     await act(() => hook.current.handleSendMessage("Composer request", []));
     expect(await pending).toEqual({ ok: false, code: "inactive" });
     expect(deps.processPromptForModel).toHaveBeenCalledWith(
@@ -179,18 +337,24 @@ describe("host-owned intelligent UI sends", () => {
     );
   });
 
-  it("keeps frozen preview content even if local state changes before confirmation", async () => {
+  it("keeps frozen context even if local state changes before manual send", async () => {
     const { source, hook } = setup();
     let pending!: Promise<unknown>;
     act(() => {
       pending = hook.current.handleUiSendMessage("Ask", source);
     });
-    await waitFor(() => expect(hook.current.uiSendProposal).not.toBeNull());
-    const preview = hook.current.uiSendProposal!.context;
+    await waitFor(() => expect(stageDraft).toHaveBeenCalledOnce());
+    const blockBeforeEdit = state.activeMessages[0].outputBlocks![0];
+    if (blockBeforeEdit.type !== "intelligent_ui") throw Error("fixture");
+    const preview = projectUiBlock(blockBeforeEdit, {
+      purpose: "model-continuation",
+      locale: "en",
+      sourceSummary: [],
+    });
     const block = state.activeMessages[0].outputBlocks![0];
     if (block.type === "intelligent_ui")
       block.staticSnapshot = "Changed after preview";
-    await act(() => hook.current.confirmUiSend());
+    await act(() => sendDraft(hook));
     expect(await pending).toEqual({ ok: true, messageId: "user-1" });
     const options = stream.mock.calls[0][17] as {
       intelligentUiSource: { content: string };
@@ -199,7 +363,7 @@ describe("host-owned intelligent UI sends", () => {
     expect(preview).not.toContain("Changed after preview");
   });
 
-  it("keeps failed-save confirmation available for explicit retry without sending", async () => {
+  it("keeps a failed-save draft available for explicit retry without sending", async () => {
     const { deps, source, hook } = setup();
     vi.mocked(waitForSessionMessageWrites).mockRejectedValueOnce(
       new Error("disk full"),
@@ -208,12 +372,12 @@ describe("host-owned intelligent UI sends", () => {
     act(() => {
       pending = hook.current.handleUiSendMessage("Ask", source);
     });
-    await waitFor(() => expect(hook.current.uiSendProposal).not.toBeNull());
-    await act(() => hook.current.confirmUiSend());
-    expect(hook.current.uiSendProposal?.saveFailed).toBe(true);
+    await waitFor(() => expect(stageDraft).toHaveBeenCalledOnce());
+    await act(() => sendDraft(hook));
+    expect(deps.showActionError).toHaveBeenCalledWith("disk full");
     expect(deps.addMessage).not.toHaveBeenCalled();
     expect(stream).not.toHaveBeenCalled();
-    await act(() => hook.current.confirmUiSend());
+    await act(() => sendDraft(hook));
     expect(await pending).toEqual({ ok: true, messageId: "user-1" });
   });
 
@@ -225,10 +389,10 @@ describe("host-owned intelligent UI sends", () => {
     act(() => {
       pending = hook.current.handleUiSendMessage("Ask", source);
     });
-    await waitFor(() => expect(hook.current.uiSendProposal).not.toBeNull());
-    let confirmation!: Promise<void>;
+    await waitFor(() => expect(stageDraft).toHaveBeenCalledOnce());
+    let confirmation!: Promise<boolean | void>;
     act(() => {
-      confirmation = hook.current.confirmUiSend();
+      confirmation = sendDraft(hook);
     });
     source.isActive = () => false;
     await act(async () => {
@@ -240,21 +404,21 @@ describe("host-owned intelligent UI sends", () => {
     expect(stream).not.toHaveBeenCalled();
   });
 
-  it("rejects an expired instance before confirmation", async () => {
+  it("rejects an expired instance before manual send", async () => {
     const { deps, source, hook } = setup();
     let pending!: Promise<unknown>;
     act(() => {
       pending = hook.current.handleUiSendMessage("Ask", source);
     });
-    await waitFor(() => expect(hook.current.uiSendProposal).not.toBeNull());
+    await waitFor(() => expect(stageDraft).toHaveBeenCalledOnce());
     source.isActive = () => false;
-    await act(() => hook.current.confirmUiSend());
+    await act(() => sendDraft(hook));
     expect(await pending).toEqual({ ok: false, code: "inactive" });
     expect(deps.addMessage).not.toHaveBeenCalled();
     expect(stream).not.toHaveBeenCalled();
   });
 
-  it("returns a failure receipt and releases the lock when preparation throws", async () => {
+  it("returns a failure receipt and allows retrying the same draft when preparation throws", async () => {
     const { deps, source, hook } = setup();
     vi.mocked(deps.prepareComposerSkillParameters).mockRejectedValueOnce(
       new Error("preparation failed"),
@@ -266,10 +430,7 @@ describe("host-owned intelligent UI sends", () => {
     await waitFor(() => expect(deps.addMessage).not.toHaveBeenCalled());
     // The rejected operation's finalizer runs before another browser event.
     await Promise.resolve();
-    expect(await approve(hook, source)).toEqual({
-      ok: true,
-      messageId: "user-1",
-    });
+    await act(async () => expect(await sendDraft(hook)).toBe(true));
     await waitFor(() =>
       expect(deps.finishActiveGeneration).toHaveBeenCalledOnce(),
     );
@@ -492,23 +653,23 @@ describe("host-owned intelligent UI sends", () => {
   });
 });
 
-it("revalidates precise sources after confirmation without accepting a message", async () => {
+it("revalidates precise sources after manual send without accepting a message", async () => {
   const { deps, source, hook } = setup();
   let result!: Promise<unknown>;
   act(() => {
     result = hook.current.handleUiSendMessage("Ask", source);
   });
-  await waitFor(() => expect(hook.current.uiSendProposal).not.toBeNull());
+  await waitFor(() => expect(stageDraft).toHaveBeenCalledOnce());
   sourceAssert.mockRejectedValueOnce(new Error("UI_SOURCE_STALE"));
   await act(async () => {
-    await hook.current.confirmUiSend();
+    await sendDraft(hook);
   });
   expect(await result).toEqual({ ok: false, code: "inactive" });
   expect(deps.addMessage).not.toHaveBeenCalled();
   expect(stream).not.toHaveBeenCalled();
 });
 
-it("rejects a model removed from the latest model list while confirmation is open", async () => {
+it("rejects a model removed from the latest model list while the draft is pending", async () => {
   const deps = createChatFlowDeps();
   deps.addMessage = vi.fn();
   const source: UiChatSource = {
@@ -523,11 +684,11 @@ it("rejects a model removed from the latest model list while confirmation is ope
   act(() => {
     receipt = result.current.handleUiSendMessage("Ask", source);
   });
-  await waitFor(() => expect(result.current.uiSendProposal).not.toBeNull());
+  await waitFor(() => expect(stageDraft).toHaveBeenCalledOnce());
   deps.availableModels = [];
   rerender();
   await act(async () => {
-    await result.current.confirmUiSend();
+    await sendDraft(result);
   });
   expect(await receipt).toEqual({ ok: false, code: "model_unavailable" });
   expect(deps.addMessage).not.toHaveBeenCalled();

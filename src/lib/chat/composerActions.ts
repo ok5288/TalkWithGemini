@@ -2,10 +2,16 @@ import type { Attachment } from "@/lib/chat/types";
 
 export const COMPOSER_DRAFT_EVENT = "neo-chat:composer-draft";
 
+export interface ComposerUiSend {
+  id: string;
+  cancel: () => void;
+}
+
 export interface ComposerDraftRequest {
   sessionId: string;
   text: string;
   attachments?: Attachment[];
+  intelligentUiSend?: ComposerUiSend;
 }
 
 /** Host-owned actions may stage a draft; this event never sends a message. */

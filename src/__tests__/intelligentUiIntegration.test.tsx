@@ -6,6 +6,7 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
 } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -186,6 +187,148 @@ describe("Intelligent UI composer integration", () => {
     ).toBe("Explain report version 2");
     expect(screen.getByText("report-v2.md")).toBeTruthy();
     expect(onSend).not.toHaveBeenCalled();
+  });
+  it("sends edited UI draft text with its source identity only on manual send", async () => {
+    const onSend = vi.fn(async () => true);
+    const cancel = vi.fn();
+    render(
+      provider(
+        <MessageInput
+          onSend={onSend}
+          disabled={false}
+          selectedModel="provider:model"
+        />,
+      ),
+    );
+    const input = screen.getByRole("textbox", {
+      name: "Message",
+    }) as HTMLTextAreaElement;
+    fireEvent.change(input, { target: { value: "Existing draft" } });
+    act(() =>
+      requestComposerDraft({
+        sessionId: session.id,
+        text: "Explain the result",
+        intelligentUiSend: { id: "ui-request", cancel },
+      }),
+    );
+    expect(input.value).toBe("Existing draft\n\nExplain the result");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(onSend).not.toHaveBeenCalled();
+    fireEvent.change(input, {
+      target: { value: "Explain the result in more detail" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+    await waitFor(() => expect(input.value).toBe(""));
+    expect(onSend).toHaveBeenCalledExactlyOnceWith(
+      "Explain the result in more detail",
+      [],
+      undefined,
+      undefined,
+      { skillIds: [], pluginIds: [] },
+      "ui-request",
+    );
+    expect(cancel).not.toHaveBeenCalled();
+  });
+  it("retains an unaccepted draft and its attachments for an explicit retry", async () => {
+    const onSend = vi.fn().mockResolvedValueOnce(false).mockResolvedValue(true);
+    render(
+      provider(
+        <MessageInput
+          onSend={onSend}
+          disabled={false}
+          selectedModel="provider:model"
+        />,
+      ),
+    );
+    const attachment = {
+      id: "report",
+      mimeType: "text/markdown",
+      fileName: "report.md",
+      url: "data:text/markdown,Report",
+    };
+    act(() =>
+      requestComposerDraft({
+        sessionId: session.id,
+        text: "Explain the result",
+        attachments: [attachment],
+        intelligentUiSend: { id: "ui-request", cancel: vi.fn() },
+      }),
+    );
+    const input = screen.getByRole("textbox", {
+      name: "Message",
+    }) as HTMLTextAreaElement;
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+    });
+    expect(input.value).toBe("Explain the result");
+    expect(screen.getByText("report.md")).toBeTruthy();
+    expect(onSend.mock.lastCall?.[1]).toEqual([attachment]);
+    fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+    await waitFor(() => expect(input.value).toBe(""));
+    expect(onSend).toHaveBeenCalledTimes(2);
+    expect(onSend.mock.lastCall?.[5]).toBe("ui-request");
+  });
+  it("cancels UI requests when the draft is cleared, replaced or unmounted", () => {
+    const cancel = vi.fn();
+    const onSend = vi.fn();
+    const { unmount } = render(
+      provider(
+        <MessageInput
+          onSend={onSend}
+          disabled={false}
+          selectedModel="provider:model"
+        />,
+      ),
+    );
+    const stage = () =>
+      act(() =>
+        requestComposerDraft({
+          sessionId: session.id,
+          text: "Explain the result",
+          intelligentUiSend: { id: "ui-request", cancel },
+        }),
+      );
+    stage();
+    fireEvent.change(screen.getByRole("textbox", { name: "Message" }), {
+      target: { value: "" },
+    });
+    expect(cancel).toHaveBeenCalledTimes(1);
+    stage();
+    act(() =>
+      requestComposerDraft({ sessionId: session.id, text: "Another draft" }),
+    );
+    expect(cancel).toHaveBeenCalledTimes(2);
+    stage();
+    unmount();
+    expect(cancel).toHaveBeenCalledTimes(3);
+    expect(onSend).not.toHaveBeenCalled();
+  });
+  it("cancels the UI request when switching conversations", () => {
+    const cancel = vi.fn();
+    render(
+      provider(
+        <MessageInput
+          onSend={vi.fn()}
+          disabled={false}
+          selectedModel="provider:model"
+        />,
+      ),
+    );
+    act(() =>
+      requestComposerDraft({
+        sessionId: session.id,
+        text: "Explain the result",
+        intelligentUiSend: { id: "ui-request", cancel },
+      }),
+    );
+    act(() => {
+      useChatStore.setState({ currentSessionId: "another-session" });
+    });
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(
+      (screen.getByRole("textbox", { name: "Message" }) as HTMLTextAreaElement)
+        .value,
+    ).toBe("");
   });
 });
 describe("Intelligent UI renderer/export integration", () => {

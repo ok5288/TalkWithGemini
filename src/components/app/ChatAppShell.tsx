@@ -181,7 +181,8 @@ interface ChatAppShellProps {
     replyTo?: MessageReplyReference,
     skillParameters?: ComposerSkillParameterValues,
     forced?: ComposerForcedInvocations,
-  ) => Promise<void>;
+    intelligentUiSendId?: string,
+  ) => Promise<void | boolean>;
   prepareComposerSkillParameters: (
     forced?: ComposerForcedInvocations,
   ) => Promise<ComposerSkillParameterValues | null>;
@@ -1060,15 +1061,30 @@ const ChatAppShell = ({
                         replyTo,
                         skillParameters,
                         forced,
+                        intelligentUiSendId,
                       ) => {
-                        void handleSendMessage(
+                        const sent = handleSendMessage(
                           text,
                           attachments,
                           replyTo,
                           skillParameters,
                           forced,
+                          intelligentUiSendId,
                         );
-                        setReplyTarget(undefined);
+                        if (!intelligentUiSendId) {
+                          setReplyTarget(undefined);
+                          void sent;
+                          return;
+                        }
+                        return sent.then((accepted) => {
+                          if (
+                            accepted &&
+                            useChatStore.getState().currentSessionId ===
+                              currentSessionId
+                          )
+                            setReplyTarget(undefined);
+                          return accepted;
+                        });
                       }}
                       onPrepareSend={prepareComposerSkillParameters}
                       onStop={isGenerating ? handleStopGeneration : undefined}

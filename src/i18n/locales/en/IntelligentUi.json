@@ -232,15 +232,6 @@
     "resultFinite": "The result is outside the supported numeric range.",
     "unsafeNumber": "An input or intermediate result exceeds the safe numeric range."
   },
-  "sendConfirmation": {
-    "title": "Send to the conversation?",
-    "message": "Message to send",
-    "context": "Result context to include",
-    "confirm": "Confirm and send",
-    "cancel": "Cancel",
-    "saving": "Saving…",
-    "saveFailed": "Changes could not be saved. Retry before sending."
-  },
   "retrySave": "Retry saving",
   "chartData": "Preserved chart data",
   "chartNoData": "No readable inline data is available. The original definition is preserved.",

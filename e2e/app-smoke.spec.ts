@@ -238,6 +238,180 @@ test("loads the local chat shell", async ({ page }) => {
   await expect(page.locator('textarea[name="message"]')).toBeVisible();
 });
 
+test("stages Intelligent UI text in the composer and sends its frozen context manually", async ({
+  page,
+}) => {
+  const sessionId = "intelligent-ui-composer-session";
+  const model = "e2e-provider:e2e-model";
+  const html = `<label for="count">Count</label><input id="count" value="2">
+<button type="button" data-neo-ai-action id="ask">Ask AI about the count</button>
+<p id="receipt" role="status"></p>
+<script>
+const count = document.getElementById("count");
+function save() {
+  window.intelligentUi.setState({ ...window.intelligentUi.initialState, count: count.value });
+  window.intelligentUi.reportSnapshot("Count: " + count.value);
+}
+count.addEventListener("input", save);
+document.getElementById("ask").addEventListener("click", () => {
+  save();
+  window.intelligentUi.sendMessage("Explain the count").then(result => {
+    document.getElementById("receipt").textContent = result.ok ? "Accepted" : result.code;
+  });
+});
+</script>`;
+  const definition = {
+    version: 1,
+    title: "Count interface",
+    summary: "Explore a local count.",
+    html,
+  };
+  await page.goto("/manifest.webmanifest");
+  await page.evaluate(
+    (value) => localStorage.setItem("neo-chat-core-settings", value),
+    persistedState({
+      theme: "light",
+      language: "en",
+      providers: [
+        {
+          id: "e2e-provider",
+          name: "E2E Provider",
+          type: "OpenAI Compatible",
+          baseUrl: "https://model.example.test/v1",
+          apiKey: "",
+          enabled: true,
+          models: ["e2e-model"],
+          modelsList: ["e2e-model"],
+        },
+      ],
+      defaultModels: {},
+    }),
+  );
+  await setIndexedDbValue(
+    page,
+    "neo-chat-settings",
+    persistedState({
+      system: {
+        enableIntelligentUi: true,
+        enableAutoTitle: false,
+        enableRelatedQuestions: false,
+        enableAutoCompression: false,
+      },
+    }),
+  );
+  await setIndexedDbValue(
+    page,
+    "neo-chat-storage",
+    persistedState({
+      sessions: [
+        {
+          id: sessionId,
+          title: "Intelligent UI composer",
+          messageCount: 1,
+          updatedAt: Date.now(),
+          model,
+        },
+      ],
+      workspaces: [],
+      currentSessionId: sessionId,
+      selectedModel: model,
+      chatConfig: { useSearch: false, useRAG: false },
+    }),
+  );
+  await setIndexedDbValue(page, `session_messages_${sessionId}`, {
+    nodesById: {
+      "ui-message": {
+        id: "ui-message",
+        message: {
+          id: "ui-message",
+          role: "model",
+          content: "",
+          timestamp: Date.now(),
+          outputBlocks: [
+            {
+              id: "ui-block",
+              type: "intelligent_ui",
+              schemaVersion: 1,
+              renderer: "html",
+              definition,
+              definitionRevision: 1,
+              status: "ready",
+              fallbackMarkdown: definition.summary,
+              state: { secret: "HIDDEN_DRAFT_STATE" },
+              stateRevision: 0,
+              staticSnapshot: "Count: 2",
+              sourceRefs: [],
+            },
+          ],
+        },
+        childMessageIds: [],
+      },
+    },
+    rootMessageIds: ["ui-message"],
+    activeRootMessageId: "ui-message",
+  });
+  await setIndexedDbValue(
+    page,
+    "neo-chat-memory",
+    persistedState({
+      settings: {
+        enabled: false,
+        searchEnabled: false,
+        autoRecordEnabled: false,
+        dreamEnabled: false,
+      },
+      memories: [],
+      dreamStatus: { isRunning: false },
+    }),
+  );
+  const requests: Array<{ newMessage: string }> = [];
+  await page.route("**/api/chat", async (route) => {
+    requests.push(route.request().postDataJSON());
+    await route.fulfill({
+      status: 200,
+      contentType: "text/event-stream",
+      body: sseBody([
+        { type: "content", content: "The count was two." },
+        { type: "done" },
+      ]),
+    });
+  });
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: "Intelligent UI composer", exact: true })
+    .click();
+  const composer = page.locator('textarea[name="message"]');
+  const ui = page.frameLocator('iframe[title="Count interface"]');
+  await expect(
+    ui.getByRole("button", { name: "Ask AI about the count" }),
+  ).toBeVisible();
+  await composer.fill("Existing draft");
+  await ui.getByRole("button", { name: "Ask AI about the count" }).click();
+  await expect(composer).toHaveValue("Existing draft\n\nExplain the count");
+  await expect(composer).toBeFocused();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  expect(requests).toHaveLength(0);
+  await ui.getByLabel("Count").fill("9");
+  await composer.fill("Explain the original count in detail");
+  await page.getByRole("button", { name: "Send message" }).click();
+  await expect(
+    page.getByText("The count was two.", { exact: true }),
+  ).toBeVisible();
+  await expect(ui.getByRole("status")).toHaveText("Accepted");
+  await expect(composer).toHaveValue("");
+  expect(requests).toHaveLength(1);
+  expect(requests[0].newMessage).toContain(
+    "Explain the original count in detail",
+  );
+  expect(requests[0].newMessage).toContain(
+    'Reported visible result: "Count: 2"',
+  );
+  expect(requests[0].newMessage).not.toContain(
+    'Reported visible result: "Count: 9"',
+  );
+  expect(requests[0].newMessage).not.toContain("HIDDEN_DRAFT_STATE");
+});
+
 test("loads the HEIC converter from the checked-in public script", async ({
   page,
 }) => {
@@ -659,7 +833,9 @@ test("follows streamed output only when enabled and keeps manual scrolling stabl
               fixture.phase = "content-grown";
               await waitForGate("close-code");
 
-              push({ type: "content", content: "\n```" });
+              // Terminate the fence line while the stream remains open; a
+              // trailing fence prefix is withheld until a newline or EOF.
+              push({ type: "content", content: "\n```\n" });
               fixture.phase = "code-closed";
               await waitForGate("finish");
 

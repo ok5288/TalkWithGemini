@@ -69,6 +69,7 @@ import { useChatStore } from "@/store/core/chatStore";
 import {
   COMPOSER_DRAFT_EVENT,
   type ComposerDraftRequest,
+  type ComposerUiSend,
 } from "@/lib/chat/composerActions";
 import { appDb } from "@/store/storage/storageConfig";
 import {
@@ -189,7 +190,8 @@ interface MessageInputProps {
     replyTo?: MessageReplyReference,
     skillParameters?: ComposerSkillParameterValues,
     forced?: ComposerForcedInvocations,
-  ) => void;
+    intelligentUiSendId?: string,
+  ) => void | Promise<void | boolean>;
   onPrepareSend?: (
     forced?: ComposerForcedInvocations,
   ) => Promise<ComposerSkillParameterValues | null>;
@@ -252,6 +254,7 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
   ) => {
     const [input, setInputState] = useState("");
     const inputValueRef = useRef("");
+    const intelligentUiSendRef = useRef<ComposerUiSend | null>(null);
     const setInput = useCallback((next: React.SetStateAction<string>) => {
       setInputState((previous) => {
         const value =
@@ -354,6 +357,8 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
       }
 
       draftSessionRef.current = currentSessionId || null;
+      intelligentUiSendRef.current?.cancel();
+      intelligentUiSendRef.current = null;
       const draft = currentSessionId ? readComposerDraft(currentSessionId) : "";
       inputValueRef.current = draft;
       setInputState(draft);
@@ -372,6 +377,8 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
 
     useEffect(
       () => () => {
+        intelligentUiSendRef.current?.cancel();
+        intelligentUiSendRef.current = null;
         if (draftSessionRef.current) {
           writeComposerDraft(draftSessionRef.current, inputValueRef.current);
         }
@@ -667,6 +674,8 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
           typeof request.text !== "string"
         )
           return;
+        intelligentUiSendRef.current?.cancel();
+        intelligentUiSendRef.current = request.intelligentUiSend ?? null;
         setInput((previous) =>
           previous.trim() ? `${previous}\n\n${request.text}` : request.text,
         );
@@ -1286,6 +1295,8 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
 
     useImperativeHandle(ref, () => ({
       setValue: (value: string) => {
+        intelligentUiSendRef.current?.cancel();
+        intelligentUiSendRef.current = null;
         setInput(value);
         // The stale match indexes into the replaced text, so drop it.
         setCommandMatch(null);
@@ -1311,6 +1322,10 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
       e: React.ChangeEvent<HTMLTextAreaElement>,
     ) => {
       const value = e.target.value;
+      if (!value.trim()) {
+        intelligentUiSendRef.current?.cancel();
+        intelligentUiSendRef.current = null;
+      }
       setInput(value);
       setCommandMatch(
         detectComposerTrigger(value, e.target.selectionStart ?? value.length),
@@ -1380,22 +1395,38 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
             ? { pendingSessionSkillIds: activeSkillIds }
             : {}),
         };
+        const uiSend = intelligentUiSendRef.current;
         const skillParameters = onPrepareSend
           ? await onPrepareSend(forced)
           : undefined;
         if (onPrepareSend && !skillParameters) return;
         if (
           getTemporarySessionSignal(sendingSessionId)?.aborted ||
-          useChatStore.getState().currentSessionId !== sendingSessionId
+          useChatStore.getState().currentSessionId !== sendingSessionId ||
+          intelligentUiSendRef.current !== uiSend
         )
           return;
-        onSend(
+        const sendArgs = [
           input,
           temporary ? [] : attachments,
           replyTo,
           skillParameters || undefined,
           forced,
-        );
+        ] as const;
+        const sent = uiSend
+          ? onSend(...sendArgs, uiSend.id)
+          : onSend(...sendArgs);
+        if (uiSend) {
+          const accepted = await sent;
+          if (
+            accepted !== true ||
+            !isMountedRef.current ||
+            useChatStore.getState().currentSessionId !== sendingSessionId ||
+            intelligentUiSendRef.current !== uiSend
+          )
+            return;
+        }
+        intelligentUiSendRef.current = null;
         setInput("");
         if (currentSessionId) clearComposerDraft(currentSessionId);
         setAttachments([]);

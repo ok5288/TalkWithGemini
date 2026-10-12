@@ -48,7 +48,7 @@ ask.addEventListener("click", () => {
   save();
   const accepted = window.intelligentUi.sendMessage("Explain the current portion calculation and suggest how to adjust it.");
   ask.disabled = true;
-  status.textContent = "Waiting for confirmation...";
+  status.textContent = "Review and send the draft in the message input...";
   accepted.then((result) => {
     status.textContent = result.ok ? "Sent. The reply will appear in chat." : result.code === "cancelled" ? "Cancelled. Nothing was sent." : "Unable to send (" + result.code + "). Please try again.";
   }).catch(() => { status.textContent = "Unable to send. Please try again."; })

@@ -38,16 +38,18 @@ research evidence.
 
 Interfaces appear as part of the answer without a host border, title bar or footer.
 Ordinary controls run locally. A clearly labeled AI button may call
-`window.intelligentUi.sendMessage(text)` on a real click to open a host confirmation
-showing the exact message and frozen result context. Confirming adds a normal user
-message and requests an answer. It does not consume or clear the main composer's
-unsent text, attachments or reply target. Loading, timers and ordinary input
+`window.intelligentUi.sendMessage(text)` on a real click to append an editable
+draft to the main message input and focus it. Filling the input does not send
+anything. Existing draft text, attachments and the reply target are retained;
+the user's normal Send action submits them together with the edited text and
+the interface's frozen result context. Clearing or replacing the draft cancels
+the pending interface request. Loading, timers and ordinary input
 changes cannot send messages. The existing tool confirmation flow still applies.
 Runtime failures and unsaved state display host retry actions; interface-specific controls
 remain inside the content.
 An HTML error, unexpected reload or unmount also permanently invalidates that
 instance's pending send proposal. Retrying the interface creates a new instance;
-it cannot revive an earlier confirmation.
+it cannot revive an earlier pending request.
 
 Completed Research reports offer **Explain interactively in chat**. This opens
 an ordinary chat draft referencing the selected immutable report version and
@@ -264,14 +266,14 @@ for conventional listeners it replays `DOMContentLoaded` once after insertion.
 Use bounded work and accessible labels. Ordinary JS variables are not persisted.
 The frozen `window.intelligentUi` bridge exposes:
 
-| Member                 | Purpose                                                              |
-| ---------------------- | -------------------------------------------------------------------- |
-| `initialState`         | JSON state saved by this instance                                    |
-| `setState(object)`     | Save explicit local JSON state                                       |
-| `reportSummary(text)`  | Report a plain text summary; does not stage a draft                  |
-| `reportSnapshot(text)` | Save visible results for chat context and selected exports           |
-| `reportHeight()`       | Measure content height; also observed automatically                  |
-| `sendMessage(text)`    | Propose normal chat for host confirmation after AI-button activation |
+| Member                 | Purpose                                                    |
+| ---------------------- | ---------------------------------------------------------- |
+| `initialState`         | JSON state saved by this instance                          |
+| `setState(object)`     | Save explicit local JSON state                             |
+| `reportSummary(text)`  | Report a plain text summary; does not stage a draft        |
+| `reportSnapshot(text)` | Save visible results for chat context and selected exports |
+| `reportHeight()`       | Measure content height; also observed automatically        |
+| `sendMessage(text)`    | Fill an editable chat draft after AI-button activation     |
 
 An AI button must use `type="button" data-neo-ai-action`. Call `sendMessage`
 synchronously within its real click handler, before any `await`, after saving the
@@ -280,13 +282,15 @@ message is accepted, or `{ok:false,code}`. Handle busy, inactive, offline,
 model_unavailable, invalid_message, user_action_required, cancelled and send_failed without
 automatic retries. Model generation completion is separate from acceptance.
 Keyboard activation works through the same button click. One activation creates
-one proposal. Only the host confirmation authorizes sending; gesture checks are
-an additional interaction guard. The host freezes the displayed message and
-context, waits for pending local saves, and rechecks the instance, branch,
+one proposal. Only the user's normal composer Send action authorizes sending;
+gesture checks are an additional interaction guard. The host freezes the result
+context when the interface is clicked, uses the edited message at send time,
+waits for pending local saves, and rechecks the instance, branch,
 definition, source permissions, model and availability before dispatch.
 Switching conversations, changing the definition or revoking access invalidates
-the proposal. A failed save keeps confirmation open for retry. Confirmation is
-not backed up or resumed after reload and does not replace tool confirmation.
+the proposal without silently sending it as ordinary chat. A failed save keeps
+the draft available for retry. Pending source context is not backed up or resumed
+after reload; only ordinary draft text is restored. This does not replace tool confirmation.
 Authorization is checked again after asynchronous history and Skill preparation,
 on request retries, and at the proxy fetch or direct SDK dispatch boundary. If
 the user message has already been accepted, later revocation preserves that
@@ -578,7 +582,7 @@ backup format. Each area has local regression coverage:
 
 | Area                                              | Implementation boundary                                                      | Regression coverage                                                                                                                                                                                                                                                                                                                                                    |
 | ------------------------------------------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Host-confirmed sends and tool visibility          | `useSendMessageFlow`, plugin resolver and registered MCP execution           | `intelligentUiChatSend`, `intelligentUiSendConfirmationDialog`, `mcpVisibility`, `mcpRefresh`: confirmation, frozen content, cancellation, stale permissions, model-only filtering and authenticated refresh                                                                                                                                                           |
+| Composer sends and tool visibility                | `useSendMessageFlow`, plugin resolver and registered MCP execution           | `intelligentUiChatSend`, `intelligentUiIntegration`, `mcpVisibility`, `mcpRefresh`: editable drafts, manual send, frozen content, cancellation, stale permissions, model-only filtering and authenticated refresh                                                                                                                                                      |
 | Native data correctness                           | Calculator, Explorer derivation and chart capability                         | `intelligentUiCalculations`, `intelligentUiExplorerDomain`, `intelligentUiExplorer`, `intelligentUiChart`, `intelligentUiCompatibility`: raw range edits, checked intermediates, decimal split conservation, static legacy datasets, renderer/ECharts SSR agreement and private-data preservation                                                                      |
 | Runtime limits and durable saving                 | SDK/host guards, runtime flush registry and per-session write queue          | `intelligentUiRuntimeLimits`, `intelligentUiSandbox`, `intelligentUiInstance`, `sessionMessagePersistence`, `intelligentUiState`, `sessionCreationGate`, `intelligentUiLegacyHtmlState`, `appExport`: call-time copies, bounded inputs, coalescing, acknowledgement order, failed saves, retries, deletion rollback, session isolation and lossless legacy JSON backup |
 | Frozen sources and public output                  | Source context, asynchronous projection and prepared sharing                 | Source-binding/connected-source tests, `intelligentUiPortability`, sharing snapshot/client/UI tests and `messageMutationFlows`: target-branch isolation, repository sources, original/current boundaries, preview payload reuse and final authorization guards                                                                                                         |
