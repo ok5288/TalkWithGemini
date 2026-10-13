@@ -157,7 +157,7 @@ export function appendDiagramRequestInstructions(
   settings?: SystemSettings,
   maxChars: number = API_INPUT_LIMITS.maxChatTextChars,
 ): string {
-  // 1. 如果系统指令中本来就没有配置图表渲染指令，直接原样返回，不追加任何东西
+  // 1. 如果系统指令中本来就没有配置图表渲染指令，直接原样返回
   if (!isDiagramPromptInstructionEnabled(systemInstruction)) {
     return message;
   }
@@ -167,42 +167,34 @@ export function appendDiagramRequestInstructions(
     return message;
   }
 
-  // 3. 【核心优化：用户意图优先】
-  // 检查用户输入的消息里有没有主动要求图表的关键词（中英文均可）
-  const lowerMessage = message.toLowerCase();
-  const userWantsDiagram = 
-    lowerMessage.includes("mermaid") ||
-    lowerMessage.includes("mindmap") ||
-    lowerMessage.includes("思维导图") ||
-    lowerMessage.includes("流程图") ||
-    lowerMessage.includes("架构图") ||
-    lowerMessage.includes("图表");
-
-  // 4. 只有当“设置关闭” 并且 “用户没有主动要求图表” 时，才追加禁用指令
-  // 如果用户主动要求了（userWantsDiagram 为 true），直接跳过禁用，执行第 5 步画图！
-  if (settings && settings.enableDiagramPrompt === false && !userWantsDiagram) {
-    const disableInstruction =
-      "(Note: Do not output any ```mermaid or ```mindmap diagram blocks for this response.)";
-    
-    if (message.includes(disableInstruction)) {
-      return message;
+  // 3. 【关键修复】：如果用户在设置里关闭了图表开关
+  if (settings && settings.enableDiagramPrompt === false) {
+    const lowerMessage = message.toLowerCase();
+    const userWantsDiagram = 
+      lowerMessage.includes("mermaid") ||
+      lowerMessage.includes("mindmap") ||
+      lowerMessage.includes("思维导图") ||
+      lowerMessage.includes("流程图") ||
+      lowerMessage.includes("架构图") ||
+      lowerMessage.includes("图表") ||
+      lowerMessage.includes("时序图") ||
+      lowerMessage.includes("甘特图") ||
+      lowerMessage.includes("类图") ||
+      lowerMessage.includes("diagram");
+    // 如果用户【没有】主动要求画图，直接原样返回 message！
+    // 绝对不要追加什么 "(Note: Do not output...)" 这种额外文本！
+    if (!userWantsDiagram) {
+      return message; // 👈 干净利落地直接返回原消息，不污染输入！
     }
-
-    const separator = "\n\n";
-    const maxMessageChars = Math.max(
-      0,
-      maxChars - separator.length - disableInstruction.length,
-    );
-    const boundedMessage = clampChatInputText(message, maxMessageChars);
-    return `${boundedMessage}${separator}${disableInstruction}`;
   }
 
-  // 5. 用户开启了开关，或者用户虽然关了开关但【主动点名要求画图】，追加正常图表引导指令
+  // 4. 用户开启了开关，或者主动要求了画图，追加标准图表引导指令
   const instructions = isEnhancedDiagramPromptInstructionEnabled(
     systemInstruction,
   )
     ? `${DIAGRAM_REQUEST_INSTRUCTIONS}\n\n${DIAGRAM_ENHANCED_REQUEST_INSTRUCTIONS}`
     : DIAGRAM_REQUEST_INSTRUCTIONS;
+
   const separator = "\n\n";
   const maxMessageChars = Math.max(
     0,

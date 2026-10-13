@@ -188,9 +188,12 @@ const AssistantEditorModal = ({
     },
   );
   const [selectedRevisionId, setSelectedRevisionId] = useState("");
-  const profileRevisions = useAgentProfileRevisionStore((state) =>
-    agent ? state.revisionsByProfileId[agent.identifier] || [] : [],
-  );
+  const EMPTY_REVISIONS: any[] = []; // 定义一个全局稳定的空数组引用
+  
+  const profileRevisions = useAgentProfileRevisionStore((state) => {
+    if (!agent) return EMPTY_REVISIONS;
+    return state.revisionsByProfileId[agent.identifier] || EMPTY_REVISIONS;
+  });
 
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [optimizeError, setOptimizeError] = useState("");
@@ -303,14 +306,14 @@ const AssistantEditorModal = ({
     installedSkillIds,
     installedPluginIds,
   );
-  const draftDiffCount = useMemo(
-    () =>
-      agentProfile
-        ? diffAgentProfiles(normalizeAgentProfile(agent?.profile), agentProfile)
-            .length
-        : 0,
-    [agent?.profile, agentProfile],
-  );
+  const draftDiffCount = useMemo(() => {
+    if (!agentProfile || !agent?.profile) return 0;
+    try {
+      return diffAgentProfiles(normalizeAgentProfile(agent.profile), agentProfile).length;
+    } catch {
+      return 0;
+    }
+  }, [agent?.identifier, agentProfile?.schemaVersion]);
   const preferredModelOptions = useMemo(
     () =>
       Array.from(

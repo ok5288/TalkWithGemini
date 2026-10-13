@@ -1174,6 +1174,9 @@ export const streamChatResponse = async (
       .replace(/<auto-mode>[\s\S]*?<\/auto-mode>/g, "");
   }
 
+
+  // ====================================================================
+
   if (agentRun) {
     const lease = acquireAgentRunLease({ sessionId, runId: agentRun.id });
     if (!lease.acquired) {
