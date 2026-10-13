@@ -21,14 +21,16 @@ export const nativeCapabilities = {
   flashcards: flashcardsCapability,
   explorer: explorerCapability,
 } as const;
-export const nativeDefinitionSchema = z.discriminatedUnion("kind", [
-  checklistCapability.schema,
-  comparisonCapability.schema,
-  formCapability.schema,
-  chartCapability.schema,
-  quizCapability.schema,
-  calculatorCapability.schema,
-  flashcardsCapability.schema,
+export const nativeDefinitionSchema = z.union([
+  z.discriminatedUnion("kind", [
+    checklistCapability.schema,
+    comparisonCapability.schema,
+    formCapability.schema,
+    chartCapability.schema,
+    quizCapability.schema,
+    calculatorCapability.schema,
+    flashcardsCapability.schema,
+  ]),
   explorerCapability.schema,
 ]);
 // The directory pairs each discriminant with its own typed implementation. These

@@ -1,6 +1,10 @@
-import type { ExplorerDefinition, ExplorerUnit } from "./types";
+import type {
+  ExplorerDefinitionV1,
+  ExplorerDefinitionV2,
+  ExplorerUnit,
+} from "./types";
 const money: ExplorerUnit = { kind: "currency", code: "CNY", precision: 2 };
-export const EXPLORER_TRAVEL_EXAMPLE: ExplorerDefinition = {
+export const EXPLORER_TRAVEL_EXAMPLE: ExplorerDefinitionV1 = {
   version: 1,
   kind: "explorer",
   title: "Travel costs",
@@ -77,5 +81,42 @@ export const EXPLORER_TRAVEL_EXAMPLE: ExplorerDefinition = {
     filters: [{ field: "total", operator: "lte", parameter: "budget" }],
     chart: { type: "bar", x: "name", y: "total" },
     metrics: ["selectedTotal"],
+  },
+};
+
+const {
+  chart: _chart,
+  metrics: _metrics,
+  ...travelProps
+} = EXPLORER_TRAVEL_EXAMPLE.props;
+void _chart;
+void _metrics;
+export const EXPLORER_TRAVEL_V2_EXAMPLE: ExplorerDefinitionV2 = {
+  ...EXPLORER_TRAVEL_EXAMPLE,
+  version: 2,
+  props: {
+    ...travelProps,
+    sections: [
+      { kind: "parameters" },
+      { kind: "metrics", nodes: ["selectedTotal"] },
+      {
+        kind: "chart",
+        id: "totalChart",
+        title: "Total by option",
+        type: "bar",
+        x: "name",
+        y: "total",
+      },
+      {
+        kind: "chart",
+        id: "personChart",
+        title: "Cost per person",
+        type: "bar",
+        x: "name",
+        y: "perPerson",
+      },
+      { kind: "table" },
+      { kind: "notices" },
+    ],
   },
 };

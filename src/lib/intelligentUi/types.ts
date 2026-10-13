@@ -101,6 +101,16 @@ export interface HtmlDefinition {
   summary: string;
   html: string;
 }
+export type UiDiagnosticCode =
+  | "incomplete"
+  | "invalid_json"
+  | "invalid_fields"
+  | "unsupported_version"
+  | "unsupported_kind"
+  | "html_policy";
+export interface UiDiagnostic {
+  code: UiDiagnosticCode;
+}
 export interface IntelligentUiBlock {
   id: string;
   type: "intelligent_ui";
@@ -115,6 +125,8 @@ export interface IntelligentUiBlock {
   staticSnapshot: string;
   sourceRefs: string[];
   unsupportedPayload?: string;
+  /** Host-derived reason only; never a model-supplied message or field value. */
+  diagnostic?: UiDiagnostic;
   /** Explicitly imported user data; never populated from model JSON. */
   dataSnapshot?: import("./explorer/types").ExplorerDataset;
   /** Reference identities only. Re-resolve live access before using content. */

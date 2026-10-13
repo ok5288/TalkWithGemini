@@ -17,6 +17,62 @@ const definition = {
 };
 const fence = "```intelligent-ui\n" + JSON.stringify(definition) + "\n```\n";
 describe("Intelligent UI protocol", () => {
+  it("keeps controlled failure reasons without treating streaming input as failed", () => {
+    const ui = (body: string, final = true) => {
+      const segment = parseIntelligentUiText(
+        "```intelligent-ui\n" + body + (final ? "\n```\n" : ""),
+        { final },
+      )[0];
+      if (segment?.type !== "intelligent_ui") throw Error("Missing UI");
+      return segment.block;
+    };
+    expect(ui('{"private":"SECRET"')).toMatchObject({
+      status: "failed",
+      diagnostic: { code: "invalid_json" },
+    });
+    expect(ui(JSON.stringify({ ...definition, props: {} }))).toMatchObject({
+      status: "failed",
+      diagnostic: { code: "invalid_fields" },
+    });
+    expect(ui(JSON.stringify({ ...definition, version: 99 }))).toMatchObject({
+      diagnostic: { code: "unsupported_version" },
+    });
+    expect(
+      ui(JSON.stringify({ ...definition, kind: "unknown" })),
+    ).toMatchObject({
+      diagnostic: { code: "unsupported_kind" },
+    });
+    expect(ui('{"private":"SECRET"', false)).not.toHaveProperty("diagnostic");
+    const incomplete = parseIntelligentUiText("```intelligent-ui\n{", {
+      final: true,
+      cancelled: true,
+    })[0];
+    expect(incomplete).toMatchObject({
+      block: {
+        status: "cancelled",
+        diagnostic: { code: "incomplete" },
+      },
+    });
+  });
+
+  it("restores only allowlisted diagnostic codes and excludes them from public output", () => {
+    const segment = parseIntelligentUiText(fence, { final: true })[0];
+    if (segment?.type !== "intelligent_ui") throw Error("Missing UI");
+    const restored = normalizeIntelligentUiBlock({
+      ...segment.block,
+      diagnostic: { code: "invalid_fields", message: "PRIVATE_SECRET" },
+    })!;
+    expect(restored.diagnostic).toEqual({ code: "invalid_fields" });
+    expect(
+      projectUiBlock(restored, { purpose: "static-original" }),
+    ).not.toContain("PRIVATE_SECRET");
+    expect(
+      normalizeIntelligentUiBlock({
+        ...segment.block,
+        diagnostic: { code: "PRIVATE_SECRET" },
+      }),
+    ).not.toHaveProperty("diagnostic");
+  });
   it("does not recognize retired code block labels", () => {
     for (const label of ["neo-ui", "neo-html"]) {
       const source = `\`\`\`${label}\n${JSON.stringify(definition)}\n\`\`\``;

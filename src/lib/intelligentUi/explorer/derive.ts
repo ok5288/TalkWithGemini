@@ -197,7 +197,7 @@ export function deriveExplorer(
     for (const code of validateGraph({
       ...d,
       props: { ...d.props, dataset: { kind: "inline", data } },
-    }))
+    } as ExplorerDefinition))
       errors.push({ code });
   for (const [field, raw] of Object.entries(state.ranges)) {
     const range = record(raw),

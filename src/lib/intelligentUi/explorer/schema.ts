@@ -131,7 +131,7 @@ const node = z.object({
   collection: z.enum(["filtered", "selected"]).optional(),
   unit: unit.optional(),
 });
-export const explorerSchema = z
+export const explorerV1Schema = z
   .object({
     ...base,
     kind: z.literal("explorer"),
@@ -163,6 +163,125 @@ export const explorerSchema = z
     for (const error of validateGraph(definition as ExplorerDefinition))
       ctx.addIssue({ code: "custom", message: error });
   });
+const section = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("parameters") }).strict(),
+  z
+    .object({
+      kind: z.literal("metrics"),
+      nodes: z
+        .array(id)
+        .min(1)
+        .max(16)
+        .refine((ids) => new Set(ids).size === ids.length),
+    })
+    .strict(),
+  z.object({ kind: z.literal("table") }).strict(),
+  z
+    .object({
+      kind: z.literal("chart"),
+      id,
+      title: text,
+      type: z.enum(["bar", "line", "scatter"]),
+      x: id,
+      y: id,
+    })
+    .strict(),
+  z.object({ kind: z.literal("notices") }).strict(),
+]);
+const strictUnit = unit.strict();
+const strictDataset = explorerDatasetSchema.strict().safeExtend({
+  columns: z
+    .array(column.strict().safeExtend({ unit: strictUnit.optional() }))
+    .min(1)
+    .max(20),
+  rows: z
+    .array(
+      z
+        .object({
+          id,
+          values: z.record(
+            id,
+            z.union([z.string(), finite, z.boolean(), z.null()]),
+          ),
+        })
+        .strict(),
+    )
+    .max(1000),
+});
+const strictInput = z.union([
+  z.object({ field: id }).strict(),
+  z.object({ parameter: id }).strict(),
+  z.object({ node: id }).strict(),
+  z.object({ constant: finite, unit: strictUnit.optional() }).strict(),
+]);
+export const explorerV2Schema = z
+  .object({
+    ...base,
+    version: z.literal(2),
+    kind: z.literal("explorer"),
+    props: explorerV1Schema.shape.props
+      .omit({ chart: true, metrics: true })
+      .extend({
+        dataset: z.discriminatedUnion("kind", [
+          z.object({ kind: z.literal("inline"), data: strictDataset }).strict(),
+          z
+            .object({ kind: z.literal("context"), alias: id, version: text })
+            .strict(),
+        ]),
+        parameters: z
+          .array(parameter.strict().safeExtend({ unit: strictUnit.optional() }))
+          .max(20),
+        nodes: z
+          .array(
+            node.strict().extend({
+              unit: strictUnit.optional(),
+              inputs: z.array(strictInput).max(16),
+            }),
+          )
+          .max(16),
+        filters: z
+          .array(
+            z
+              .object({
+                field: id,
+                operator: z.enum(["lte", "gte"]),
+                parameter: id,
+              })
+              .strict(),
+          )
+          .max(20)
+          .optional(),
+        sections: z.array(section).min(1).max(8),
+      })
+      .strict(),
+  })
+  .strict()
+  .superRefine((definition, ctx) => {
+    const sections = definition.props.sections;
+    const fail = (message: string) => ctx.addIssue({ code: "custom", message });
+    if (sections.filter((s) => s.kind === "table").length !== 1)
+      fail("required_table");
+    for (const kind of ["parameters", "metrics", "notices"])
+      if (sections.filter((s) => s.kind === kind).length > 1)
+        fail("duplicate_section");
+    if (
+      definition.props.parameters.length &&
+      !sections.some((s) => s.kind === "parameters")
+    )
+      fail("required_parameters");
+    const charts = sections.filter((s) => s.kind === "chart");
+    if (
+      charts.length > 4 ||
+      new Set(charts.map((s) => s.id)).size !== charts.length
+    )
+      fail("invalid_charts");
+    for (const error of validateGraph(definition)) fail(error);
+  });
+export const explorerSchema = z.discriminatedUnion("version", [
+  explorerV1Schema,
+  explorerV2Schema,
+]);
+
 export function unitKey(u?: ExplorerUnit) {
   return !u || u.kind === "scalar"
     ? "scalar"
@@ -279,18 +398,29 @@ export function validateGraph(d: ExplorerDefinition): string[] {
     )
       errors.push("invalid_filter");
   }
-  for (const key of p.metrics ?? [])
+  const metricIds =
+    d.version === 2
+      ? d.props.sections.flatMap((s) => (s.kind === "metrics" ? s.nodes : []))
+      : (p.metrics ?? []);
+  for (const key of metricIds)
     if (!seen.has(key) || seen.get(key)?.stage === "row")
       errors.push("invalid_metric");
-  if (p.chart && p.dataset.kind === "inline") {
+  const charts =
+    d.version === 2
+      ? d.props.sections.filter((s) => s.kind === "chart")
+      : p.chart
+        ? [p.chart]
+        : [];
+  for (const chart of charts) {
+    if (p.dataset.kind !== "inline") continue;
     for (const key of [
-      p.chart.y,
-      ...(p.chart.type === "scatter" ? [p.chart.x] : []),
+      chart.y,
+      ...(chart.type === "scatter" ? [chart.x] : []),
     ]) {
       const column = columns.find((c) => c.id === key);
       if (column && column.type !== "number") errors.push("invalid_chart_type");
     }
-    for (const key of [p.chart.x, p.chart.y])
+    for (const key of [chart.x, chart.y])
       if (
         p.dataset.kind === "inline" &&
         !columns.some((c) => c.id === key) &&

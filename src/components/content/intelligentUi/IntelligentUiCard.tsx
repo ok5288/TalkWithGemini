@@ -16,6 +16,7 @@ import { getNativeInitialState } from "@/lib/intelligentUi/catalog";
 import {
   getUiInstanceKey,
   isUiInstanceEligible,
+  type HtmlRuntimeStatus,
 } from "@/lib/intelligentUi/instance";
 import NativeUi from "./NativeUi";
 import { isExplorerEnabled } from "@/lib/intelligentUi/featurePolicy";
@@ -38,6 +39,13 @@ export interface IntelligentUiCardProps {
   onSendMessage?: HtmlUiFrameProps["onSendMessage"];
   resolvedDataset?: ExplorerDataset;
   onImportDataset?: (dataset: ExplorerDataset | null) => void;
+  onEscape?: () => void;
+  paused?: boolean;
+  displayEpoch?: number;
+  canStartRuntime?: () => boolean;
+  onRuntimeControl?: HtmlUiFrameProps["onRuntimeControl"];
+  onRuntimeStatus?: (status: HtmlRuntimeStatus) => void;
+  onPendingImportChange?: (pending: boolean) => void;
 }
 
 class UiBoundary extends Component<
@@ -72,11 +80,20 @@ function IntelligentUiCardContent({
   onSendMessage,
   resolvedDataset,
   onImportDataset,
+  onEscape,
+  paused = false,
+  displayEpoch = 0,
+  canStartRuntime,
+  onRuntimeControl,
+  onRuntimeStatus,
+  onPendingImportChange,
 }: IntelligentUiCardProps) {
   const t = useTranslations("IntelligentUi");
   const locale = useLocale();
   const [runtimeError, setRuntimeError] = useState("");
   const [generation, setGeneration] = useState(0);
+  const [runtimeStatus, setRuntimeStatus] =
+    useState<HtmlRuntimeStatus>("starting");
   const definition = block.definition;
   const featureEnabled =
     !(definition && "kind" in definition && definition.kind === "explorer") ||
@@ -98,7 +115,7 @@ function IntelligentUiCardContent({
     messageId,
     blockId: block.id,
     definitionRevision: block.definitionRevision,
-    epoch: generation,
+    epoch: displayEpoch,
   });
   const dataset = block.dataSnapshot ?? resolvedDataset;
   const expectedDataset =
@@ -127,6 +144,24 @@ function IntelligentUiCardContent({
     onStateChange?.(next, snapshot);
   };
   const currentBlock = { ...block, state };
+  const diagnostic =
+    runtimeError === "invalid_definition"
+      ? "html_policy"
+      : block.diagnostic?.code;
+  const statusLabel =
+    block.status === "receiving" || block.status === "preview"
+      ? t(`status.${block.status}`)
+      : block.status === "failed" || block.status === "cancelled"
+        ? t(`status.${block.status}`)
+        : runtimeError
+          ? t("runtime.failed")
+          : interactive && block.renderer === "html"
+            ? t(
+                `runtime.${runtimeStatus === "disposed" ? "failed" : runtimeStatus}`,
+              )
+            : interactive
+              ? t("runtime.active")
+              : undefined;
   const fallback = (
     <div className="whitespace-pre-wrap break-words text-sm leading-relaxed">
       {projectUiBlock(currentBlock, {
@@ -142,68 +177,104 @@ function IntelligentUiCardContent({
       className="my-3 min-w-0 max-w-full text-inherit"
     >
       <div className="min-w-0">
-        <UiBoundary
-          key={`${block.id}:${block.definitionRevision}:${generation}`}
-          fallback={
-            <>
-              <p role="alert" className="text-sm text-red-600">
-                {t("renderError")}
-              </p>
-              {fallback}
-            </>
-          }
-        >
-          {interactive && !runtimeError ? (
-            definition && "kind" in definition ? (
-              <NativeUi
-                definition={definition}
-                state={state}
-                onChange={(next) => updateState(next)}
-                dataset={dataset}
-                expectedDataset={expectedDataset}
-                onImportDataset={
-                  onImportDataset
-                    ? (next) => {
-                        if (interactionAllowed.current) onImportDataset(next);
-                      }
-                    : undefined
-                }
-                datasetProvenance={block.dataSnapshot ? "user" : undefined}
-              />
-            ) : definition && "html" in definition ? (
-              <HtmlUiFrame
-                key={instanceId}
-                source={definition.html}
-                complete={block.status === "ready"}
-                instanceId={instanceId}
-                sessionId={sessionId}
-                initialState={state}
-                title={definition.title}
-                onStateChange={(next) => updateState(next as JsonObject)}
-                onSnapshot={(snapshot) =>
-                  updateState(latestState.current, snapshot)
-                }
-                onSendMessage={(text, isRuntimeActive) => {
-                  if (
-                    !interactionAllowed.current ||
-                    !isRuntimeActive() ||
-                    !onSendMessage
-                  )
-                    return Promise.resolve({ ok: false, code: "inactive" });
-                  return onSendMessage(
-                    text,
-                    () => interactionAllowed.current && isRuntimeActive(),
-                  );
-                }}
-                onError={setRuntimeError}
-              />
+        {enabled && !readOnly && statusLabel ? (
+          <p
+            role="status"
+            aria-live="polite"
+            className="mb-2 text-xs text-muted-foreground"
+          >
+            {statusLabel}
+          </p>
+        ) : null}
+        {enabled && !readOnly && diagnostic ? (
+          <p className="mb-2 text-sm text-muted-foreground">
+            {t(`diagnostic.${diagnostic}`)}
+          </p>
+        ) : null}
+        {enabled && !readOnly && block.status === "receiving" ? (
+          <div
+            aria-hidden="true"
+            className="space-y-2 motion-safe:animate-pulse"
+          >
+            <div className="h-3 w-1/3 rounded bg-foreground/10" />
+            <div className="h-8 rounded bg-foreground/5" />
+          </div>
+        ) : null}
+        <div inert={paused ? true : undefined} aria-busy={paused || undefined}>
+          <UiBoundary
+            key={`${block.id}:${block.definitionRevision}:${generation}`}
+            fallback={
+              <>
+                <p role="alert" className="text-sm text-red-600">
+                  {t("renderError")}
+                </p>
+                {fallback}
+              </>
+            }
+          >
+            {interactive && !runtimeError ? (
+              definition && "kind" in definition ? (
+                <NativeUi
+                  onPendingImportChange={onPendingImportChange}
+                  definition={definition}
+                  state={state}
+                  onChange={(next) => {
+                    if (!paused) updateState(next);
+                  }}
+                  dataset={dataset}
+                  expectedDataset={expectedDataset}
+                  onImportDataset={
+                    onImportDataset
+                      ? (next) => {
+                          if (interactionAllowed.current) onImportDataset(next);
+                        }
+                      : undefined
+                  }
+                  datasetProvenance={block.dataSnapshot ? "user" : undefined}
+                />
+              ) : definition && "html" in definition ? (
+                <HtmlUiFrame
+                  onEscape={onEscape}
+                  canStartRuntime={canStartRuntime}
+                  onRuntimeControl={onRuntimeControl}
+                  key={instanceId}
+                  source={definition.html}
+                  complete={block.status === "ready"}
+                  instanceId={`${instanceId}:${generation}`}
+                  sessionId={sessionId}
+                  initialState={state}
+                  title={definition.title}
+                  onStateChange={(next) => updateState(next as JsonObject)}
+                  onSnapshot={(snapshot) =>
+                    updateState(latestState.current, snapshot)
+                  }
+                  onSendMessage={(text, isRuntimeActive) => {
+                    if (
+                      paused ||
+                      !interactionAllowed.current ||
+                      !isRuntimeActive() ||
+                      !onSendMessage
+                    )
+                      return Promise.resolve({ ok: false, code: "inactive" });
+                    return onSendMessage(
+                      text,
+                      () => interactionAllowed.current && isRuntimeActive(),
+                    );
+                  }}
+                  onError={setRuntimeError}
+                  onStatus={(status) => {
+                    setRuntimeStatus(status);
+                    onRuntimeStatus?.(status);
+                  }}
+                />
+              ) : (
+                fallback
+              )
             ) : (
               fallback
-            )
-          ) : (
-            fallback
-          )}
-        </UiBoundary>
+            )}
+          </UiBoundary>
+        </div>
         {runtimeError && (
           <div
             role="alert"
@@ -216,6 +287,7 @@ function IntelligentUiCardContent({
                 variant="ghost"
                 onClick={() => {
                   setRuntimeError("");
+                  setRuntimeStatus("starting");
                   setGeneration((value) => value + 1);
                 }}
               >

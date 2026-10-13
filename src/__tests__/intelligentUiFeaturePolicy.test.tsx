@@ -10,7 +10,10 @@ import {
 } from "@/lib/intelligentUi/catalog";
 import { buildIntelligentUiPromptInstruction } from "@/lib/intelligentUi/prompt";
 import { parseIntelligentUiText } from "@/lib/intelligentUi/parser";
-import { EXPLORER_TRAVEL_EXAMPLE } from "@/lib/intelligentUi/explorer";
+import {
+  EXPLORER_TRAVEL_EXAMPLE,
+  EXPLORER_TRAVEL_V2_EXAMPLE,
+} from "@/lib/intelligentUi/explorer";
 import IntelligentUiCard from "@/components/content/intelligentUi/IntelligentUiCard";
 import type { IntelligentUiBlock, JsonObject } from "@/lib/intelligentUi/types";
 import messages from "@/i18n/locales/en/IntelligentUi.json";
@@ -47,14 +50,14 @@ const block: IntelligentUiBlock = {
   staticSnapshot: "",
   sourceRefs: [],
 };
-it("defaults on and keeps all three validated prompt examples", () => {
+it("defaults on and keeps both Explorer versions in the validated prompt examples", () => {
   vi.stubEnv("NEXT_PUBLIC_ENABLE_INTELLIGENT_UI_EXPLORER", undefined);
   expect(isExplorerEnabled()).toBe(true);
   expect(
     parseIntelligentUiText(buildIntelligentUiPromptInstruction(), {
       final: true,
     }).filter((s) => s.type === "intelligent_ui"),
-  ).toHaveLength(3);
+  ).toHaveLength(4);
 });
 it("removes explorer instructions and examples without removing schema compatibility", () => {
   vi.stubEnv("NEXT_PUBLIC_ENABLE_INTELLIGENT_UI_EXPLORER", "false");
@@ -71,6 +74,9 @@ it("removes explorer instructions and examples without removing schema compatibi
   );
   expect(
     nativeDefinitionSchema.safeParse(EXPLORER_TRAVEL_EXAMPLE).success,
+  ).toBe(true);
+  expect(
+    nativeDefinitionSchema.safeParse(EXPLORER_TRAVEL_V2_EXAMPLE).success,
   ).toBe(true);
 });
 it("renders disabled explorers as static and rejects stale state/import callbacks", () => {

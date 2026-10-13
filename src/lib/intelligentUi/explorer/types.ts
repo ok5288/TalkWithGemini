@@ -53,7 +53,7 @@ export interface ExplorerNode {
   collection?: "filtered" | "selected";
   unit?: ExplorerUnit;
 }
-export interface ExplorerDefinition {
+export interface ExplorerDefinitionV1 {
   version: 1;
   kind: "explorer";
   title: string;
@@ -84,3 +84,29 @@ export interface ExplorerError {
   field?: string;
   row?: string;
 }
+
+export type ExplorerSection =
+  | { kind: "parameters" }
+  | { kind: "metrics"; nodes: string[] }
+  | { kind: "table" }
+  | {
+      kind: "chart";
+      id: string;
+      title: string;
+      type: "bar" | "line" | "scatter";
+      x: string;
+      y: string;
+    }
+  | { kind: "notices" };
+export interface ExplorerDefinitionV2 extends Omit<
+  ExplorerDefinitionV1,
+  "version" | "props"
+> {
+  version: 2;
+  props: Omit<ExplorerDefinitionV1["props"], "chart" | "metrics"> & {
+    sections: ExplorerSection[];
+    chart?: never;
+    metrics?: never;
+  };
+}
+export type ExplorerDefinition = ExplorerDefinitionV1 | ExplorerDefinitionV2;

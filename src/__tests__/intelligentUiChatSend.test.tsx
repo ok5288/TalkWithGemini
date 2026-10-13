@@ -788,3 +788,178 @@ it("rejects revoked authorization after a suspended skill read", async () => {
   );
   expect(stream).not.toHaveBeenCalled();
 });
+
+it("host explain freezes the latest persisted visible result", async () => {
+  const save = deferred<void>();
+  vi.mocked(waitForSessionMessageWrites).mockReturnValueOnce(save.promise);
+  const { source, hook } = setup();
+  act(() => {
+    void hook.current.handleUiSendMessage("Explain", source, "explain");
+  });
+  expect(stageDraft).not.toHaveBeenCalled();
+  const block = state.activeMessages[0].outputBlocks![0];
+  if (block.type !== "intelligent_ui") throw Error("fixture");
+  block.staticSnapshot = "Result after runtime flush";
+  await act(async () => save.resolve());
+  await waitFor(() => expect(stageDraft).toHaveBeenCalledOnce());
+  await act(() => sendDraft(hook, "My edited explanation request"));
+  await waitFor(() => expect(stream).toHaveBeenCalledOnce());
+  expect(JSON.stringify(stream.mock.calls[0][17])).toContain(
+    "Result after runtime flush",
+  );
+});
+
+it("host preparation save failure releases busy for explicit retry", async () => {
+  vi.mocked(waitForSessionMessageWrites).mockRejectedValueOnce(
+    new Error("save failed"),
+  );
+  const { source, hook } = setup();
+  let receipt!: Promise<unknown>;
+  act(() => {
+    receipt = hook.current.handleUiSendMessage("Explain", source, "explain");
+  });
+  expect(await receipt).toEqual({ ok: false, code: "send_failed" });
+  expect(stageDraft).not.toHaveBeenCalled();
+  act(() => {
+    void hook.current.handleUiSendMessage("Explain", source, "explain");
+  });
+  await waitFor(() => expect(stageDraft).toHaveBeenCalledOnce());
+});
+
+it("repairs only the original uniquely located failed fence and rejects changes before send", async () => {
+  const content = '```intelligent-ui\n{"version":1,broken}\n```';
+  const segment = parseIntelligentUiText(content, {
+    idPrefix: "original",
+    final: true,
+  })[0];
+  if (segment.type !== "intelligent_ui") throw Error("fixture");
+  state.activeMessages[0].content = content;
+  state.activeMessages[0].outputBlocks = [segment.block];
+  const { source, hook } = setup();
+  act(() => {
+    void hook.current.handleUiSendMessage("Repair", source, "repair");
+  });
+  await waitFor(() => expect(stageDraft).toHaveBeenCalledOnce());
+  state.activeMessages[0].content = content.replace("broken", "changed");
+  await act(async () => {
+    expect(await sendDraft(hook)).toBe(false);
+  });
+  expect(stream).not.toHaveBeenCalled();
+});
+
+it("sends a repair source as quoted context with edited composer text", async () => {
+  const content = '```intelligent-ui\n{"version":1,broken}\n```';
+  const segment = parseIntelligentUiText(content, {
+    idPrefix: "original",
+    final: true,
+  })[0];
+  if (segment.type !== "intelligent_ui") throw Error("fixture");
+  state.activeMessages[0].content = content;
+  state.activeMessages[0].outputBlocks = [segment.block];
+  const { source, hook } = setup();
+  let receipt!: Promise<unknown>;
+  act(() => {
+    receipt = hook.current.handleUiSendMessage("Repair", source, "repair");
+  });
+  await waitFor(() => expect(stageDraft).toHaveBeenCalledOnce());
+  await act(() => sendDraft(hook, "Repair with my edits"));
+  expect(await receipt).toMatchObject({ ok: true });
+  await waitFor(() => expect(stream).toHaveBeenCalledOnce());
+  expect(JSON.stringify(stream.mock.calls[0][17])).toContain(
+    "untrustedOriginalUiSource",
+  );
+});
+
+it("reserves a host gesture while flushing and rejects a revoked owner before staging", async () => {
+  const save = deferred<void>();
+  vi.mocked(waitForSessionMessageWrites).mockReturnValueOnce(save.promise);
+  const { source, hook } = setup();
+  let active = true;
+  source.isActive = () => active;
+  let receipt!: Promise<unknown>;
+  act(() => {
+    receipt = hook.current.handleUiSendMessage("Modify", source, "modify");
+  });
+  expect(
+    await hook.current.handleUiSendMessage("Duplicate", source, "modify"),
+  ).toEqual({ ok: false, code: "busy" });
+  active = false;
+  await act(async () => save.resolve());
+  expect(await receipt).toEqual({ ok: false, code: "inactive" });
+  expect(stageDraft).not.toHaveBeenCalled();
+  expect(stream).not.toHaveBeenCalled();
+});
+
+it.each(["explain", "modify"] as const)(
+  "%s refuses a revoked source after flushing without staging a draft",
+  async (action) => {
+    const { source, hook, deps } = setup();
+    sourceAssert.mockRejectedValueOnce(new Error("UI_SOURCE_STALE"));
+    let receipt!: Promise<unknown>;
+    act(() => {
+      receipt = hook.current.handleUiSendMessage(
+        "Host request",
+        source,
+        action,
+      );
+    });
+    expect(await receipt).toMatchObject({ ok: false });
+    expect(waitForSessionMessageWrites).toHaveBeenCalled();
+    expect(stageDraft).not.toHaveBeenCalled();
+    expect(deps.addMessage).not.toHaveBeenCalled();
+    expect(stream).not.toHaveBeenCalled();
+  },
+);
+
+it.each(["explain", "modify"] as const)(
+  "%s preserves acceptance but blocks dispatch when source access expires during preparation",
+  async (action) => {
+    const { source, hook, deps } = setup();
+    prepareHistory.mockImplementationOnce(async () => {
+      sourceAssert.mockRejectedValueOnce(new Error("UI_SOURCE_STALE"));
+      return [];
+    });
+    let receipt!: Promise<unknown>;
+    act(() => {
+      receipt = hook.current.handleUiSendMessage(
+        "Host request",
+        source,
+        action,
+      );
+    });
+    await waitFor(() => expect(stageDraft).toHaveBeenCalledOnce());
+    await act(() => sendDraft(hook));
+    expect(await receipt).toMatchObject({ ok: true });
+    await waitFor(() => expect(deps.updateMessage).toHaveBeenCalled());
+    expect(stream).not.toHaveBeenCalled();
+    expect(
+      state.activeMessages.filter((message) => message.role === "user"),
+    ).toHaveLength(1);
+  },
+);
+
+it.each(["marker", "diagnostic"])(
+  "does not dispatch a repair draft after the block gains an unsupported %s",
+  async (change) => {
+    const content = '```intelligent-ui\n{"version":1,broken}\n```';
+    const segment = parseIntelligentUiText(content, {
+      idPrefix: "original",
+      final: true,
+    })[0];
+    if (segment.type !== "intelligent_ui") throw Error("fixture");
+    state.activeMessages[0].content = content;
+    state.activeMessages[0].outputBlocks = [segment.block];
+    const { source, hook, deps } = setup();
+    act(() => {
+      void hook.current.handleUiSendMessage("Repair", source, "repair");
+    });
+    await waitFor(() => expect(stageDraft).toHaveBeenCalledOnce());
+    if (change === "marker") segment.block.unsupportedPayload = "future";
+    else segment.block.diagnostic = { code: "unsupported_version" };
+    await act(async () => {
+      expect(await sendDraft(hook)).toBe(false);
+    });
+    expect(deps.addMessage).not.toHaveBeenCalled();
+    expect(stream).not.toHaveBeenCalled();
+  },
+);

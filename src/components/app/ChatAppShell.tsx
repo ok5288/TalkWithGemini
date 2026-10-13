@@ -1,5 +1,6 @@
 "use client";
 
+import IntelligentUiViewer from "@/components/content/intelligentUi/IntelligentUiViewer";
 import React from "react";
 import dynamic from "next/dynamic";
 import { useTranslations } from "next-intl";
@@ -1118,6 +1119,7 @@ const ChatAppShell = ({
             )}
           </div>
         </main>
+        {viewMode === "chat" && <IntelligentUiViewer onLocate={focusMessage} />}
         {viewMode === "search" && (
           <GlobalSearchCenter
             onClose={() => navigateToPanel("chat")}

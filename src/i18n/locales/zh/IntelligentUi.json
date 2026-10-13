@@ -33,7 +33,7 @@
     "example": "示例数据"
   },
   "status": {
-    "receiving": "正在接收",
+    "receiving": "正在生成界面",
     "preview": "静态预览",
     "ready": "可以交互",
     "failed": "暂不可用",
@@ -60,7 +60,7 @@
   "runtime": {
     "starting": "正在启动界面",
     "active": "可交互",
-    "failed": "界面不可用"
+    "failed": "界面启动失败"
   },
   "sourceTrace": {
     "title": "来源追踪",
@@ -217,7 +217,8 @@
       "rounding": "金额按 Math.round((value + Number.EPSILON) × 10^p) 转为最小单位，精度为 {precision} 位；精确半值朝正无穷取整",
       "splitRemainder": "拆分余数按顺序分配",
       "splitRounding": "分摊先用 Math.round(value) 将总额舍入为整数单位；精确中点向正无穷方向舍入"
-    }
+    },
+    "notices": "计算提示"
   },
   "calculations": {
     "arity": "计算缺少必要参数。",
@@ -244,5 +245,34 @@
     "ambiguous-mapping": "此图表的数据集映射或布局无法确定。数据保持只读，交互筛选不可用。"
   },
   "htmlSnapshotLabel": "界面自报快照（未经独立验证）",
-  "htmlSnapshotMissing": "界面尚未提供快照。"
+  "htmlSnapshotMissing": "界面尚未提供快照。",
+  "diagnostic": {
+    "incomplete": "生成结束时此界面尚未完整。",
+    "invalid_json": "此界面的 JSON 格式无效。",
+    "invalid_fields": "此界面字段不符合支持的格式。",
+    "unsupported_version": "此界面需要更新版本的 Neo Chat。",
+    "unsupported_kind": "此版本的 Neo Chat 不支持该界面类型。",
+    "html_policy": "此界面请求了不支持的 HTML 能力。"
+  },
+  "viewer": {
+    "title": "界面查看区",
+    "open": "在查看区打开",
+    "close": "关闭查看区",
+    "locate": "定位原消息",
+    "opened": "已在查看区打开",
+    "saving": "正在保存进度…",
+    "saveError": "进度保存失败，请重试打开或关闭查看区。",
+    "importError": "请先确认或取消待导入内容，再移动此界面。",
+    "cancelImport": "取消导入"
+  },
+  "hostActions": {
+    "explain": "解释当前结果",
+    "modify": "修改此界面",
+    "repair": "请求修复",
+    "explainDraft": "请解释此界面的当前结果。",
+    "modifyDraft": "请修改此界面，并生成完整的新界面定义，保留原界面。",
+    "repairDraft": "请修复这个未能完成生成的界面，并生成完整的新定义。",
+    "failed": "请求准备失败，请重试此操作。",
+    "busy": "另一个界面请求正在等待确认，请先完成或取消。"
+  }
 }

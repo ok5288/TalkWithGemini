@@ -1,4 +1,5 @@
 "use client";
+import { IntelligentUiDisplayProvider } from "@/components/content/intelligentUi/IntelligentUiDisplayContext";
 import dynamic from "next/dynamic";
 import { UiChatContext } from "@/components/content/intelligentUi/UiChatContext";
 import {
@@ -1212,68 +1213,70 @@ const ChatApp = () => {
       onNotice={showActionNotice}
     >
       <UiChatContext.Provider value={handleUiSendMessage}>
-        <ChatAppShell
-          actionError={actionError}
-          actionNotice={actionNotice}
-          sessions={sessions}
-          currentSessionId={currentSessionId}
-          currentSession={currentSession}
-          messages={messages}
-          activeMessageTree={activeMessageTree}
-          isGenerating={isGenerating}
-          isActiveSessionLoading={isActiveSessionLoading}
-          availableModels={availableModels}
-          isModelBootstrapReady={serverModelBootstrapReady}
-          selectedModel={selectedModel}
-          isSearchEnabled={chatConfig.useSearch}
-          viewMode={viewMode}
-          settingsTab={settingsTab}
-          researchTaskId={researchTaskId}
-          isSidebarOpen={isSidebarOpen}
-          isNonDesktopViewport={isNonDesktopViewport}
-          isSidebarDrawerOpen={isSidebarDrawerOpen}
-          mainInertProps={mainInertProps}
-          shouldShowChatTitleBar={shouldShowChatTitleBar}
-          welcomeState={welcomeState}
-          messageInputVariant={messageInputVariant}
-          messagesScrollRef={messagesScrollRef}
-          messageInputRef={messageInputRef}
-          setIsSidebarOpen={setIsSidebarOpen}
-          navigateToPanel={navigateToPanel}
-          handleSettingsTabChange={handleSettingsTabChange}
-          stopActiveGenerationWithFeedback={stopActiveGenerationWithFeedback}
-          selectSession={handleSelectSession}
-          handleNewChat={handleNewChat}
-          handleNewChatInWorkspace={handleNewChatInWorkspace}
-          handleStartTemporaryChat={handleStartTemporaryChat}
-          handleDeleteSession={handleDeleteSession}
-          updateSessionTitle={updateSessionTitle}
-          toggleSessionPin={toggleSessionPin}
-          handleDuplicateSession={handleDuplicateSession}
-          handleSmartRename={handleSmartRename}
-          handleAssistantSelect={handleAssistantSelect}
-          updateSessionInstruction={updateSessionInstruction}
-          handleEditMessage={handleEditMessage}
-          handleDeleteMessage={handleDeleteMessage}
-          handleSubmitUserMessageEdit={handleSubmitUserMessageEdit}
-          handleRetractMessage={handleRetractMessage}
-          handleRegenerate={handleRegenerate}
-          handleContinueGeneration={handleContinueGeneration}
-          handleVersionChange={handleVersionChange}
-          handleVersionSelect={handleVersionSelect}
-          handleSendMessage={handleSendMessage}
-          prepareComposerSkillParameters={prepareComposerSend}
-          handleCompressContext={handleCompressContext}
-          handleSuggestionClick={handleSuggestionClick}
-          handleStopGeneration={handleStopGeneration}
-          setModel={setModel}
-          onToggleSearch={() =>
-            setChatConfig({ useSearch: !chatConfig.useSearch })
-          }
-          pendingToolConfirmations={pendingToolConfirmations}
-          onToolConfirmationDecision={decideToolConfirmation}
-          onRevokeToolSessionApproval={revokeToolSessionApproval}
-        />
+        <IntelligentUiDisplayProvider>
+          <ChatAppShell
+            actionError={actionError}
+            actionNotice={actionNotice}
+            sessions={sessions}
+            currentSessionId={currentSessionId}
+            currentSession={currentSession}
+            messages={messages}
+            activeMessageTree={activeMessageTree}
+            isGenerating={isGenerating}
+            isActiveSessionLoading={isActiveSessionLoading}
+            availableModels={availableModels}
+            isModelBootstrapReady={serverModelBootstrapReady}
+            selectedModel={selectedModel}
+            isSearchEnabled={chatConfig.useSearch}
+            viewMode={viewMode}
+            settingsTab={settingsTab}
+            researchTaskId={researchTaskId}
+            isSidebarOpen={isSidebarOpen}
+            isNonDesktopViewport={isNonDesktopViewport}
+            isSidebarDrawerOpen={isSidebarDrawerOpen}
+            mainInertProps={mainInertProps}
+            shouldShowChatTitleBar={shouldShowChatTitleBar}
+            welcomeState={welcomeState}
+            messageInputVariant={messageInputVariant}
+            messagesScrollRef={messagesScrollRef}
+            messageInputRef={messageInputRef}
+            setIsSidebarOpen={setIsSidebarOpen}
+            navigateToPanel={navigateToPanel}
+            handleSettingsTabChange={handleSettingsTabChange}
+            stopActiveGenerationWithFeedback={stopActiveGenerationWithFeedback}
+            selectSession={handleSelectSession}
+            handleNewChat={handleNewChat}
+            handleNewChatInWorkspace={handleNewChatInWorkspace}
+            handleStartTemporaryChat={handleStartTemporaryChat}
+            handleDeleteSession={handleDeleteSession}
+            updateSessionTitle={updateSessionTitle}
+            toggleSessionPin={toggleSessionPin}
+            handleDuplicateSession={handleDuplicateSession}
+            handleSmartRename={handleSmartRename}
+            handleAssistantSelect={handleAssistantSelect}
+            updateSessionInstruction={updateSessionInstruction}
+            handleEditMessage={handleEditMessage}
+            handleDeleteMessage={handleDeleteMessage}
+            handleSubmitUserMessageEdit={handleSubmitUserMessageEdit}
+            handleRetractMessage={handleRetractMessage}
+            handleRegenerate={handleRegenerate}
+            handleContinueGeneration={handleContinueGeneration}
+            handleVersionChange={handleVersionChange}
+            handleVersionSelect={handleVersionSelect}
+            handleSendMessage={handleSendMessage}
+            prepareComposerSkillParameters={prepareComposerSend}
+            handleCompressContext={handleCompressContext}
+            handleSuggestionClick={handleSuggestionClick}
+            handleStopGeneration={handleStopGeneration}
+            setModel={setModel}
+            onToggleSearch={() =>
+              setChatConfig({ useSearch: !chatConfig.useSearch })
+            }
+            pendingToolConfirmations={pendingToolConfirmations}
+            onToolConfirmationDecision={decideToolConfirmation}
+            onRevokeToolSessionApproval={revokeToolSessionApproval}
+          />
+        </IntelligentUiDisplayProvider>
       </UiChatContext.Provider>
       <SkillParameterDialog
         open={Boolean(skillParameterDialog)}

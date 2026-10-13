@@ -110,7 +110,8 @@ export function isUnsupportedNativeDefinition(value: unknown): boolean {
   return (
     isRecord(value) &&
     ((Object.prototype.hasOwnProperty.call(value, "version") &&
-      value.version !== INTELLIGENT_UI_SCHEMA_VERSION) ||
+      value.version !== INTELLIGENT_UI_SCHEMA_VERSION &&
+      !(value.kind === "explorer" && value.version === 2)) ||
       (typeof value.kind === "string" && !isKnownNativeKind(value.kind)))
   );
 }

@@ -8,8 +8,10 @@ import type {
 } from "./types";
 import { base } from "./capabilities/shared";
 import { nativeDefinitionSchema } from "./catalog";
-import { explorerDatasetSchema } from "./explorer/schema";
+import { explorerDatasetSchema, explorerV2Schema } from "./explorer/schema";
+import { initialExplorer, normalizeExplorer } from "./explorer/derive";
 import { normalizeUiSourceBindings } from "./sources/types";
+import { normalizeUiDiagnostic } from "./diagnostics";
 import {
   getUnsupportedUiFallback,
   isQuarantinedUiPayload,
@@ -140,13 +142,135 @@ function isNormalizedQuarantineRecord(value: Record<string, unknown>): boolean {
   );
 }
 
+/** Only the canonical inert wrapper can be reopened, and only for Explorer v2. */
+function recoverExplorerV2Quarantine(
+  b: Record<string, unknown>,
+): Record<string, unknown> | undefined {
+  if (
+    !isNormalizedQuarantineRecord(b) ||
+    !isQuarantinedUiPayload(b.unsupportedPayload)
+  )
+    return;
+  const wrapperKeys = new Set([
+    "id",
+    "type",
+    "schemaVersion",
+    "renderer",
+    "definition",
+    "definitionRevision",
+    "status",
+    "fallbackMarkdown",
+    "state",
+    "stateRevision",
+    "staticSnapshot",
+    "sourceRefs",
+    "unsupportedPayload",
+    "diagnostic",
+  ]);
+  if (Object.keys(b).some((key) => !wrapperKeys.has(key))) return;
+  let raw: unknown;
+  try {
+    raw = JSON.parse(b.unsupportedPayload);
+  } catch {
+    return;
+  }
+  const hasNestedMarker = (value: unknown): boolean => {
+    if (
+      value &&
+      typeof value === "object" &&
+      Object.hasOwn(value, "unsupportedPayload")
+    )
+      return true;
+    const pending = [{ value, depth: 0 }];
+    while (pending.length) {
+      const item = pending.pop()!;
+      if (item.depth > 24) return true;
+      if (!item.value || typeof item.value !== "object") continue;
+      for (const nested of Object.values(item.value))
+        pending.push({ value: nested, depth: item.depth + 1 });
+    }
+    return false;
+  };
+  if (
+    !raw ||
+    typeof raw !== "object" ||
+    Array.isArray(raw) ||
+    hasNestedMarker(raw)
+  )
+    return;
+  const payload = raw as Record<string, unknown>;
+  const full = payload.type === "intelligent_ui";
+  if (
+    full &&
+    (payload.schemaVersion !== 1 ||
+      payload.renderer !== "native" ||
+      typeof payload.id !== "string" ||
+      typeof payload.fallbackMarkdown !== "string" ||
+      typeof payload.staticSnapshot !== "string" ||
+      !Array.isArray(payload.sourceRefs) ||
+      !["ready", "failed", "cancelled", "receiving", "preview"].includes(
+        String(payload.status),
+      ) ||
+      !Number.isSafeInteger(payload.definitionRevision) ||
+      Number(payload.definitionRevision) < 1 ||
+      !Number.isSafeInteger(payload.stateRevision) ||
+      Number(payload.stateRevision) < 0 ||
+      !payload.state ||
+      typeof payload.state !== "object" ||
+      Array.isArray(payload.state))
+  )
+    return;
+  const definition = explorerV2Schema.safeParse(
+    full ? payload.definition : payload,
+  );
+  if (!definition.success) return;
+  const snapshot =
+    full && payload.dataSnapshot !== undefined
+      ? explorerDatasetSchema.safeParse(payload.dataSnapshot)
+      : undefined;
+  if (snapshot && !snapshot.success) return;
+  const data = snapshot?.success ? snapshot.data : undefined;
+  const input = full
+    ? normalizeJsonState(payload.state)
+    : initialExplorer(definition.data);
+  const state =
+    data || definition.data.props.dataset.kind === "inline"
+      ? normalizeExplorer(definition.data, input, data)
+      : input;
+  return {
+    ...(full ? payload : b),
+    id: b.id,
+    type: "intelligent_ui",
+    schemaVersion: 1,
+    renderer: "native",
+    definition: definition.data,
+    definitionRevision: full
+      ? payload.definitionRevision
+      : b.definitionRevision,
+    status: full ? payload.status : "ready",
+    fallbackMarkdown: definition.data.summary,
+    state,
+    stateRevision: full ? payload.stateRevision : 0,
+    staticSnapshot: full ? payload.staticSnapshot : "",
+    sourceRefs: [],
+    ...(data ? { dataSnapshot: data } : {}),
+    sourceBindings: normalizeUiSourceBindings(
+      full ? payload.sourceBindings : undefined,
+    ),
+    unsupportedPayload: undefined,
+    diagnostic: undefined,
+  };
+}
+
 export function normalizeIntelligentUiBlock(
   value: unknown,
   options: { interrupted?: boolean } = {},
 ): IntelligentUiBlock | null {
   if (!value || typeof value !== "object") return null;
-  const b = value as Record<string, unknown>;
+  let b = value as Record<string, unknown>;
   if (b.type !== "intelligent_ui" || typeof b.id !== "string") return null;
+  const blockId = b.id;
+  b = recoverExplorerV2Quarantine(b) ?? b;
   if (isUnsupportedIntelligentUiPayload(b)) {
     const unsupportedPayload =
       isNormalizedQuarantineRecord(b) &&
@@ -160,7 +284,7 @@ export function normalizeIntelligentUiBlock(
         ? b.fallbackMarkdown
         : "");
     return {
-      id: b.id,
+      id: blockId,
       type: "intelligent_ui",
       schemaVersion: 1,
       renderer: "native",
@@ -176,6 +300,9 @@ export function normalizeIntelligentUiBlock(
       staticSnapshot: "",
       sourceRefs: [],
       unsupportedPayload,
+      diagnostic: normalizeUiDiagnostic(b.diagnostic) ?? {
+        code: "unsupported_version",
+      },
     };
   }
   const renderer = b.renderer === "html" ? "html" : "native";
@@ -207,8 +334,11 @@ export function normalizeIntelligentUiBlock(
         })()
       : undefined;
   const sourceBindings = normalizeUiSourceBindings(b.sourceBindings);
+  const diagnostic =
+    normalizeUiDiagnostic(b.diagnostic) ??
+    (status === "cancelled" ? { code: "incomplete" as const } : undefined);
   return {
-    id: b.id,
+    id: blockId,
     type: "intelligent_ui",
     schemaVersion: 1,
     renderer,
@@ -226,5 +356,6 @@ export function normalizeIntelligentUiBlock(
     sourceRefs: [],
     ...(dataSnapshot ? { dataSnapshot } : {}),
     ...(sourceBindings.length ? { sourceBindings } : {}),
+    ...(diagnostic ? { diagnostic } : {}),
   };
 }

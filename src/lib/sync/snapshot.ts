@@ -1,3 +1,4 @@
+import { recoverKnownExplorerV2InAppData } from "@/lib/intelligentUi/recovery";
 import type {
   AppExportPayload,
   BrowserAppExportPayloadOptions,
@@ -422,7 +423,7 @@ export async function captureLocalSyncSnapshot(
   const captured = await createBrowserAppExportPayload(options);
   const exported: AppExportPayload = {
     ...captured,
-    data: prepareDataForSync(captured.data),
+    data: prepareDataForSync(recoverKnownExplorerV2InAppData(captured.data)),
   };
   return {
     exported,
@@ -546,7 +547,9 @@ export async function applySyncedAppData(
       throw new StaleSyncSnapshotError();
     }
 
-    const currentRaw = await readRawLocalAppData();
+    const currentRaw = recoverKnownExplorerV2InAppData(
+      await readRawLocalAppData(),
+    );
     const synchronizedData = prepareDataForSync(data);
     const currentSyncData = prepareDataForSync(currentSnapshot.exported.data);
     const restoredData = overlayLocalOnlySyncFields(

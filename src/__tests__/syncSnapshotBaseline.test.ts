@@ -139,3 +139,167 @@ describe("sync apply baseline", () => {
     expect(mocks.writeBlobToOPFS).not.toHaveBeenCalled();
   });
 });
+
+it("recovers unopened Explorer v2 quarantine in both capture and split documents without writing DB", async () => {
+  const { EXPLORER_TRAVEL_V2_EXAMPLE } =
+    await import("@/lib/intelligentUi/explorer");
+  const { captureLocalSyncSnapshot } = await import("@/lib/sync/snapshot");
+  const { hasUnsupportedUiContent } =
+    await import("@/lib/intelligentUi/compatibility");
+  const captured = exportPayload("Unopened", true);
+  const wrapper = {
+    id: "quarantined",
+    type: "intelligent_ui",
+    schemaVersion: 1,
+    renderer: "native",
+    definition: null,
+    definitionRevision: 1,
+    status: "failed",
+    fallbackMarkdown: "Travel",
+    state: {},
+    stateRevision: 0,
+    staticSnapshot: "",
+    sourceRefs: [],
+    unsupportedPayload: JSON.stringify(EXPLORER_TRAVEL_V2_EXAMPLE),
+  };
+  captured.data.sessionMessages["unopened"] = JSON.stringify({
+    rootMessageIds: ["message"],
+    nodesById: {
+      message: {
+        id: "message",
+        childMessageIds: [],
+        message: {
+          id: "message",
+          role: "model",
+          content: "",
+          timestamp: 0,
+          outputBlocks: [wrapper],
+        },
+      },
+    },
+  });
+  mocks.createBrowserAppExportPayload.mockResolvedValue(captured);
+  mocks.appDb.setItem.mockClear();
+  const snapshot = await captureLocalSyncSnapshot();
+  expect(hasUnsupportedUiContent(snapshot.exported.data)).toBe(false);
+  expect(hasUnsupportedUiContent(snapshot.documents)).toBe(false);
+  expect(JSON.stringify(snapshot.documents)).toContain('"version":2');
+  expect(wrapper.unsupportedPayload).toBeDefined();
+  expect(mocks.appDb.setItem).not.toHaveBeenCalled();
+});
+
+it("exposes unknown quarantine from a stored JSON session to the sync rejection gate", async () => {
+  const { captureLocalSyncSnapshot } = await import("@/lib/sync/snapshot");
+  const { hasUnsupportedUiContent } =
+    await import("@/lib/intelligentUi/compatibility");
+  const captured = exportPayload("Future", false);
+  const wrapper = {
+    id: "future",
+    type: "intelligent_ui",
+    schemaVersion: 1,
+    renderer: "native",
+    definition: null,
+    definitionRevision: 1,
+    status: "failed",
+    fallbackMarkdown: "Future",
+    state: {},
+    stateRevision: 0,
+    staticSnapshot: "",
+    sourceRefs: [],
+    unsupportedPayload: '{"version":3,"kind":"explorer"}',
+  };
+  captured.data.sessionMessages.unopened = JSON.stringify({
+    rootMessageIds: ["m"],
+    nodesById: {
+      m: { id: "m", childMessageIds: [], message: { outputBlocks: [wrapper] } },
+    },
+  });
+  mocks.createBrowserAppExportPayload.mockResolvedValue(captured);
+  const snapshot = await captureLocalSyncSnapshot();
+  expect(hasUnsupportedUiContent(snapshot.exported.data)).toBe(true);
+  expect(hasUnsupportedUiContent(snapshot.documents)).toBe(true);
+});
+
+vi.mock("@/services/sharing/client", () => ({
+  withSessionSharesRemoved: async (
+    _ids: unknown,
+    operation: () => Promise<unknown>,
+  ) => operation(),
+}));
+
+it("does not reintroduce the local quarantine marker while applying recovered sync data", async () => {
+  const { EXPLORER_TRAVEL_V2_EXAMPLE } =
+    await import("@/lib/intelligentUi/explorer");
+  const { captureLocalSyncSnapshot, applySyncedAppData } =
+    await import("@/lib/sync/snapshot");
+  const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+  Object.defineProperty(globalThis, "window", {
+    configurable: true,
+    value: {
+      localStorage: {
+        getItem: () => null,
+        setItem: vi.fn(),
+        removeItem: vi.fn(),
+      },
+    },
+  });
+  try {
+    const captured = exportPayload("Before", false);
+    const wrapper = {
+      id: "ui",
+      type: "intelligent_ui",
+      schemaVersion: 1,
+      renderer: "native",
+      definition: null,
+      definitionRevision: 1,
+      status: "failed",
+      fallbackMarkdown: "Travel",
+      state: {},
+      stateRevision: 0,
+      staticSnapshot: "",
+      sourceRefs: [],
+      unsupportedPayload: JSON.stringify(EXPLORER_TRAVEL_V2_EXAMPLE),
+    };
+    const tree = {
+      rootMessageIds: ["m"],
+      nodesById: {
+        m: {
+          id: "m",
+          childMessageIds: [],
+          message: {
+            id: "m",
+            role: "model",
+            timestamp: 0,
+            content: "",
+            outputBlocks: [wrapper],
+          },
+        },
+      },
+    };
+    captured.data.sessionMessages.unopened = JSON.stringify(tree);
+    mocks.createBrowserAppExportPayload.mockResolvedValue(captured);
+    mocks.appDb.keys.mockResolvedValue(["session_messages_unopened"]);
+    mocks.appDb.getItem.mockImplementation(async (key: string) =>
+      key === "session_messages_unopened"
+        ? JSON.stringify(tree)
+        : key === "chat-storage"
+          ? JSON.stringify(captured.data.chat)
+          : null,
+    );
+    mocks.appDb.setItem.mockClear();
+    const snapshot = await captureLocalSyncSnapshot();
+    const remote = structuredClone(snapshot.exported.data);
+    remote.chat = exportPayload("After", false).data.chat;
+    expect(await applySyncedAppData(remote, new Map())).toBe(true);
+    const written = mocks.appDb.setItem.mock.calls.find(
+      ([key]) => key === "session_messages_unopened",
+    )?.[1];
+    expect(written).toBeDefined();
+    expect(written).not.toContain("unsupportedPayload");
+    expect(written).toContain('"version":2');
+  } finally {
+    if (originalWindow)
+      Object.defineProperty(globalThis, "window", originalWindow);
+    else Reflect.deleteProperty(globalThis, "window");
+  }
+});

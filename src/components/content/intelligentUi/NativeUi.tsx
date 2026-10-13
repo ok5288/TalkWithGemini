@@ -48,6 +48,7 @@ export interface NativeUiProps {
   expectedDataset?: ExplorerDataset;
   onImportDataset?: (dataset: ExplorerDataset) => void;
   datasetProvenance?: "user" | "source" | "example";
+  onPendingImportChange?: (pending: boolean) => void;
 }
 
 export default function NativeUi({
@@ -58,6 +59,7 @@ export default function NativeUi({
   expectedDataset,
   onImportDataset,
   datasetProvenance,
+  onPendingImportChange,
 }: NativeUiProps) {
   const state = normalizeNativeState(definition, inputState);
   const t = useTranslations("IntelligentUi");
@@ -78,6 +80,7 @@ export default function NativeUi({
         expectedDataset={expectedDataset}
         onImportDataset={onImportDataset}
         datasetProvenance={datasetProvenance}
+        onPendingImportChange={onPendingImportChange}
       />
     );
   }

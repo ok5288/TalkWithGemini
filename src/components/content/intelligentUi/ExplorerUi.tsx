@@ -9,6 +9,7 @@ import type { JsonObject } from "@/lib/intelligentUi/types";
 import { formatExplorerMetricExplanation } from "@/lib/intelligentUi/presentation";
 import {
   deriveExplorer,
+  deriveExplorerDisplay,
   parseExplorerImport,
   remapExplorerImport,
   type ExplorerColumn,
@@ -91,6 +92,7 @@ export interface ExplorerUiProps {
   expectedDataset?: ExplorerDataset;
   onImportDataset?: (dataset: ExplorerDataset) => void;
   datasetProvenance?: "user" | "source" | "example";
+  onPendingImportChange?: (pending: boolean) => void;
 }
 
 export default function ExplorerUi({
@@ -101,13 +103,19 @@ export default function ExplorerUi({
   expectedDataset,
   onImportDataset,
   datasetProvenance,
+  onPendingImportChange,
 }: ExplorerUiProps) {
   const t = useTranslations("IntelligentUi");
   const locale = useLocale();
   const prefix = useId();
   const result = deriveExplorer(definition, inputState, dataset);
+  const display = deriveExplorerDisplay(definition, result);
   const state = result.state;
   const [importText, setImportText] = useState("");
+  useEffect(() => {
+    onPendingImportChange?.(importText.length > 0);
+    return () => onPendingImportChange?.(false);
+  }, [importText, onPendingImportChange]);
   const [importFormat, setImportFormat] = useState<"csv" | "json">("csv");
   const [importOpen, setImportOpen] = useState(false);
   const [typeOverrides, setTypeOverrides] = useState<
@@ -162,7 +170,6 @@ export default function ExplorerUi({
   );
   // The chart always represents the current filtered dataset. Selection is
   // reserved for metrics, so clicking a point never hides other rows.
-  const chartRows = result.chart?.rows ?? [];
 
   const patch = (next: JsonObject) => {
     setPage(0);
@@ -195,7 +202,10 @@ export default function ExplorerUi({
     patch({ visibleColumns: Array.from(next) });
   };
 
-  const handleChartPointClick = (event: ExplorerChartPointEvent) => {
+  const handleChartPointClick = (
+    event: ExplorerChartPointEvent,
+    chartRows: typeof result.rows,
+  ) => {
     if (event.componentType && event.componentType !== "series") return;
     if (
       event.seriesType &&
@@ -232,57 +242,50 @@ export default function ExplorerUi({
     setMapping({});
   }, [importFormat, importText]);
 
-  return (
+  const parametersSection = definition.props.parameters.length > 0 && (
+    <fieldset className="space-y-2">
+      <legend className="text-sm font-medium">
+        {t("explorer.parameters")}
+      </legend>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {definition.props.parameters.map((parameter) => {
+          const value = record(state.parameters)[parameter.id];
+          const error = result.parameterErrors[parameter.id];
+          const id = `${prefix}-${parameter.id}`;
+          return (
+            <Field
+              key={parameter.id}
+              label={parameter.label}
+              htmlFor={id}
+              error={error ? t(`explorer.errors.${error}`) : undefined}
+            >
+              <input
+                id={id}
+                className={control}
+                type="number"
+                min={parameter.min}
+                max={parameter.max}
+                step={parameter.step ?? "any"}
+                value={typeof value === "number" ? value : String(value ?? "")}
+                onChange={(event) =>
+                  patchParameters({
+                    [parameter.id]:
+                      event.target.value === ""
+                        ? ""
+                        : Number(event.target.value),
+                  })
+                }
+                aria-invalid={error ? true : undefined}
+              />
+            </Field>
+          );
+        })}
+      </div>
+    </fieldset>
+  );
+  const tableSection = (
     <div className="space-y-4">
-      <p className="text-xs text-muted-foreground">
-        {t(`provenance.${datasetProvenance ?? definition.props.provenance}`)}
-        {result.datasetVersion ? ` · ${result.datasetVersion}` : ""}
-      </p>
-
-      {definition.props.parameters.length > 0 && (
-        <fieldset className="space-y-2">
-          <legend className="text-sm font-medium">
-            {t("explorer.parameters")}
-          </legend>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {definition.props.parameters.map((parameter) => {
-              const value = record(state.parameters)[parameter.id];
-              const error = result.parameterErrors[parameter.id];
-              const id = `${prefix}-${parameter.id}`;
-              return (
-                <Field
-                  key={parameter.id}
-                  label={parameter.label}
-                  htmlFor={id}
-                  error={error ? t(`explorer.errors.${error}`) : undefined}
-                >
-                  <input
-                    id={id}
-                    className={control}
-                    type="number"
-                    min={parameter.min}
-                    max={parameter.max}
-                    step={parameter.step ?? "any"}
-                    value={
-                      typeof value === "number" ? value : String(value ?? "")
-                    }
-                    onChange={(event) =>
-                      patchParameters({
-                        [parameter.id]:
-                          event.target.value === ""
-                            ? ""
-                            : Number(event.target.value),
-                      })
-                    }
-                    aria-invalid={error ? true : undefined}
-                  />
-                </Field>
-              );
-            })}
-          </div>
-        </fieldset>
-      )}
-
+      {" "}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t("explorer.search")} htmlFor={`${prefix}-search`}>
           <input
@@ -308,7 +311,6 @@ export default function ExplorerUi({
           />
         </Field>
       </div>
-
       <div className="flex flex-wrap items-center gap-3 text-sm">
         <label className="flex items-center gap-2">
           <input
@@ -325,7 +327,6 @@ export default function ExplorerUi({
           {t("explorer.selectedCount", { count: selected.size })}
         </span>
       </div>
-
       <details>
         <summary className="cursor-pointer text-sm font-medium">
           {t("explorer.visibleColumns")}
@@ -343,7 +344,6 @@ export default function ExplorerUi({
           ))}
         </div>
       </details>
-
       {result.columns.some(
         (column) => column.type === "number" || column.type === "date",
       ) && (
@@ -419,17 +419,6 @@ export default function ExplorerUi({
           </div>
         </details>
       )}
-
-      {result.errors.length > 0 && (
-        <div role="alert" className="space-y-1 text-sm text-red-600">
-          {Array.from(new Set(result.errors.map((error) => error.code))).map(
-            (code) => (
-              <p key={code}>{t(`explorer.errors.${code}`)}</p>
-            ),
-          )}
-        </div>
-      )}
-
       <div className="overflow-x-auto rounded-md border border-border">
         <table className="w-full min-w-[36rem] text-left text-sm">
           <thead>
@@ -487,7 +476,6 @@ export default function ExplorerUi({
           </p>
         )}
       </div>
-
       {pageCount > 1 && (
         <nav
           className="flex items-center justify-between gap-2"
@@ -514,58 +502,119 @@ export default function ExplorerUi({
           </Button>
         </nav>
       )}
-
-      {result.metrics && Object.keys(result.metrics).length > 0 && (
-        <section className="space-y-2" aria-label={t("explorer.metrics")}>
-          <h4 className="text-sm font-medium">{t("explorer.metrics")}</h4>
-          <dl className="grid gap-2 sm:grid-cols-2">
-            {definition.props.nodes
-              .filter((node) => {
-                const requested = definition.props.metrics;
-                return (
-                  node.stage !== "row" &&
-                  (!requested?.length || requested.includes(node.id)) &&
-                  Object.hasOwn(result.metrics, node.id)
-                );
-              })
-              .map((node) => (
-                <div
-                  className="rounded-md bg-muted/40 p-2 text-sm"
-                  key={node.id}
-                >
-                  <dt>{node.label}</dt>
-                  <dd className="font-medium tabular-nums">
-                    {displayCell(result.metrics[node.id])}
-                  </dd>
-                  {result.metricExplanations[node.id] && (
-                    <dd className="text-xs font-normal text-muted-foreground">
-                      {formatExplorerMetricExplanation(
-                        result.metricExplanations[node.id],
-                        locale,
-                      )}
-                    </dd>
+    </div>
+  );
+  const metricsSection = result.metrics &&
+    Object.keys(result.metrics).length > 0 && (
+      <section className="space-y-2" aria-label={t("explorer.metrics")}>
+        <h4 className="text-sm font-medium">{t("explorer.metrics")}</h4>
+        <dl className="grid gap-2 sm:grid-cols-2">
+          {display.metrics.map((node) => (
+            <div className="rounded-md bg-muted/40 p-2 text-sm" key={node.id}>
+              <dt>{node.label}</dt>
+              <dd className="font-medium tabular-nums">
+                {displayCell(result.metrics[node.id])}
+              </dd>
+              {result.metricExplanations[node.id] && (
+                <dd className="text-xs font-normal text-muted-foreground">
+                  {formatExplorerMetricExplanation(
+                    result.metricExplanations[node.id],
+                    locale,
                   )}
-                </div>
+                </dd>
+              )}
+            </div>
+          ))}
+        </dl>
+      </section>
+    );
+  const renderSections = (
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      {display.sections.map((section) => (
+        <div
+          key={section.kind === "chart" ? section.id : section.kind}
+          className={
+            section.kind === "chart" && definition.version === 2
+              ? "min-w-0"
+              : "min-w-0 lg:col-span-2"
+          }
+        >
+          {section.kind === "parameters" ? (
+            parametersSection
+          ) : section.kind === "table" ? (
+            tableSection
+          ) : section.kind === "metrics" ? (
+            metricsSection
+          ) : section.kind === "notices" ? (
+            <section
+              aria-label={t("explorer.notices")}
+              className="space-y-2 text-sm"
+              role="status"
+            >
+              {display.notices.map((notice) => (
+                <p key={notice.id}>
+                  {notice.label}:{" "}
+                  {formatExplorerMetricExplanation(notice.explanation, locale)}
+                </p>
               ))}
-          </dl>
-        </section>
+            </section>
+          ) : (
+            (() => {
+              const chart = display.charts.find(
+                (item) => item.id === section.id,
+              )!;
+              return chart.rows.length > 0 ? (
+                <section
+                  className="space-y-2"
+                  aria-label={chart.title || t("explorer.chart")}
+                >
+                  <h4 className="text-sm font-medium">
+                    {chart.title || t("explorer.chart")}
+                  </h4>
+                  {definition.version === 2 && (
+                    <p className="text-xs text-muted-foreground">
+                      {chart.xLabel} · {chart.yLabel}
+                    </p>
+                  )}
+                  <ChartBlock
+                    source={explorerChartSource(
+                      chart.type,
+                      chart.x,
+                      chart.y,
+                      chart.rows,
+                    )}
+                    incomplete={false}
+                    onDataPointClick={(event) =>
+                      handleChartPointClick(event, chart.rows)
+                    }
+                  />
+                </section>
+              ) : null;
+            })()
+          )}
+        </div>
+      ))}
+    </div>
+  );
+
+  return (
+    <div className="space-y-4">
+      <p className="text-xs text-muted-foreground">
+        {t(`provenance.${datasetProvenance ?? definition.props.provenance}`)}
+        {result.datasetVersion ? ` · ${result.datasetVersion}` : ""}
+      </p>
+
+      {result.errors.length > 0 && (
+        <div role="alert" className="space-y-1 text-sm text-red-600">
+          {Array.from(new Set(result.errors.map((error) => error.code))).map(
+            (code) => (
+              <p key={code}>{t(`explorer.errors.${code}`)}</p>
+            ),
+          )}
+        </div>
       )}
 
-      {result.chart && result.chart.rows.length > 0 && (
-        <section className="space-y-2" aria-label={t("explorer.chart")}>
-          <h4 className="text-sm font-medium">{t("explorer.chart")}</h4>
-          <ChartBlock
-            source={explorerChartSource(
-              result.chart.type,
-              result.chart.x,
-              result.chart.y,
-              chartRows,
-            )}
-            incomplete={false}
-            onDataPointClick={handleChartPointClick}
-          />
-        </section>
-      )}
+      {renderSections}
 
       {onImportDataset && (
         <section className="space-y-2 border-t border-border pt-3">
@@ -769,13 +818,14 @@ export default function ExplorerUi({
                   size="sm"
                   variant="ghost"
                   onClick={() => {
+                    setImportOpen(false);
                     setImportText("");
                     setTypeOverrides({});
                     setMapping({});
                     setImportAttempted(false);
                   }}
                 >
-                  {t("explorer.resetImport")}
+                  {t("viewer.cancelImport")}
                 </Button>
               </div>
             </div>

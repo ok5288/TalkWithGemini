@@ -33,7 +33,7 @@
     "example": "Illustrative example data"
   },
   "status": {
-    "receiving": "Receiving",
+    "receiving": "Generating interface",
     "preview": "Static preview",
     "ready": "Ready",
     "failed": "Unavailable",
@@ -60,7 +60,7 @@
   "runtime": {
     "starting": "Starting interface",
     "active": "Interactive",
-    "failed": "Interface unavailable"
+    "failed": "Interface failed to start"
   },
   "sourceTrace": {
     "title": "Source trace",
@@ -217,7 +217,8 @@
       "rounding": "Currency uses Math.round((value + Number.EPSILON) × 10^p) at precision {precision}; exact midpoints round toward positive infinity",
       "splitRemainder": "Split remainders are assigned in order",
       "splitRounding": "Split rounds the total with Math.round(value) to whole units; exact midpoints round toward positive infinity"
-    }
+    },
+    "notices": "Calculation notices"
   },
   "calculations": {
     "arity": "This calculation is missing required inputs.",
@@ -244,5 +245,34 @@
     "ambiguous-mapping": "This chart has an uncertain dataset mapping or layout. Its data remains read-only; interactive filters are unavailable."
   },
   "htmlSnapshotLabel": "Interface-reported snapshot (not independently verified)",
-  "htmlSnapshotMissing": "The interface has not reported a snapshot."
+  "htmlSnapshotMissing": "The interface has not reported a snapshot.",
+  "diagnostic": {
+    "incomplete": "Generation ended before this interface was complete.",
+    "invalid_json": "The interface contains invalid JSON.",
+    "invalid_fields": "The interface fields do not match the supported format.",
+    "unsupported_version": "This interface requires a newer version of Neo Chat.",
+    "unsupported_kind": "This interface type is not supported by this version of Neo Chat.",
+    "html_policy": "The interface requests an unsupported HTML capability."
+  },
+  "viewer": {
+    "title": "Interface viewer",
+    "open": "Open in viewer",
+    "close": "Close viewer",
+    "locate": "Locate message",
+    "opened": "Open in the viewer",
+    "saving": "Saving progress…",
+    "saveError": "Progress could not be saved. Try opening or closing the viewer again.",
+    "importError": "Confirm or cancel the pending import before moving this interface.",
+    "cancelImport": "Cancel import"
+  },
+  "hostActions": {
+    "explain": "Explain current result",
+    "modify": "Modify this interface",
+    "repair": "Request repair",
+    "explainDraft": "Please explain the current results of this interface.",
+    "modifyDraft": "Please modify this interface and generate a complete new definition, keeping the original interface.",
+    "repairDraft": "Please repair this interface that failed to generate and provide a complete new definition.",
+    "failed": "Could not prepare the request. Try the action again.",
+    "busy": "Another interface request is awaiting confirmation. Finish or cancel it first."
+  }
 }

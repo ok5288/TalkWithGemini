@@ -10,6 +10,17 @@ import {
 import type { UiChatSend } from "@/components/content/intelligentUi/UiChatContext";
 import type { UiSendResult } from "@/lib/intelligentUi/bridgeTypes";
 import { projectUiBlock } from "@/lib/intelligentUi/projection";
+import {
+  getUiRepairSource,
+  projectHostAction,
+} from "@/lib/intelligentUi/actions";
+import {
+  createUiProposal,
+  cancelUiProposal,
+  canRetryUiProposal,
+  observeUiProposal,
+  type UiProposal,
+} from "@/lib/intelligentUi/proposals";
 import { matchesUiStateTarget } from "@/lib/intelligentUi/instance";
 import { requestComposerDraft } from "@/lib/chat/composerActions";
 import { useSettingsStore } from "@/store/core/settingsStore";
@@ -57,16 +68,7 @@ type ComposerSendArgs = [
   forced?: ComposerForcedInvocations,
 ];
 
-interface PendingUiSend {
-  id: string;
-  cancelled: boolean;
-  validate: () => UiSendResult | undefined;
-  acknowledge: (result: UiSendResult) => void;
-  send?: (
-    args: ComposerSendArgs,
-    acknowledge: (result: UiSendResult) => void,
-  ) => Promise<void>;
-}
+type PendingUiSend = UiProposal<ComposerSendArgs>;
 
 /** Composer send: user message -> placeholder -> stream -> post-generation. */
 export function useSendMessageFlow(deps: ChatFlowDeps) {
@@ -123,26 +125,18 @@ export function useSendMessageFlow(deps: ChatFlowDeps) {
   ) => {
     const pending = pendingUiSend.current;
     pendingUiSend.current = null;
-    if (pending) pending.cancelled = true;
-    pending?.acknowledge(result);
+    cancelUiProposal(pending, result);
   };
-  useEffect(() => {
-    const check = () => {
-      const invalid = pendingUiSend.current?.validate();
-      if (invalid) cancelUiSend(invalid);
-    };
-    const unsubscribeChat = useChatStore.subscribe?.(check);
-    const unsubscribeSettings = useSettingsStore.subscribe?.(check);
-    const timer = window.setInterval(check, 100);
-    return () => {
-      unsubscribeChat?.();
-      unsubscribeSettings?.();
-      window.clearInterval(timer);
-      const pending = pendingUiSend.current;
-      pendingUiSend.current = null;
-      pending?.acknowledge({ ok: false, code: "inactive" });
-    };
-  }, []);
+  useEffect(
+    () =>
+      observeUiProposal({
+        current: () => pendingUiSend.current,
+        cancel: cancelUiSend,
+        subscribe: [useChatStore.subscribe, useSettingsStore.subscribe],
+      }),
+    [],
+  );
+
   const runSendMessage = async (
     text: string,
     attachments: Attachment[],
@@ -1000,9 +994,8 @@ export function useSendMessageFlow(deps: ChatFlowDeps) {
           sending.current = false;
           if (
             !accepted &&
-            !pending.cancelled &&
             !pendingUiSend.current &&
-            !pending.validate()
+            canRetryUiProposal(pending)
           )
             pendingUiSend.current = pending;
           acknowledge({ ok: false, code: "send_failed" });
@@ -1019,7 +1012,7 @@ export function useSendMessageFlow(deps: ChatFlowDeps) {
     }
   };
 
-  const handleUiSendMessage: UiChatSend = (text, source) => {
+  const handleUiSendMessage: UiChatSend = (text, source, action) => {
     if (pendingUiSend.current || sending.current || isGenerating)
       return Promise.resolve({ ok: false, code: "busy" });
     const initialState = useChatStore.getState();
@@ -1030,6 +1023,32 @@ export function useSendMessageFlow(deps: ChatFlowDeps) {
     const branch = initialState.activeMessages
       .map((message) => message.id)
       .join("\n");
+    const originalRepairSource =
+      action === "repair"
+        ? getUiRepairSource(
+            initialState.activeMessages.find(
+              (message) => message.id === source.messageId,
+            ),
+            source.blockId,
+          )
+        : undefined;
+    const matchesTarget = (message: Message | undefined) => {
+      const block = message?.outputBlocks?.find(
+        (item) => item.id === source.blockId,
+      );
+      return (
+        block?.type === "intelligent_ui" &&
+        block.definitionRevision === source.definitionRevision &&
+        (action === "repair"
+          ? !!originalRepairSource &&
+            getUiRepairSource(message, source.blockId) === originalRepairSource
+          : matchesUiStateTarget(
+              block,
+              source.blockId,
+              source.definitionRevision,
+            ))
+      );
+    };
     const validate = (): UiSendResult | undefined => {
       const state = useChatStore.getState();
       if (!text.trim() || text.length > API_INPUT_LIMITS.maxChatTextChars)
@@ -1058,12 +1077,12 @@ export function useSendMessageFlow(deps: ChatFlowDeps) {
         )
       )
         return { ok: false, code: "busy" };
-      const block = state.activeMessages
-        .find((message) => message.id === source.messageId)
-        ?.outputBlocks?.find((block) => block.id === source.blockId);
       if (
-        block?.type !== "intelligent_ui" ||
-        !matchesUiStateTarget(block, source.blockId, source.definitionRevision)
+        !matchesTarget(
+          state.activeMessages.find(
+            (message) => message.id === source.messageId,
+          ),
+        )
       )
         return { ok: false, code: "inactive" };
     };
@@ -1074,32 +1093,42 @@ export function useSendMessageFlow(deps: ChatFlowDeps) {
       ?.outputBlocks?.find((block) => block.id === source.blockId);
     if (block?.type !== "intelligent_ui")
       return Promise.resolve({ ok: false, code: "inactive" });
-    // Capture content before asynchronous source reads or composer editing.
-    const frozenBlock = structuredClone(block);
-    let acknowledge!: (result: UiSendResult) => void;
-    const result = new Promise<UiSendResult>((resolve) => {
-      acknowledge = resolve;
-    });
-    const pending: PendingUiSend = {
-      id: uuidv7(),
-      cancelled: false,
-      validate: () =>
-        pending.cancelled ? { ok: false, code: "cancelled" } : validate(),
-      acknowledge,
-    };
+    // SDK sends keep their synchronous snapshot; host gestures flush first.
+    let frozenBlock = structuredClone(block);
+    const { proposal: pending, result } = createUiProposal<ComposerSendArgs>(
+      uuidv7(),
+      validate,
+    );
     pendingUiSend.current = pending;
     void (async () => {
+      if (action) {
+        await waitForSessionMessageWrites(source.sessionId);
+        if (pendingUiSend.current !== pending || pending.validate())
+          throw new Error("UI_SOURCE_STALE");
+        const latest = useChatStore
+          .getState()
+          .activeMessages.find((message) => message.id === source.messageId)
+          ?.outputBlocks?.find((item) => item.id === source.blockId);
+        if (latest?.type !== "intelligent_ui")
+          throw new Error("UI_SOURCE_STALE");
+        frozenBlock = structuredClone(latest);
+      }
       const scope = await createActiveUiSourceScope(
         source.sessionId,
         source.messageId,
       );
-      const data = await resolveBlockUiProjectionData(
-        frozenBlock,
-        source.sessionId,
-        source.messageId,
-        "model-continuation",
-        scope,
-      );
+      if (pending.validate()) throw new Error("UI_SOURCE_STALE");
+      const data =
+        action === "repair"
+          ? {}
+          : await resolveBlockUiProjectionData(
+              frozenBlock,
+              source.sessionId,
+              source.messageId,
+              "model-continuation",
+              scope,
+            );
+      if (pending.validate()) throw new Error("UI_SOURCE_STALE");
       await scope.assertValid();
       return { data, scope };
     })()
@@ -1110,15 +1139,18 @@ export function useSendMessageFlow(deps: ChatFlowDeps) {
           cancelUiSend(stale);
           return;
         }
-        const content = projectUiBlock(frozenBlock, {
-          purpose: "model-continuation",
-          locale,
-          ...data,
-        });
+        const projected =
+          action === "repair"
+            ? originalRepairSource!
+            : projectUiBlock(frozenBlock, {
+                purpose: "model-continuation",
+                locale,
+                ...data,
+              });
         const context = Object.freeze({
           messageId: source.messageId,
           blockId: source.blockId,
-          content,
+          content: action ? projectHostAction(action, projected) : projected,
         });
         pending.send = (args, acknowledge) =>
           runSendMessage(...args, {
@@ -1144,15 +1176,11 @@ export function useSendMessageFlow(deps: ChatFlowDeps) {
                   )
                 )
                   throw new Error("UI_SOURCE_STALE");
-                const current = state.activeMessages
-                  .find((message) => message.id === source.messageId)
-                  ?.outputBlocks?.find((item) => item.id === source.blockId);
                 if (
-                  current?.type !== "intelligent_ui" ||
-                  !matchesUiStateTarget(
-                    current,
-                    source.blockId,
-                    source.definitionRevision,
+                  !matchesTarget(
+                    state.activeMessages.find(
+                      (message) => message.id === source.messageId,
+                    ),
                   )
                 )
                   throw new Error("UI_SOURCE_STALE");
@@ -1178,7 +1206,9 @@ export function useSendMessageFlow(deps: ChatFlowDeps) {
       })
       .catch(() => {
         if (pendingUiSend.current === pending)
-          cancelUiSend({ ok: false, code: "send_failed" });
+          cancelUiSend(
+            pending.validate() ?? { ok: false, code: "send_failed" },
+          );
       });
     return result;
   };

@@ -110,7 +110,16 @@ describe("Intelligent UI generation contract fixtures", () => {
       buildIntelligentUiPromptInstruction(),
       { final: true },
     ).filter((segment) => segment.type === "intelligent_ui");
-    expect(blocks).toHaveLength(3);
+    expect(blocks).toHaveLength(4);
+    expect(
+      blocks.some(
+        ({ block }) =>
+          block.definition &&
+          "kind" in block.definition &&
+          block.definition.kind === "explorer" &&
+          block.definition.version === 2,
+      ),
+    ).toBe(true);
     for (const { block } of blocks) {
       expect(block.status).toBe("ready");
       if (block.definition && "html" in block.definition) {

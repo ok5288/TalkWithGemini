@@ -51,6 +51,40 @@ An HTML error, unexpected reload or unmount also permanently invalidates that
 instance's pending send proposal. Retrying the interface creates a new instance;
 it cannot revive an earlier pending request.
 
+### Viewing, feedback and host actions
+
+The host distinguishes receiving content, starting the HTML runtime, interactive
+readiness and failure. Incomplete native content has a lightweight placeholder;
+partial HTML retains its scriptless preview. Invalid JSON, incompatible fields,
+unsupported versions/types and HTML policy rejection have controlled explanations
+rather than displaying private values or runtime stacks. Unknown versions require
+an upgrade. **Retry** restarts the same HTML definition without calling a model.
+
+**Open in viewer** keeps one interface visible outside the virtual message list.
+Desktop uses a side pane; narrow screens use an expanded modal view with keyboard
+focus kept inside. **Locate message** returns to its position in the conversation.
+Only one interactive owner of a block can run. Moving a view pauses interaction,
+flushes the frame and saved state, disposes the old transport, then restores the
+replacement. A save failure retains the original view for explicit retry. Changing
+the conversation, branch, definition or source authorization cancels the viewer.
+Normal appended chat messages do not cancel an otherwise valid source interface.
+A responsive layout change retains the current runtime.
+
+HTML restores only values published through `setState` and `reportSnapshot`;
+arbitrary JavaScript or DOM state is not copied. Confirm or **Cancel import**
+before moving an Explorer with unconfirmed import text or a preview.
+
+**Explain current result** and **Modify this interface** stage editable requests
+in the main composer. The host flushes pending state before freezing the current
+result, retains existing draft text and attachments, and revalidates sources at
+send time. The normal Send action is still required. A revision creates a complete
+new definition and instance while preserving the original answer and progress.
+**Request repair** appears only for supported failed content with a uniquely
+identifiable original fence. Copied, ambiguous or missing source identities and
+unknown protocol versions do not offer targeted repair. Original source is quoted
+context data, never executed or promoted to instructions. Preparation failures
+have host feedback; retry remains an explicit user action.
+
 Completed Research reports offer **Explain interactively in chat**. This opens
 an ordinary chat draft referencing the selected immutable report version and
 its attachment. It does not modify the report, evidence snapshots, research
@@ -125,6 +159,48 @@ only selected rows and visible fields. The explorer's own import controls manage
 import. Deployment operators can disable new exploration with the build-time
 `NEXT_PUBLIC_ENABLE_INTELLIGENT_UI_EXPLORER=false` switch; existing definitions
 remain readable and other native components remain available.
+
+### Composed Explorer definitions (v2)
+
+Use Explorer v1 for the existing default table/metrics/single-chart presentation.
+Explorer v2 keeps the same typed dataset, parameters, registered calculations and
+filters, and replaces the top-level `chart`/`metrics` presentation with ordered
+`props.sections`. It supports these finite sections:
+
+| Section      | Fields and behavior                                                |
+| ------------ | ------------------------------------------------------------------ |
+| `parameters` | The existing local parameter controls                              |
+| `metrics`    | `nodes`: unique aggregate/scalar calculation IDs                   |
+| `table`      | Existing search, sort, filters, columns and row selection          |
+| `chart`      | Unique `id`, readable `title`, `type` (bar/line/scatter), `x`, `y` |
+| `notices`    | Host-generated explanations of existing calculation states         |
+
+Definitions have at most eight sections and four charts. Table is required;
+nonempty parameters require their section. Other than charts, a section cannot
+repeat. Chart axes refer to dataset columns or row calculations; Y is numeric,
+and scatter X is numeric. Layout is controlled by the host, with charts sharing
+wide-screen columns and stacking on narrow screens. Arbitrary nested layout,
+CSS, formulas and model-authored conditions are not accepted.
+
+Every section uses the same computed, filtered and sorted result. Each chart maps
+its own valid points back to stable row IDs; selecting a point changes global
+selection without filtering other charts to selected rows. Notices reuse current
+empty-selection, missing-input and calculation statuses. Required validation
+errors remain visible even when the definition omits a notices section.
+Static and model projections use the same presentation rules; current public
+output continues to include only selected rows and visible fields.
+
+Only the Explorer definition changes to `version:2`; the fence, outer stored
+block version, HTML and other native definitions retain their existing versions.
+Older clients preserve v2 as inert quarantine and can read its summary, but reject
+synchronization involving unsupported content. Upgrade clients that synchronize
+this data. New clients restore fully validated known v2 quarantine from private
+backups, including saved progress and valid imported datasets, using the current
+host block identity. Restored source bindings are unverified until current source
+access is resolved again. Unknown, corrupt or nested quarantine stays inert and
+continues to block sync. Sync capture also restores known v2 in unopened local
+sessions without changing arbitrary tool results or writing storage during
+capture.
 
 ## Traceable materials and tool results
 

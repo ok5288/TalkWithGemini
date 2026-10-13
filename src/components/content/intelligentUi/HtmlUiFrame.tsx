@@ -33,6 +33,9 @@ export interface HtmlUiFrameProps {
   onSummary?: (summary: string) => void;
   onError?: (message: string) => void;
   onStatus?: (status: HtmlRuntimeStatus) => void;
+  onEscape?: () => void;
+  canStartRuntime?: () => boolean;
+  onRuntimeControl?: (release: (() => void) | null) => void;
 }
 
 export function HtmlUiFrame(props: HtmlUiFrameProps) {
@@ -65,7 +68,12 @@ export function HtmlUiFrame(props: HtmlUiFrameProps) {
       callbacks.current.onError?.("invalid_definition");
       return;
     }
-    if (!props.complete || !prepared) return;
+    if (
+      !props.complete ||
+      !prepared ||
+      callbacks.current.canStartRuntime?.() === false
+    )
+      return;
     let live = true;
     let active = false;
     const isRuntimeActive = () => live && active;
@@ -79,6 +87,7 @@ export function HtmlUiFrame(props: HtmlUiFrameProps) {
       onSendMessage: (text) =>
         callbacks.current.onSendMessage?.(text, isRuntimeActive) ??
         Promise.resolve({ ok: false, code: "inactive" }),
+      onEscape: () => callbacks.current.onEscape?.(),
       onDiagnostic: (diagnostic) =>
         console.error("Intelligent UI runtime", diagnostic),
       onStatus: (status) => {
@@ -105,6 +114,15 @@ export function HtmlUiFrame(props: HtmlUiFrameProps) {
       },
     });
     runtimeRef.current = runtime;
+    const release = () => {
+      live = false;
+      active = false;
+      runtime.dispose();
+      if (runtimeRef.current === runtime) runtimeRef.current = null;
+      // Terminate the document as well as its MessageChannel before another owner starts.
+      if (frameRef.current) frameRef.current.src = "about:blank";
+    };
+    callbacks.current.onRuntimeControl?.(release);
     const syncEnvironment = () => {
       const element = frameRef.current?.parentElement;
       if (!element) return;
@@ -149,8 +167,8 @@ export function HtmlUiFrame(props: HtmlUiFrameProps) {
       active = false;
       observer.disconnect();
       media?.removeEventListener("change", syncEnvironment);
-      runtime.dispose();
-      runtimeRef.current = null;
+      release();
+      callbacks.current.onRuntimeControl?.(null);
     };
     // State changes persist without restarting the running document.
   }, [

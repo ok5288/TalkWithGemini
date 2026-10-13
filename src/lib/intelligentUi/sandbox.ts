@@ -153,6 +153,15 @@ function sandboxBootstrap(
     window.addEventListener("unhandledrejection", () =>
       fail("unhandled_rejection"),
     );
+    // Internal keyboard relay; no model-callable SDK method or permission change.
+    document.addEventListener(
+      "keydown",
+      (event) => {
+        if (event.isTrusted && event.key === "Escape" && started && !stopped)
+          send("host-escape", true);
+      },
+      true,
+    );
     document.addEventListener(
       "click",
       (click) => {

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState, useSyncExternalStore } from "react";
 import type { Message, Session } from "@/lib/chat/types";
 import { useChatStore } from "@/store/core/chatStore";
 import { useSettingsStore } from "@/store/core/settingsStore";
@@ -28,6 +29,7 @@ const references = new WeakMap<object, number>();
 let nextReference = 0;
 let authorityEpoch = 0;
 let researchEpoch = 0;
+let branchEpoch = 0;
 function reference(value: object | undefined): number {
   if (!value) return 0;
   let id = references.get(value);
@@ -150,6 +152,21 @@ export function getActiveUiSourceContextKey(
   return captureAuthority(sessionId, throughMessageId).key;
 }
 
+/** Appending conversation messages does not revoke an existing source owner.
+ * Away/back and branch replacement still create a new, irreversible lifetime.
+ */
+export function getActiveUiSourceOwnershipKey(
+  sessionId: string,
+  throughMessageId: string,
+): string {
+  const captured = captureAuthority(sessionId, throughMessageId);
+  return JSON.stringify([
+    branchEpoch,
+    researchEpoch,
+    ...JSON.parse(captured.key).slice(1),
+  ]);
+}
+
 const cache = new Map<string, Promise<UiSourceContext>>();
 let cachedSession: string | undefined;
 const emptyContext = (sessionId: string): UiSourceContext => ({
@@ -181,6 +198,15 @@ subscribeResearchExtensions(researchChanged);
 subscribeResearchTasks(researchChanged);
 // Invalidating the epoch also rejects an async read that outlived an away-and-back switch.
 useChatStore.subscribe?.((state, previous) => {
+  if (
+    state.currentSessionId !== previous.currentSessionId ||
+    state.isActiveSessionLoading !== previous.isActiveSessionLoading ||
+    state.pendingSessionId !== previous.pendingSessionId ||
+    !previous.activeMessages.every(
+      (message, index) => state.activeMessages[index]?.id === message.id,
+    )
+  )
+    branchEpoch++;
   const session = state.sessions.find(
     (item) => item.id === state.currentSessionId,
   );
@@ -625,5 +651,49 @@ export async function createFrozenUiSourceScope(
       return context;
     },
     assertValid,
+  };
+}
+
+/** React adapters consume the same centralized authority epoch as store guards. */
+export function useActiveUiSourceContext(
+  sessionId: string,
+  messageId: string,
+  active: boolean,
+  needed: boolean,
+) {
+  useSyncExternalStore(
+    subscribeUiSourceAuthority,
+    getUiSourceAuthorityEpoch,
+    getUiSourceAuthorityEpoch,
+  );
+  const key = getActiveUiSourceContextKey(sessionId, messageId);
+  const ownershipKey = getActiveUiSourceOwnershipKey(sessionId, messageId);
+  const [resolved, setResolved] = useState<{
+    key: string;
+    context: UiSourceContext;
+  } | null>(null);
+  useEffect(() => {
+    if (!active || !needed) return;
+    let cancelled = false;
+    void loadActiveUiSourceContext(sessionId, messageId)
+      .then((context) => {
+        if (
+          !cancelled &&
+          getActiveUiSourceContextKey(sessionId, messageId) === key
+        )
+          setResolved({ key: ownershipKey, context });
+      })
+      .catch(() => {
+        if (!cancelled) setResolved(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionId, messageId, active, needed, key, ownershipKey]);
+  return {
+    key,
+    ownershipKey,
+    context:
+      active && resolved?.key === ownershipKey ? resolved.context : undefined,
   };
 }

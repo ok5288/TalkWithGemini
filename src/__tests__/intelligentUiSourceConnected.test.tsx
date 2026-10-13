@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 import React from "react";
+import { IntelligentUiDisplayProvider } from "@/components/content/intelligentUi/IntelligentUiDisplayContext";
+import IntelligentUiViewer from "@/components/content/intelligentUi/IntelligentUiViewer";
 import { webcrypto } from "node:crypto";
 import { EXPLORER_TRAVEL_EXAMPLE } from "@/lib/intelligentUi/explorer/example";
 import { createMessageSourceContext } from "@/lib/intelligentUi/sources/adapters";
@@ -1003,4 +1005,65 @@ it("dispatch source validation accepts only this turn's suffix after the frozen 
   await expect(scope.assertDispatchValid([user.id, bot.id])).rejects.toThrow(
     "UI_SOURCE_STALE",
   );
+});
+
+it("closes a persistent source viewer immediately when its source is revoked", async () => {
+  render(
+    <NextIntlClientProvider locale="en" messages={{ IntelligentUi: messages }}>
+      <IntelligentUiDisplayProvider>
+        <Harness />
+        <IntelligentUiViewer onLocate={vi.fn()} />
+      </IntelligentUiDisplayProvider>
+    </NextIntlClientProvider>,
+  );
+  await waitFor(() => expect(currentBlock().sourceBindings).toHaveLength(1));
+  fireEvent.click(screen.getByRole("button", { name: "Open in viewer" }));
+  await screen.findByTestId("intelligent-ui-viewer");
+  act(() => {
+    void useChatStore
+      .getState()
+      .updateMessage("session", "input", { attachments: [] });
+  });
+  expect(screen.queryByTestId("intelligent-ui-viewer")).toBeNull();
+  await waitFor(() =>
+    expect(screen.queryAllByText("Confidential choice")).toHaveLength(0),
+  );
+});
+
+it("keeps a source owner and its dispatch scope valid while appending its own user and model messages", async () => {
+  render(
+    <NextIntlClientProvider locale="en" messages={{ IntelligentUi: messages }}>
+      <IntelligentUiDisplayProvider>
+        <Harness />
+        <IntelligentUiViewer onLocate={vi.fn()} />
+      </IntelligentUiDisplayProvider>
+    </NextIntlClientProvider>,
+  );
+  await waitFor(() => expect(currentBlock().sourceBindings).toHaveLength(1));
+  fireEvent.click(screen.getByRole("button", { name: "Open in viewer" }));
+  await screen.findByTestId("intelligent-ui-viewer");
+  const scope = await createActiveUiSourceScope("session", "message");
+  await act(async () => {
+    await useChatStore.getState().addMessage("session", {
+      id: "host-user",
+      role: "user",
+      content: "Explain current result",
+      timestamp: 3,
+    });
+    await useChatStore.getState().addMessage("session", {
+      id: "host-model",
+      role: "model",
+      content: "",
+      timestamp: 4,
+    });
+    await scope.assertDispatchValid(["host-user", "host-model"]);
+  });
+  expect(screen.getByTestId("intelligent-ui-viewer")).toBeTruthy();
+  expect(screen.getAllByText("Confidential choice").length).toBeGreaterThan(0);
+  act(() => {
+    void useChatStore
+      .getState()
+      .updateMessage("session", "input", { attachments: [] });
+  });
+  expect(screen.queryByTestId("intelligent-ui-viewer")).toBeNull();
 });

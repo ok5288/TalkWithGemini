@@ -60,6 +60,7 @@ export function createHtmlRuntime(options: {
   onError: (code: string) => void;
   onMessage: (type: string, value: unknown) => void;
   onSendMessage?: UiSendMessage;
+  onEscape?: () => void;
   environment?: UiEnvironment;
   onDiagnostic?: (value: unknown) => void;
 }) {
@@ -211,6 +212,12 @@ export function createHtmlRuntime(options: {
               flushing.resolve();
               flushing = undefined;
             }
+          } else if (
+            type === "host-escape" &&
+            status === "active" &&
+            value === true
+          ) {
+            options.onEscape?.();
           } else if (type === "error") {
             options.onDiagnostic?.(value);
             fail("runtime_error");

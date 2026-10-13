@@ -1,4 +1,4 @@
-import type { IntelligentUiBlock } from "./types";
+import type { IntelligentUiBlock, UiDiagnostic } from "./types";
 import { parseHtmlDefinition, parseNativeDefinition } from "./schema";
 import { getNativeInitialState } from "./catalog";
 import { renderUiMarkdown } from "./presentation";
@@ -37,6 +37,7 @@ export function parseIntelligentUiText(
     let metadata: unknown;
     let renderer: IntelligentUiBlock["renderer"] = "native";
     let unsupportedPayload: string | undefined;
+    let diagnostic: UiDiagnostic | undefined;
     const readableFallback = () => {
       if (!metadata || typeof metadata !== "object" || Array.isArray(metadata))
         return "";
@@ -51,11 +52,20 @@ export function parseIntelligentUiText(
       );
     };
     if (closed) {
+      diagnostic = { code: "invalid_json" };
       try {
         metadata = JSON.parse(source);
         definition = parseNativeDefinition(metadata);
-        if (isUnsupportedNativeDefinition(metadata))
+        diagnostic = definition ? undefined : { code: "invalid_fields" };
+        if (isUnsupportedNativeDefinition(metadata)) {
           unsupportedPayload = quarantineUnsupportedUiPayload(metadata);
+          diagnostic = {
+            code:
+              (metadata as Record<string, unknown>).version !== 1
+                ? "unsupported_version"
+                : "unsupported_kind",
+          };
+        }
       } catch {
         /* incomplete or invalid */
       }
@@ -79,11 +89,13 @@ export function parseIntelligentUiText(
             ...(metadata && typeof metadata === "object" ? metadata : {}),
             html,
           });
+          diagnostic = definition ? undefined : { code: "invalid_fields" };
           if (closed && isUnsupportedHtmlMetadata(metadata)) {
             unsupportedPayload = quarantineUnsupportedUiPayload({
               ...(metadata && typeof metadata === "object" ? metadata : {}),
               html,
             });
+            diagnostic = { code: "unsupported_version" };
           }
         } catch {
           /* invalid metadata */
@@ -117,6 +129,11 @@ export function parseIntelligentUiText(
       staticSnapshot: "",
       sourceRefs: [],
       ...(unsupportedPayload ? { unsupportedPayload } : {}),
+      ...(!closed && options.final
+        ? { diagnostic: { code: "incomplete" as const } }
+        : closed && diagnostic
+          ? { diagnostic }
+          : {}),
     };
     if (closed && definition && renderer === "native")
       block.staticSnapshot = renderUiMarkdown(block, false);

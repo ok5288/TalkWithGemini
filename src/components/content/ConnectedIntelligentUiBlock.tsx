@@ -4,7 +4,8 @@ import React, {
   useState,
   useEffect,
   useMemo,
-  useSyncExternalStore,
+  useRef,
+  useLayoutEffect,
 } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import type { IntelligentUiBlock, JsonObject } from "@/lib/intelligentUi/types";
@@ -20,18 +21,21 @@ import IntelligentUiCard from "./intelligentUi/IntelligentUiCard";
 import SourceBindings from "./intelligentUi/SourceBindings";
 import MarkdownRenderer from "./MarkdownRenderer";
 import {
-  loadActiveUiSourceContext,
-  subscribeUiSourceAuthority,
-  getUiSourceAuthorityEpoch,
+  useActiveUiSourceContext,
   getActiveUiSourceContextKey,
+  getActiveUiSourceOwnershipKey,
 } from "@/lib/intelligentUi/sourceContext";
 import { resolveUiSourceDataset } from "@/lib/intelligentUi/sources/dataset";
 import { projectUiSources } from "@/lib/intelligentUi/sources/resolver";
-import type { UiSourceContext } from "@/lib/intelligentUi/sources/types";
-import { useKnowledgeStore } from "@/store/core/knowledgeStore";
-import { useResearchStore } from "@/store/core/researchStore";
 import { Button } from "@/components/ui/primitives";
 import { waitForSessionMessageWrites } from "@/store/sessionMessagePersistence";
+import { useUiDisplay } from "./intelligentUi/IntelligentUiDisplayContext";
+import {
+  uiDisplayKey,
+  type UiDisplayGrant,
+  type UiDisplayLocation,
+} from "@/lib/intelligentUi/displayOwnership";
+import { getUiRepairSource } from "@/lib/intelligentUi/actions";
 import { initialExplorer } from "@/lib/intelligentUi/explorer/derive";
 
 export default function ConnectedIntelligentUiBlock({
@@ -39,11 +43,13 @@ export default function ConnectedIntelligentUiBlock({
   sessionId,
   messageId,
   mode = "interactive",
+  location = "inline",
 }: {
   block: IntelligentUiBlock;
   sessionId: string;
   messageId: string;
   mode?: "interactive" | "static-original" | "static-current";
+  location?: UiDisplayLocation;
 }) {
   const sendMessage = useUiChatSend();
   const locale = useLocale();
@@ -56,35 +62,41 @@ export default function ConnectedIntelligentUiBlock({
       !state.pendingSessionId &&
       state.activeMessages.some((message) => message.id === messageId),
   );
+  const repairLifetime = useRef({ active: true });
+  useLayoutEffect(() => {
+    const lifetime = { active: true };
+    repairLifetime.current = lifetime;
+    return () => {
+      lifetime.active = false;
+    };
+  }, [
+    sessionId,
+    messageId,
+    block.id,
+    block.definitionRevision,
+    active,
+    enabled,
+  ]);
+  const repairActive = () => {
+    const store = useChatStore.getState();
+    const current = store.activeMessages
+      .find((message) => message.id === messageId)
+      ?.outputBlocks?.find((item) => item.id === block.id);
+    return (
+      active &&
+      enabled &&
+      store.currentSessionId === sessionId &&
+      !store.pendingSessionId &&
+      !store.isActiveSessionLoading &&
+      useSettingsStore.getState().system.enableIntelligentUi &&
+      current?.type === "intelligent_ui" &&
+      current.definitionRevision === block.definitionRevision
+    );
+  };
+  const [hostActionError, setHostActionError] = useState<
+    "failed" | "busy" | null
+  >(null);
   const [saveFailed, setSaveFailed] = useState(false);
-  // Subscribe to authority changes; the key itself contains identities, never body dumps.
-  useChatStore((state) => state.activeMessages);
-  useChatStore(
-    (state) =>
-      state.sessions.find((item) => item.id === sessionId)?.config
-        ?.activePlugins,
-  );
-  useChatStore(
-    (state) =>
-      state.sessions.find((item) => item.id === sessionId)?.config
-        ?.agentProfile,
-  );
-  useChatStore((state) => state.workspaces);
-  useSettingsStore((state) => state.installedPlugins);
-  useSettingsStore((state) => state.activePlugins);
-  useSettingsStore((state) => state.pluginConfigs);
-  useKnowledgeStore((state) => state.collections);
-  useResearchStore((state) => state.tasksById);
-  useSyncExternalStore(
-    subscribeUiSourceAuthority,
-    getUiSourceAuthorityEpoch,
-    getUiSourceAuthorityEpoch,
-  );
-  const sourceKey = getActiveUiSourceContextKey(sessionId, messageId);
-  const [resolvedContext, setResolvedContext] = useState<{
-    key: string;
-    context: UiSourceContext;
-  } | null>(null);
   const selector =
     block.definition &&
     "kind" in block.definition &&
@@ -93,28 +105,30 @@ export default function ConnectedIntelligentUiBlock({
       ? block.definition.props.dataset
       : undefined;
   const needsSources = !!selector || !!block.sourceBindings?.length;
-  useEffect(() => {
-    if (!active || !needsSources) return;
-    let cancelled = false;
-    void loadActiveUiSourceContext(sessionId, messageId)
-      .then((context) => {
-        if (
-          !cancelled &&
-          getActiveUiSourceContextKey(sessionId, messageId) === sourceKey
-        )
-          setResolvedContext({ key: sourceKey, context });
-      })
-      .catch(() => {
-        if (!cancelled) setResolvedContext(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [active, sessionId, messageId, sourceKey, needsSources]);
-  const context =
-    active && resolvedContext?.key === sourceKey
-      ? resolvedContext.context
-      : undefined;
+  const {
+    key: sourceKey,
+    ownershipKey,
+    context,
+  } = useActiveUiSourceContext(sessionId, messageId, active, needsSources);
+  const { display, snapshot: displaySnapshot } = useUiDisplay();
+  const target = useMemo(
+    () => ({
+      sessionId,
+      messageId,
+      blockId: block.id,
+      definitionRevision: block.definitionRevision,
+    }),
+    [sessionId, messageId, block.id, block.definitionRevision],
+  );
+  const grant = useRef<UiDisplayGrant | null>(null);
+  const [displayId] = useState(() => Symbol());
+  const releaseRuntime = useRef<(() => void) | null>(null);
+  const pendingImport = useRef(false);
+  const [runtimeReady, setRuntimeReady] = useState(block.renderer !== "html");
+  const runtimeReadyRef = useRef(runtimeReady);
+  useLayoutEffect(() => {
+    runtimeReadyRef.current = runtimeReady;
+  });
   const resolvedData = useMemo(
     () =>
       selector && context && (!block.dataSnapshot || mode === "static-original")
@@ -181,10 +195,48 @@ export default function ConnectedIntelligentUiBlock({
   }, [lease]);
   const stillActive = () =>
     lease.accepts() &&
+    (!needsSources ||
+      getActiveUiSourceOwnershipKey(sessionId, messageId) === ownershipKey) &&
     (!selector ||
       !!block.dataSnapshot ||
-      (getActiveUiSourceContextKey(sessionId, messageId) === sourceKey &&
+      (getActiveUiSourceOwnershipKey(sessionId, messageId) === ownershipKey &&
         !!resolvedData?.dataset));
+  const eligible = useRef(stillActive);
+  useLayoutEffect(() => {
+    eligible.current = stillActive;
+  });
+  useLayoutEffect(() => {
+    if (!display || mode !== "interactive") return;
+    if (!grant.current?.owns()) {
+      grant.current = display.register(
+        target,
+        location,
+        {
+          eligible: () => eligible.current(),
+          pendingImport: () => pendingImport.current,
+          ready: () => runtimeReadyRef.current,
+          release: () => releaseRuntime.current?.(),
+        },
+        displayId,
+      );
+    }
+  });
+  useLayoutEffect(
+    () => () => {
+      grant.current?.unregister();
+      grant.current = null;
+    },
+    [display, target, location],
+  );
+  const displayState = display?.inspect(target, displayId);
+  const owns = !display || !!displayState?.owns;
+  const canInteract = () =>
+    stillActive() && (!display || !!grant.current?.interactive());
+  const canSave = () => stillActive() && (!display || !!grant.current?.owns());
+  const paused = !!displayState?.paused;
+  const inViewer =
+    displaySnapshot.viewer &&
+    uiDisplayKey(displaySnapshot.viewer) === uiDisplayKey(target);
   useEffect(() => {
     if (
       !resolvedData?.dataset ||
@@ -234,7 +286,7 @@ export default function ConnectedIntelligentUiBlock({
     messageId,
   ]);
   const saveState = (state: JsonObject, snapshot?: string) => {
-    if (!stillActive()) return;
+    if (!canSave()) return;
     void useChatStore
       .getState()
       .updateIntelligentUiState(
@@ -290,15 +342,140 @@ export default function ConnectedIntelligentUiBlock({
     );
   return (
     <>
+      {display &&
+      enabled &&
+      active &&
+      block.status === "ready" &&
+      location === "inline" ? (
+        <div
+          className="flex items-center gap-2 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          data-ui-viewer-origin={uiDisplayKey(target)}
+          tabIndex={-1}
+        >
+          {inViewer ? (
+            <p className="text-xs text-muted-foreground">
+              {t("viewer.opened")}
+            </p>
+          ) : (
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={displaySnapshot.transitioning || !owns || !runtimeReady}
+              data-ui-viewer-open={uiDisplayKey(target)}
+              onClick={() => void display.move(target)}
+            >
+              {t("viewer.open")}
+            </Button>
+          )}
+        </div>
+      ) : null}
+      {enabled &&
+      active &&
+      sendMessage &&
+      ((owns && !paused) ||
+        block.status === "failed" ||
+        block.status === "cancelled") ? (
+        <div className="flex flex-wrap gap-2">
+          {(block.status === "ready"
+            ? (["explain", "modify"] as const)
+            : getUiRepairSource(
+                  useChatStore
+                    .getState()
+                    .activeMessages.find(
+                      (message) => message.id === messageId,
+                    )!,
+                  block.id,
+                )
+              ? (["repair"] as const)
+              : []
+          ).map((action) => (
+            <Button
+              key={action}
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                const interaction = grant.current?.captureInteraction();
+                const lifetime = repairLifetime.current;
+                setHostActionError(null);
+                void sendMessage(
+                  t(`hostActions.${action}Draft`),
+                  {
+                    sessionId,
+                    messageId,
+                    blockId: block.id,
+                    definitionRevision: block.definitionRevision,
+                    isActive: () =>
+                      action === "repair"
+                        ? lifetime.active && repairActive()
+                        : canInteract() && (!interaction || interaction()),
+                    isInstanceActive: () =>
+                      action === "repair"
+                        ? lifetime.active && repairActive()
+                        : lease.accepts() && (!interaction || interaction()),
+                  },
+                  action,
+                )
+                  .then((result) => {
+                    if (
+                      !result.ok &&
+                      result.code !== "inactive" &&
+                      result.code !== "cancelled" &&
+                      repairLifetime.current === lifetime &&
+                      lifetime.active
+                    )
+                      setHostActionError(
+                        result.code === "busy" ? "busy" : "failed",
+                      );
+                  })
+                  .catch(() => {
+                    if (lifetime.active) setHostActionError("failed");
+                  });
+              }}
+            >
+              {t(`hostActions.${action}`)}
+            </Button>
+          ))}
+        </div>
+      ) : null}
+      {displaySnapshot.error && location === "inline" && !inViewer ? (
+        <p role="alert" className="text-sm text-red-600">
+          {t(`viewer.${displaySnapshot.error}Error`)}
+        </p>
+      ) : null}
+      {hostActionError ? (
+        <p role="alert" className="text-sm text-red-600">
+          {t(`hostActions.${hostActionError}`)}
+        </p>
+      ) : null}
       <IntelligentUiCard
         block={block}
         sessionId={sessionId}
         messageId={messageId}
         enabled={enabled && active}
+        readOnly={!owns && block.status === "ready"}
+        onEscape={
+          location === "viewer" && display
+            ? () => {
+                void display.move(null);
+              }
+            : undefined
+        }
+        paused={paused}
+        displayEpoch={displayState?.epoch ?? 0}
+        canStartRuntime={() => canSave()}
+        onRuntimeStatus={(status) =>
+          setRuntimeReady(status === "active" || status === "failed")
+        }
+        onRuntimeControl={(release) => {
+          releaseRuntime.current = release;
+        }}
+        onPendingImportChange={(pending) => {
+          pendingImport.current = pending;
+        }}
         resolvedDataset={resolvedData?.dataset ?? undefined}
         onImportDataset={(dataset) => {
           if (
-            !lease.accepts() ||
+            !canInteract() ||
             !block.definition ||
             !("kind" in block.definition) ||
             block.definition.kind !== "explorer"
@@ -327,18 +504,25 @@ export default function ConnectedIntelligentUiBlock({
             });
         }}
         onStateChange={saveState}
-        onSendMessage={(text, isRuntimeActive) =>
-          sendMessage && stillActive()
+        onSendMessage={(text, isRuntimeActive) => {
+          const interaction = grant.current?.captureInteraction();
+          return sendMessage && canInteract()
             ? sendMessage(text, {
                 sessionId,
                 messageId,
                 blockId: block.id,
                 definitionRevision: block.definitionRevision,
-                isActive: () => stillActive() && isRuntimeActive(),
-                isInstanceActive: () => lease.accepts() && isRuntimeActive(),
+                isActive: () =>
+                  canInteract() &&
+                  isRuntimeActive() &&
+                  (!interaction || interaction()),
+                isInstanceActive: () =>
+                  lease.accepts() &&
+                  isRuntimeActive() &&
+                  (!interaction || interaction()),
               })
-            : Promise.resolve({ ok: false, code: "inactive" })
-        }
+            : Promise.resolve({ ok: false, code: "inactive" });
+        }}
       />
       {!block.dataSnapshot &&
       context &&

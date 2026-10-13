@@ -1,6 +1,6 @@
 import type { IntelligentUiBlock, JsonObject } from "./types";
 import type { ExplorerDataset, ExplorerMetricExplanation } from "./explorer";
-import { deriveExplorer } from "./explorer";
+import { deriveExplorer, deriveExplorerDisplay } from "./explorer";
 import { calculateUi } from "./calculations";
 import {
   getNativeInitialState,
@@ -248,6 +248,74 @@ export function renderUiMarkdown(
             new Set(result.errors.map((item) => item.code)),
           ))
             lines.push(localizedExplorerError(labels, error));
+        }
+        if (definition.version === 2) {
+          const display = deriveExplorerDisplay(definition, result, {
+            selectedOnly: includeState,
+            visibleOnly: includeState,
+          });
+          const renderRows = (
+            rows: typeof result.rows,
+            columnIds: string[],
+          ) => {
+            const columns = result.columns.filter((column) =>
+              columnIds.includes(column.id),
+            );
+            if (!rows.length || !columns.length) return;
+            lines.push(
+              `| ${columns.map((column) => escape(column.label)).join(" | ")} |`,
+              `| ${columns.map(() => "---").join(" | ")} |`,
+              ...rows.map(
+                (row) =>
+                  `| ${columns.map((column) => escapeCell(row.values[column.id])).join(" | ")} |`,
+              ),
+            );
+          };
+          for (const section of display.sections) {
+            if (section.kind === "parameters") {
+              lines.push(
+                ...definition.props.parameters.map(
+                  (parameter) =>
+                    `${escape(parameter.label)}: ${escape(result.state.parameters[parameter.id])}`,
+                ),
+              );
+            } else if (section.kind === "table") {
+              const rows = includeState ? result.selectedRows : result.rows;
+              if (includeState && !rows.length)
+                lines.push(labels.explorer.noSelection);
+              renderRows(rows, result.state.visibleColumns);
+            } else if (section.kind === "metrics") {
+              for (const node of display.metrics) {
+                lines.push(
+                  `${escape(node.label)}: ${escapeCell(result.metrics[node.id])}`,
+                );
+                const explanation = result.metricExplanations[node.id];
+                if (explanation)
+                  lines.push(
+                    escape(
+                      formatExplorerMetricExplanation(explanation, locale),
+                    ),
+                  );
+              }
+            } else if (section.kind === "chart") {
+              const chart = display.charts.find(
+                (item) => item.id === section.id,
+              )!;
+              if (chart.allowed) {
+                lines.push(
+                  `**${escape(chart.title)}**`,
+                  `${escape(chart.xLabel)} · ${escape(chart.yLabel)}`,
+                );
+                renderRows(chart.rows, [chart.x, chart.y]);
+              }
+            } else {
+              for (const notice of display.notices)
+                lines.push(
+                  `${escape(notice.label)}: ${escape(formatExplorerMetricExplanation(notice.explanation, locale))}`,
+                );
+            }
+          }
+          break;
         }
         if (includeState && definition.props.parameters.length) {
           lines.push(

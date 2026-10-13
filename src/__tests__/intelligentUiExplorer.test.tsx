@@ -15,6 +15,7 @@ import { projectUiBlock } from "@/lib/intelligentUi/projection";
 import type { IntelligentUiBlock, JsonObject } from "@/lib/intelligentUi/types";
 import {
   EXPLORER_TRAVEL_EXAMPLE,
+  EXPLORER_TRAVEL_V2_EXAMPLE,
   type ExplorerDataset,
   type ExplorerDefinition,
 } from "@/lib/intelligentUi/explorer";
@@ -330,4 +331,66 @@ describe("explorer Intelligent UI", () => {
         .filter((input) => (input as HTMLInputElement).checked),
     ).toHaveLength(3);
   });
+});
+
+it("v2 links both charts, metrics and filters while each chart owns its row map", () => {
+  const definition = structuredClone(EXPLORER_TRAVEL_V2_EXAMPLE);
+  if (definition.props.dataset.kind !== "inline") throw Error("fixture");
+  definition.props.dataset.data.rows[0].values.rating = null;
+  definition.props.sections[3] = {
+    kind: "chart",
+    id: "rating",
+    title: "Rating to cost",
+    type: "scatter",
+    x: "rating",
+    y: "total",
+  };
+  render(wrap(<Harness definition={definition} />));
+  expect(screen.getAllByTestId("explorer-chart")).toHaveLength(2);
+  fireEvent.click(
+    within(screen.getByRole("region", { name: "Rating to cost" })).getByRole(
+      "button",
+    ),
+  );
+  expect(
+    (screen.getByLabelText("Select row b") as HTMLInputElement).checked,
+  ).toBe(true);
+  expect(
+    (screen.getByLabelText("Select row a") as HTMLInputElement).checked,
+  ).toBe(false);
+  expect(screen.getByText("2 rows")).toBeTruthy();
+  const metric = within(
+    screen.getByRole("region", { name: "Calculated metrics" }),
+  ).getByText("Selected total").parentElement;
+  expect(metric?.textContent).toContain("340");
+  fireEvent.change(screen.getByLabelText("Budget"), {
+    target: { value: "400" },
+  });
+  expect(screen.getByText("1 rows")).toBeTruthy();
+  const charts = screen.getAllByTestId("explorer-chart");
+  expect(
+    JSON.parse(charts[0].getAttribute("data-source")!).data.source,
+  ).toEqual([["B", 340]]);
+});
+
+it("v2 cannot hide errors by omitting notices", () => {
+  const definition = structuredClone(EXPLORER_TRAVEL_V2_EXAMPLE);
+  definition.props.sections = definition.props.sections.filter(
+    (s) => s.kind !== "notices",
+  );
+  render(
+    wrap(
+      <Harness
+        definition={definition}
+        initial={{
+          ...getNativeInitialState(definition),
+          parameters: { nights: 0, people: 2, budget: 600 },
+        }}
+      />,
+    ),
+  );
+  expect(screen.getByLabelText("Nights").getAttribute("aria-invalid")).toBe(
+    "true",
+  );
+  expect(screen.getAllByRole("alert").length).toBeGreaterThan(0);
 });

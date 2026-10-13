@@ -80,6 +80,9 @@ it("shows startup failure and explicitly retries with saved state without resend
     </NextIntlClientProvider>
   );
   const view = render(ui(block));
+  expect(screen.getByRole("status").textContent).toBe(
+    messages.runtime.starting,
+  );
   expect(screen.queryByRole("button")).toBeNull();
   act(() => vi.advanceTimersByTime(5000));
   expect(screen.getByRole("alert").textContent).toContain(messages.renderError);
@@ -100,6 +103,7 @@ it("shows startup failure and explicitly retries with saved state without resend
     screen.queryByRole("button", { name: messages.bringIntoChat }),
   ).toBeNull();
   act(() => port.onmessage!({ data: { type: "ready", identity } }));
+  expect(screen.getByRole("status").textContent).toBe(messages.runtime.active);
   view.rerender(ui({ ...block, stateRevision: 2, state: { count: 8 } }));
   expect(view.container.querySelector("iframe")).toBe(frame);
   expect(
@@ -115,4 +119,20 @@ it("shows startup failure and explicitly retries with saved state without resend
   );
   expect(save).not.toHaveBeenCalled();
   expect(send).not.toHaveBeenCalled();
+});
+
+it("reports HTML policy rejection without displaying the rejected capability or source", () => {
+  const value = structuredClone(block);
+  if (!value.definition || !("html" in value.definition)) throw Error();
+  value.definition.html =
+    '<iframe src="https://private.example/SECRET"></iframe>';
+  render(
+    <NextIntlClientProvider locale="en" messages={{ IntelligentUi: messages }}>
+      <IntelligentUiCard block={value} enabled onStateChange={vi.fn()} />
+    </NextIntlClientProvider>,
+  );
+  expect(screen.getByText(messages.diagnostic.html_policy)).toBeTruthy();
+  expect(screen.getByRole("status").textContent).toBe(messages.runtime.failed);
+  expect(document.body.textContent).not.toContain("SECRET");
+  expect(document.querySelector("iframe")).toBeNull();
 });
