@@ -13,13 +13,13 @@ import type { ChatConfig, SystemSettings } from "@/types";
  * 默认模型配置
  */
 export const DEFAULT_MODELS = {
-  chat: "gemini-2.5-flash-lite",
-  titleGeneration: "gemini-2.5-flash-lite",
-  relatedQuestions: "gemini-2.5-flash-lite",
-  contextCompression: "gemini-2.5-flash-lite",
-  promptOptimization: "gemini-2.5-flash-lite",
-  ragQuery: "gemini-2.5-flash-lite",
-  memory: "gemini-2.5-flash-lite",
+  chat: "gemini-2.5-flash",
+  titleGeneration: "gemini-2.5-flash",
+  relatedQuestions: "gemini-2.5-flash",
+  contextCompression: "gemini-2.5-flash",
+  promptOptimization: "gemini-2.5-flash",
+  ragQuery: "gemini-2.5-flash",
+  memory: "gemini-2.5-flash",
 } as const;
 
 /**

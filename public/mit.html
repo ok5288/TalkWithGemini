@@ -1,11 +1,12 @@
 <!DOCTYPE html>
-<html lang="en" data-color-mode="light" data-light-theme="light" data-dark-theme="dark">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LICENSE - Edward Web World/Ed-iChat</title>
     <style>
-        :root, [data-color-mode="light"][data-light-theme="light"] {
+        /* 默认白天模式变量 */
+        :root {
             --bg-color: #ffffff;
             --card-bg: #f6f8fa;
             --border-color: #d0d7de;
@@ -14,10 +15,12 @@
             --accent: #0969da;
             --btn-bg: #f3f4f6;
             --btn-border: rgba(27, 31, 36, 0.15);
-            --btn-hover: #f3f4f6;
+            --btn-hover: #e8eaed;
+            --close-hover-bg: rgba(208, 215, 222, 0.4);
         }
 
-        [data-color-mode="dark"][data-dark-theme="dark"] {
+        /* 当隐藏的 checkbox 被勾选时，通过 `:has()` 让整个 html 根节点切换为黑夜变量 */
+        html:has(#theme-switch:checked) {
             --bg-color: #0d1117;
             --card-bg: #161b22;
             --border-color: #30363d;
@@ -27,6 +30,7 @@
             --btn-bg: #21262d;
             --btn-border: rgba(240, 246, 252, 0.1);
             --btn-hover: #30363d;
+            --close-hover-bg: rgba(48, 54, 61, 0.6);
         }
 
         body {
@@ -41,6 +45,10 @@
             align-items: center;
             min-height: 100vh;
             transition: background-color 0.2s ease, color 0.2s ease;
+        }
+
+        #theme-switch {
+            display: none;
         }
 
         .toolbar {
@@ -82,84 +90,106 @@
             cursor: pointer;
             font-size: 0.85rem;
             font-weight: 500;
-            transition: background-color 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            transition: background-color 0.2s, border-color 0.2s;
+            user-select: none;
         }
+
         .theme-toggle:hover {
             background-color: var(--btn-hover);
         }
 
-        .license-container {
-            background-color: var(--bg-color);
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            max-width: 780px;
-            width: 100%;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-            overflow: hidden;
-        }
-
-        .header {
-            display: flex;
+        .close-btn {
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+            display: inline-flex;
             align-items: center;
-            gap: 8px;
-            background-color: var(--card-bg);
-            border-bottom: 1px solid var(--border-color);
-            padding: 12px 16px;
+            justify-content: center;
+            transition: background-color 0.2s;
         }
 
-        .header svg {
+        .close-btn:hover {
+            background-color: var(--close-hover-bg);
+        }
+
+        .close-btn svg {
             width: 16px;
             height: 16px;
-            fill: var(--text-muted);
-            display: flex; align-items: center;
-        }
-
-        .header h1 {
-            font-size: 1.5rem;
-            margin: 0;
-            font-weight: 600;
-            color: var(--text-main);
-           
+            fill: #cf222e;
         }
 
         .license-container {
             background-color: var(--card-bg);
             border: 1px solid var(--border-color);
             border-radius: 8px;
-            max-width: 720px;
+            max-width: 780px;
             width: 100%;
-            padding: 32px;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+            transition: background-color 0.2s ease, border-color 0.2s ease;
         }
-        .content {
-            padding: 24px 16px;
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: var(--card-bg);
+            border-bottom: 1px solid var(--border-color);
+            padding: 12px 24px;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .header-left svg {
+            width: 16px;
+            height: 16px;
+            fill: var(--text-muted);
+            flex-shrink: 0;
+        }
+
+        .header h1 {
+            font-size: 1.25rem;
+            margin: 0;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        .content-body {
+            padding: 24px;
             margin: 0;
             white-space: pre-wrap;
             word-wrap: break-word;
-            font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
+            font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, monospace;
             font-size: 0.85rem;
             color: var(--text-main);
             background-color: var(--bg-color);
+            border-top: 1px solid var(--border-color);
+            border-bottom: 1px solid var(--border-color);
+            transition: background-color 0.2s ease, color 0.2s ease;
         }
-        p {
-            margin: 0 0 16px 0;
-            white-space: pre-line;
-            font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
-            font-size: 0.9rem;
-            color: var(--text-main);
-        }
+
         .footer {
-            margin-top: 24px;
+            padding: 16px 24px;
             font-size: 0.8rem;
             color: var(--text-muted);
             text-align: right;
-            border-top: 1px solid var(--border-color);
-            padding-top: 12px;
+            background-color: var(--card-bg);
         }
-    </style>
     </style>
 </head>
 <body>
+
+    <!-- 隐藏的纯 CSS 状态开关 -->
+    <input type="checkbox" id="theme-switch">
 
     <div class="toolbar">
         <div class="nav-links">
@@ -167,17 +197,27 @@
             <span class="slash">/</span>
             <a class="repo-link" href="https://ic.ok5266.com" target="_blank">Ed-iChat</a>
         </div>
-        <button class="theme-toggle" onclick="toggleTheme()">☀️ / 🌙 切换模式</button>
+        <div class="toolbar-actions">
+            <label for="theme-switch" class="theme-toggle">☀️ / 🌙</label>
+        </div>
     </div>
 
     <div class="license-container">
         <div class="header">
-            <svg viewBox="0 0 16 16" version="1.1" aria-hidden="true">
-                <path d="M0 3.75C0 2.784.784 2 1.75 2h12.5c.966 0 1.75.784 1.75 1.75v8.5A1.75 1.75 0 0 1 14.25 14H1.75A1.75 1.75 0 0 1 0 12.25Zm1.75-.25a.25.25 0 0 0-.25.25v8.5c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25v-8.5a.25.25 0 0 0-.25-.25ZM3.5 6.25a.75.75 0 0 1 1.5 0v3.5a.75.75 0 0 1-1.5 0Zm6 0a.75.75 0 0 1 1.5 0v3.5a.75.75 0 0 1-1.5 0Zm-3.75-2a.75.75 0 0 1 .75.75v7.5a.75.75 0 0 1-1.5 0v-7.5a.75.75 0 0 1 .75-.75Z"></path>
-            </svg>
-            <h1>MIT LICENSE</h1>
+            <div class="header-left">
+                <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-law">
+                    <path d="M8.75.75V2h.985c.304 0 .603.08.867.231l1.29.736c.038.022.08.033.124.033h2.234a.75.75 0 0 1 0 1.5h-.427l2.111 4.692a.75.75 0 0 1-.154.838l-.53-.53.529.531-.001.002-.002.002-.006.006-.006.005-.01.01-.045.04c-.21.176-.441.327-.686.45C14.556 10.78 13.88 11 13 11a4.498 4.498 0 0 1-2.023-.454 3.544 3.544 0 0 1-.686-.45l-.045-.04-.016-.015-.006-.006-.004-.004v-.001a.75.75 0 0 1-.154-.838L12.178 4.5h-.162c-.305 0-.604-.079-.868-.231l-1.29-.736a.245.245 0 0 0-.124-.033H8.75V13h2.5a.75.75 0 0 1 0 1.5h-6.5a.75.75 0 0 1 0-1.5h2.5V3.5h-.984a.245.245 0 0 0-.124.033l-1.289.737c-.265.15-.564.23-.869.23h-.162l2.112 4.692a.75.75 0 0 1-.154.838l-.53-.53.529.531-.001.002-.002.002-.006.006-.016.015-.045.04c-.21.176-.441.327-.686.45C4.556 10.78 3.88 11 3 11a4.498 4.498 0 0 1-2.023-.454 3.544 3.544 0 0 1-.686-.45l-.045-.04-.016-.015-.006-.006-.004-.004v-.001a.75.75 0 0 1-.154-.838L2.178 4.5H1.75a.75.75 0 0 1 0-1.5h2.234a.249.249 0 0 0 .125-.033l1.288-.737c.265-.15.564-.23.869-.23h.984V.75a.75.75 0 0 1 1.5 0Zm2.945 8.477c.285.135.718.273 1.305.273s1.02-.138 1.305-.273L13 6.327Zm-10 0c.285.135.718.273 1.305.273s1.02-.138 1.305-.273L3 6.327Z"></path>
+                </svg>
+                <h1>MIT LICENSE</h1>
+            </div>
+            <!-- 真切关窗按钮 -->
+            <button class="close-btn" onclick="forceCloseWindow()" title="关闭窗口">
+                <svg viewBox="0 0 16 16" version="1.1" aria-hidden="true">
+                    <path d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.749.749 0 0 1 1.275.326.749.749 0 0 1-.215.734L9.06 8l3.22 3.22a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L8 9.06l-3.22 3.22a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z"></path>
+                </svg>
+            </button>
         </div>
-        <p>Copyright (c) 2026 Ed iChat contributors
+        <div class="content-body">Copyright (c) 2026 Ed iChat contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -195,18 +235,19 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.</p>
-        <div class="footer"><a class="repo-link" href="https://ic.ok5266.com" target="_blank">Ed iChat Project</a></div>
+SOFTWARE.</div>
+        <div class="footer">
+            <a class="repo-link" href="https://ic.ok5266.com" target="_blank">Ed iChat Project</a>
+        </div>
+    </div>
 
     <script>
-        function toggleTheme() {
-            const html = document.documentElement;
-            const currentMode = html.getAttribute('data-color-mode');
-            if (currentMode === 'dark') {
-                html.setAttribute('data-color-mode', 'light');
-            } else {
-                html.setAttribute('data-color-mode', 'dark');
-            }
+        function forceCloseWindow() {
+            // 真切尝试关窗
+            window.close();
+            // 兼容某些浏览器的安全沙箱强行关窗
+            self.close();
+            window.top.close();
         }
     </script>
 </body>
