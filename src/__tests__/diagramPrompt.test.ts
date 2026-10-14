@@ -139,8 +139,6 @@ describe("diagram prompt helpers", () => {
 
   });
 
-=======
->>>>>>> 3233b2b (Update diagramPrompt.test.ts)
   it("ships a canonical example accepted by the installed mindmap parser", () => {
     const parsed = parseMarkdownWithFrontMatter(
       MINDMAP_PROMPT_EXAMPLE,

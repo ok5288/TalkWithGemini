@@ -1120,19 +1120,22 @@ export const streamChatResponse = async (
 
   let effectiveSystemInstruction = automaticModeEnabled
 
-    // 1. 确保框架原本计算出来的底层系统指令有安全的字符串兜底
+  // 1. 获取基础系统指令
   const rawSystemInstruction = automaticModeEnabled
-
     ? appendAgentSystemInstruction(
         workflowWithForcedTools,
         AUTO_MODE_SYSTEM_INSTRUCTION,
       )
     : workflowWithForcedTools;
 
+  // 使用一个全新的变量名，避免 "defined multiple times" 错误
+  let finalInstruction: string = (rawSystemInstruction as string) || "";
+
+  // 2. 只有当指令是字符串时才进行智能 UI 的标记检查
   if (
     !researchModeEnabled &&
     useSettingsStore.getState().system.enableIntelligentUi &&
-    effectiveSystemInstruction?.includes(INTELLIGENT_UI_PROMPT_MARKER)
+    finalInstruction.includes(INTELLIGENT_UI_PROMPT_MARKER)
   ) {
     const { buildActiveUiSourcePrompt } =
       await import("@/lib/intelligentUi/sourceContext");
@@ -1140,31 +1143,26 @@ export const streamChatResponse = async (
       () => "",
     );
     if (sourcePrompt)
-      effectiveSystemInstruction = appendAgentSystemInstruction(
-        effectiveSystemInstruction,
+      finalInstruction = appendAgentSystemInstruction(
+        finalInstruction,
         sourcePrompt,
-      );
+      ) as string;
   }
 
-
-  // 2. 显式声明为 string 类型，彻底根除 TS 任何关于类型的抱怨
-  let finalSystemInstruction: string = rawSystemInstruction || "";
-
   // 3. 安全地根据开关状态过滤图表和 HTML 提示词
-  if (system?.enableDiagramPrompt !== true) {
-    finalSystemInstruction = finalSystemInstruction
+  // 使用 !! 强制将配置转为布尔值，防止 undefined 带来的类型报错
+  if (!!system?.enableDiagramPrompt !== true) {
+    finalInstruction = finalInstruction
       .replace(/<format scope="request">\s*<diagram-rendering>[\s\S]*?<\/diagram-rendering>\s*<\/format>/g, "")
       .replace(/<format scope="request">\s*<diagram-visual-polish>[\s\S]*?<\/diagram-visual-polish>\s*<\/format>/g, "");
   }
 
-  if (system?.enableHtmlVisualPrompt !== true) {
-    finalSystemInstruction = finalSystemInstruction
+  if (!!system?.enableHtmlVisualPrompt !== true) {
+    finalInstruction = finalInstruction
       .replace(/<format scope="request">\s*<html-visual>[\s\S]*?<\/html-visual>\s*<\/format>/g, "");
   }
 
-  // 4. 【新增】智能按需过滤 <auto-mode> 路由提示词
-  // 如果用户只是发了简单的闲聊（如 "hi", "你是谁", "你好" 等短文本），且没有带附件/工具，
-  // 我们顺手把几百字的 <auto-mode> 也切掉，让发“hi”时的 Token 压到极限！
+  // 4. 智能按需过滤 <auto-mode> 路由提示词
   const isSimpleChat = 
     newMessage.trim().length < 15 && 
     !newMessage.toLowerCase().includes("search") &&
@@ -1174,9 +1172,12 @@ export const streamChatResponse = async (
     attachments.length === 0;
 
   if (isSimpleChat) {
-    finalSystemInstruction = finalSystemInstruction
+    finalInstruction = finalInstruction
       .replace(/<auto-mode>[\s\S]*?<\/auto-mode>/g, "");
   }
+
+  // 最后赋值回原来的 finalSystemInstruction (假设原本的代码最后用到的是这个变量)
+  let finalSystemInstruction: string = finalInstruction;
 
 
   // ====================================================================
