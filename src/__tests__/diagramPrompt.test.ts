@@ -10,6 +10,13 @@ import {
   MINDMAP_PROMPT_EXAMPLE,
 } from "../lib/chat/diagramPrompt";
 import { parseMarkdownDiagramBlocks } from "../lib/utils/markdownDiagrams";
+import { DEFAULT_SYSTEM_SETTINGS } from "@/config/defaults"; // ✅ 导入默认设置
+import { SystemSettings } from "@/lib/settings/types";
+
+const MOCK_SYSTEM_SETTINGS_DEFAULT: SystemSettings = {
+  ...DEFAULT_SYSTEM_SETTINGS, // ✅ 从默认设置中继承所有属性
+  enableDiagramPrompt: true, // 然后覆盖你需要测试的 enableDiagramPrompt 属性
+};
 
 describe("diagram prompt helpers", () => {
   it("builds base diagram guidance with separated Mermaid and mindmap formats", () => {
@@ -119,7 +126,8 @@ describe("diagram prompt helpers", () => {
     const message = appendDiagramRequestInstructions(
       "A".repeat(maxChars * 2),
       systemInstruction,
-      maxChars,
+      undefined, // ✅ 第三个参数 `settings` 传入 undefined
+      maxChars,  // ✅ 第四个参数是 `maxChars`
     );
 
     expect(message).toHaveLength(maxChars);
@@ -127,16 +135,16 @@ describe("diagram prompt helpers", () => {
     expect(appendDiagramRequestInstructions(message, systemInstruction)).toBe(
       message,
     );
+  });
 
   it("should append disable instruction when enableDiagramPrompt is false", () => {
     const systemInstruction = buildDiagramPromptInstruction();
     const result = appendDiagramRequestInstructions(
       "Explain this",
       systemInstruction,
-      { ...systemDefaults, enableDiagramPrompt: false } // 👈 保留你的自定义开关测试
+      { ...MOCK_SYSTEM_SETTINGS_DEFAULT, enableDiagramPrompt: false }, // ✅ 传入一个完整的 SystemSettings 对象
     );
     expect(result).toContain("Do not output any ```mermaid or ```mindmap");
-
   });
 
   it("ships a canonical example accepted by the installed mindmap parser", () => {
@@ -147,7 +155,7 @@ describe("diagram prompt helpers", () => {
 
     expect(parsed.frontMatter).toEqual({});
     expect(parsed.roots).toHaveLength(1);
-    expect(parsed.roots[0]).toMatchObject({
+    expect(parsed.roots).toMatchObject({
       text: "Project Planning",
       children: [
         {
