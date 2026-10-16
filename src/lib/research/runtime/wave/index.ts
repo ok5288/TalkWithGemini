@@ -26,8 +26,9 @@ export async function executeWave(
     const finalizedPackets = await archiveWave(wave, collected);
     return await integrateWave(wave, collected, finalizedPackets);
   } catch (error) {
-    await persistWaveCheckpoint(wave).catch(() => undefined);
-    await wave.checkpointQueue.catch(() => undefined);
+    // A failed final flush must surface as storage failure: resuming from an
+    // older checkpoint could replay work performed before the transport failed.
+    await persistWaveCheckpoint(wave);
     throw error;
   }
 }

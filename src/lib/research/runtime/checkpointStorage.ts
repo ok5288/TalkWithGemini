@@ -1,4 +1,6 @@
+import { isCheckpointQueryLedger } from "../checkpointCodec";
 import {
+  getCurrentResearchReportRunIds,
   isCommittedCheckpointToolCall,
   redactCheckpointText,
   sanitizeCheckpointToolCall,
@@ -13,11 +15,29 @@ export async function readCheckpoint(
 ): Promise<SavedResearchCheckpoint | null> {
   const path = task.checkpoint?.historyPath;
   if (!path) return null;
-  const result = await readResearchCheckpointJson(task.sessionId, path);
-  if (!result.ok) return null;
   try {
+    const result = await readResearchCheckpointJson(task.sessionId, path);
+    if (!result.ok) return null;
     const parsed = result.value as SavedResearchCheckpoint;
-    return parsed?.version === 1 && parsed.taskId === task.id
+    return parsed?.version === 1 &&
+      parsed.taskId === task.id &&
+      (parsed.researchRunId === undefined ||
+        parsed.researchRunId === task.checkpoint?.researchRunId) &&
+      (parsed.agentRunId === undefined ||
+        parsed.agentRunId === getCurrentResearchReportRunIds(task).at(-1)) &&
+      (parsed.streamCompleted === undefined ||
+        typeof parsed.streamCompleted === "boolean") &&
+      (parsed.executedQueries === undefined ||
+        isCheckpointQueryLedger(parsed.executedQueries)) &&
+      typeof parsed.prompt === "string" &&
+      typeof parsed.partialContent === "string" &&
+      typeof parsed.savedAt === "number" &&
+      Number.isFinite(parsed.savedAt) &&
+      Array.isArray(parsed.toolCalls) &&
+      parsed.toolCalls.every(
+        (call) =>
+          call && typeof call.id === "string" && typeof call.name === "string",
+      )
       ? {
           ...parsed,
           prompt: redactCheckpointText(parsed.prompt || ""),

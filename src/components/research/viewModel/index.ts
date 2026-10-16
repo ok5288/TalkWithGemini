@@ -1,3 +1,4 @@
+import { isStarterResearchPlan } from "@/lib/research/prompts/starterPlan";
 import type { ResearchTaskViewModel } from "../types";
 import type { AgentRun } from "@/lib/agent";
 import { getCurrentResearchReportRunIds } from "@/lib/research/task";
@@ -166,6 +167,7 @@ export async function createResearchTaskViewModel(
           plan: {
             id: plan.id,
             version: plan.version,
+            isStarter: isStarterResearchPlan(plan),
             summary: plan.summary,
             objective: plan.objective,
             scope: {

@@ -5,16 +5,12 @@ import { Plus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/primitives";
 import { CustomSelect } from "@/components/ui/controls";
-import {
-  RESEARCH_STRATEGY_LIMITS,
-  RESEARCH_STRATEGY_PRESETS,
-} from "@/lib/research/orchestration";
+import { RESEARCH_STRATEGY_PRESETS } from "@/lib/research/orchestration";
 import type {
   ResearchDeliverableKind,
   ResearchPriority,
   ResearchSourcePriority,
   ResearchSourceType,
-  ResearchStrategy,
 } from "@/lib/research/types";
 import type {
   CreateResearchTemplateInput,
@@ -36,7 +32,6 @@ export interface ResearchTemplateEditorLabels {
   rationale: string;
   rationalePlaceholder: string;
   addSource: string;
-  strategy: string;
   cancel: string;
   save: string;
   required: string;
@@ -59,7 +54,6 @@ const DEFAULT_LABELS: ResearchTemplateEditorLabels = {
   rationale: "Rationale",
   rationalePlaceholder: "Why this source is useful",
   addSource: "Add source priority",
-  strategy: "Starting strategy",
   cancel: "Cancel",
   save: "Save template",
   required: "Complete the required fields before saving.",
@@ -81,13 +75,6 @@ const SOURCE_TYPES: ResearchSourceType[] = [
   "mcp",
 ];
 const PRIORITIES: ResearchPriority[] = ["high", "medium", "low"];
-const STRATEGY_FIELDS: Array<keyof ResearchStrategy> = [
-  "initialBreadth",
-  "maxDepth",
-  "maxQueries",
-  "resultsPerQuery",
-];
-
 function defaultTemplate(): Pick<
   CreateResearchTemplateInput,
   | "name"
@@ -139,17 +126,6 @@ export default function ResearchTemplateEditor({
   const [draft, setDraft] = useState(() => editorDraft(template));
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
-
-  const updateStrategy = (field: keyof ResearchStrategy, value: string) => {
-    const parsed = Number(value);
-    setDraft((current) => ({
-      ...current,
-      strategy: {
-        ...current.strategy,
-        [field]: Number.isFinite(parsed) ? parsed : current.strategy[field],
-      },
-    }));
-  };
 
   const updatePriority = (
     index: number,
@@ -206,7 +182,7 @@ export default function ResearchTemplateEditor({
 
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="grid gap-1">
-          <span className="text-[10px] font-medium text-muted-foreground">
+          <span className="text-xs font-medium text-muted-foreground">
             {labels.name}
           </span>
           <input
@@ -220,7 +196,7 @@ export default function ResearchTemplateEditor({
           />
         </label>
         <label className="grid gap-1">
-          <span className="text-[10px] font-medium text-muted-foreground">
+          <span className="text-xs font-medium text-muted-foreground">
             {labels.deliverable}
           </span>
           <CustomSelect
@@ -243,7 +219,7 @@ export default function ResearchTemplateEditor({
       </div>
 
       <label className="grid gap-1">
-        <span className="text-[10px] font-medium text-muted-foreground">
+        <span className="text-xs font-medium text-muted-foreground">
           {labels.description}
         </span>
         <textarea
@@ -262,7 +238,7 @@ export default function ResearchTemplateEditor({
       </label>
 
       <label className="grid gap-1">
-        <span className="text-[10px] font-medium text-muted-foreground">
+        <span className="text-xs font-medium text-muted-foreground">
           {labels.sections}
         </span>
         <textarea
@@ -277,13 +253,13 @@ export default function ResearchTemplateEditor({
           maxLength={6_000}
           className="resize-y rounded-md border border-border bg-background px-2 py-1.5 text-xs leading-4 text-foreground outline-none focus:border-research-accent focus:ring-2 focus:ring-research-accent/20"
         />
-        <span className="text-[10px] leading-4 text-muted-foreground">
+        <span className="text-xs leading-4 text-muted-foreground">
           {labels.sectionsHint}
         </span>
       </label>
 
       <fieldset className="space-y-2">
-        <legend className="text-[10px] font-medium text-muted-foreground">
+        <legend className="text-xs font-medium text-muted-foreground">
           {labels.sources}
         </legend>
         {draft.sourcePriorities.map((source, index) => (
@@ -292,7 +268,7 @@ export default function ResearchTemplateEditor({
             className="grid gap-2 rounded-md border border-border/70 bg-muted/20 p-2 sm:grid-cols-[1fr_1fr_1.4fr_auto] sm:items-end"
           >
             <label className="grid gap-1">
-              <span className="text-[10px] text-muted-foreground">
+              <span className="text-xs text-muted-foreground">
                 {labels.sourceType}
               </span>
               <CustomSelect
@@ -308,11 +284,11 @@ export default function ResearchTemplateEditor({
                   value: sourceType,
                   label: sourceType,
                 }))}
-                selectButtonClassName="flex h-8 w-full items-center justify-between gap-2 rounded-md border border-border bg-background px-1.5 text-[11px] text-foreground outline-none focus:border-research-accent"
+                selectButtonClassName="flex h-8 w-full items-center justify-between gap-2 rounded-md border border-border bg-background px-1.5 text-xs text-foreground outline-none focus:border-research-accent"
               />
             </label>
             <label className="grid gap-1">
-              <span className="text-[10px] text-muted-foreground">
+              <span className="text-xs text-muted-foreground">
                 {labels.priority}
               </span>
               <CustomSelect
@@ -328,11 +304,11 @@ export default function ResearchTemplateEditor({
                   value: priority,
                   label: priority,
                 }))}
-                selectButtonClassName="flex h-8 w-full items-center justify-between gap-2 rounded-md border border-border bg-background px-1.5 text-[11px] text-foreground outline-none focus:border-research-accent"
+                selectButtonClassName="flex h-8 w-full items-center justify-between gap-2 rounded-md border border-border bg-background px-1.5 text-xs text-foreground outline-none focus:border-research-accent"
               />
             </label>
             <label className="grid gap-1">
-              <span className="text-[10px] text-muted-foreground">
+              <span className="text-xs text-muted-foreground">
                 {labels.rationale}
               </span>
               <input
@@ -342,7 +318,7 @@ export default function ResearchTemplateEditor({
                 }
                 placeholder={labels.rationalePlaceholder}
                 maxLength={1_000}
-                className="h-8 rounded-md border border-border bg-background px-1.5 text-[11px] text-foreground outline-none focus:border-research-accent"
+                className="h-8 rounded-md border border-border bg-background px-1.5 text-xs text-foreground outline-none focus:border-research-accent"
               />
             </label>
             <Button
@@ -375,43 +351,15 @@ export default function ResearchTemplateEditor({
               ],
             }))
           }
-          className="inline-flex min-h-8 items-center gap-1 rounded-md px-2 text-[10px] font-medium text-research-accent hover:bg-research-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-research-accent/50"
+          className="inline-flex min-h-8 items-center gap-1 rounded-md px-2 text-xs font-medium text-research-accent hover:bg-research-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-research-accent/50"
         >
           <Plus size={13} aria-hidden="true" />
           {labels.addSource}
         </Button>
       </fieldset>
 
-      <fieldset>
-        <legend className="text-[10px] font-medium text-muted-foreground">
-          {labels.strategy}
-        </legend>
-        <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {STRATEGY_FIELDS.map((field) => {
-            const limits = RESEARCH_STRATEGY_LIMITS[field];
-            return (
-              <label key={field} className="grid gap-1">
-                <span className="text-[10px] text-muted-foreground">
-                  {field.replace(/([A-Z])/g, " $1")}
-                </span>
-                <input
-                  type="number"
-                  min={limits.min}
-                  max={limits.max}
-                  value={draft.strategy[field]}
-                  onChange={(event) =>
-                    updateStrategy(field, event.target.value)
-                  }
-                  className="h-8 rounded-md border border-border bg-background px-1.5 font-mono text-[11px] text-foreground outline-none focus:border-research-accent"
-                />
-              </label>
-            );
-          })}
-        </div>
-      </fieldset>
-
       {error ? (
-        <p className="text-[10px] text-red-600 dark:text-red-400" role="alert">
+        <p className="text-xs text-red-600 dark:text-red-400" role="alert">
           {error}
         </p>
       ) : null}
@@ -422,7 +370,7 @@ export default function ResearchTemplateEditor({
           type="button"
           onClick={onCancel}
           disabled={saving}
-          className="h-8 rounded-md px-2.5 text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-research-accent/50"
+          className="h-8 rounded-md px-2.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-research-accent/50"
         >
           {labels.cancel}
         </Button>
@@ -430,7 +378,7 @@ export default function ResearchTemplateEditor({
           variant="bare"
           type="submit"
           disabled={saving}
-          className="h-8 rounded-md bg-research-accent px-3 text-[11px] font-medium text-white hover:bg-research-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-research-accent/50 disabled:opacity-50"
+          className="h-8 rounded-md bg-research-accent px-3 text-xs font-medium text-white hover:bg-research-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-research-accent/50 disabled:opacity-50"
         >
           {labels.save}
         </Button>

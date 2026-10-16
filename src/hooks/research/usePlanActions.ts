@@ -1,3 +1,4 @@
+import { resolveTaskContext } from "@/lib/research/runtime/taskContext";
 import {
   runResearchTaskAction,
   type LaunchResearch,
@@ -12,12 +13,13 @@ import {
   isActiveResearchStatus,
   isTerminalResearchStatus,
   transitionResearchTask,
+  resolveResearchBudget,
 } from "@/lib/research/task";
 import { resolveResearchStrategy } from "@/lib/research/orchestration/strategy";
 import {
   type ResearchPlanVersion,
   type ResearchSourceSnapshot,
-  type ResearchStrategy,
+  type ResearchBudgetPreset,
 } from "@/lib/research/types";
 import { useResearchStore } from "@/store/core/researchStore";
 
@@ -39,7 +41,7 @@ import {
 
 /**
  * The three plan-stage actions exposed to the UI: approve the current plan and
- * start executing, replan from an instruction, or retune its numeric strategy.
+ * start executing, replan from an instruction, or change its thoroughness preset.
  */
 export function usePlanActions({
   claimActiveSlot,
@@ -167,34 +169,38 @@ export function usePlanActions({
           )
             return;
           return {
-            run: (lease) => preparePlan(taskId, value, undefined, lease),
+            run: (lease) =>
+              preparePlan(taskId, value, undefined, lease, current),
           };
         },
-        () => onNotice?.(t("runtime.dependency.leaseConflict")),
+        () => {
+          const message = t("runtime.dependency.leaseConflict");
+          onNotice?.(message);
+          throw new Error(message);
+        },
       );
     },
     [pauseTask, preparePlan, onNotice, t],
   );
 
-  const updatePlanStrategy = useCallback(
-    async (taskId: string, overrides: Partial<ResearchStrategy>) =>
+  const updatePlanPreset = useCallback(
+    async (taskId: string, preset: ResearchBudgetPreset) =>
       runResearchTaskAction(
         taskId,
         async (task) => {
           const store = useResearchStore.getState();
           const plan = getActivePlan(task);
-          if (task.status !== "plan_ready" || !plan) return;
-          const strategy = resolveResearchStrategy(task.budgetPreset, {
-            ...plan.strategy,
-            ...overrides,
-          });
           if (
-            (Object.keys(strategy) as Array<keyof ResearchStrategy>).every(
-              (key) => strategy[key] === plan.strategy[key],
-            )
-          ) {
+            task.status !== "plan_ready" ||
+            !plan ||
+            task.budgetPreset === preset
+          )
             return;
-          }
+          const strategy = resolveResearchStrategy(preset);
+          const budget = resolveResearchBudget(
+            preset,
+            resolveTaskContext(task).effective.agentBudget,
+          );
           await store.updateTask(taskId, (current) => {
             const active = getActivePlan(current);
             if (current.status !== "plan_ready" || !active) return current;
@@ -205,11 +211,13 @@ export function usePlanActions({
               version,
               strategy,
               createdAt: Date.now(),
-              adjustment: "Approved numeric strategy tuning.",
+              adjustment: `Research thoroughness: ${preset}.`,
             };
             return {
               ...current,
               requestedStrategy: strategy,
+              budgetPreset: preset,
+              budget,
               planVersions: [...current.planVersions, nextPlan],
               activePlanVersion: version,
               updatedAt: Date.now(),
@@ -221,5 +229,5 @@ export function usePlanActions({
     [onNotice, t],
   );
 
-  return { confirmPlan, adjustPlan, updatePlanStrategy };
+  return { confirmPlan, adjustPlan, updatePlanPreset };
 }

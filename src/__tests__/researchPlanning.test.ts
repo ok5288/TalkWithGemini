@@ -1,7 +1,11 @@
+import { ResearchPersistenceError } from "@/services/research/taskRepository/errors";
+import { AgentRunLeaseConflictError } from "@/services/agent/runLease";
+import { isStarterResearchPlan } from "@/lib/research/prompts/starterPlan";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   createResearchTask,
+  buildResearchReconSnapshot,
   resolveResearchStrategy,
   type ResearchTask,
   type ResearchSourceSnapshot,
@@ -17,6 +21,7 @@ const mocks = vi.hoisted(() => ({
   snapshot: {} as ResearchSourceSnapshot,
   snapshotError: null as Error | null,
   saveError: null as Error | null,
+  saves: vi.fn(),
   sourceContext: vi.fn(),
 }));
 vi.mock("@/services/api/chatService", () => ({
@@ -24,6 +29,14 @@ vi.mock("@/services/api/chatService", () => ({
 }));
 vi.mock("@/store/core/researchStore", () => ({
   useResearchStore: {
+    setState: (
+      update: (state: { tasksById: Record<string, ResearchTask> }) => {
+        tasksById?: Record<string, ResearchTask>;
+      },
+    ) => {
+      const next = update({ tasksById: { task: mocks.task! } });
+      if (next.tasksById) mocks.task = next.tasksById.task;
+    },
     getState: () => ({
       tasksById: { task: mocks.task },
       updateTask: async (
@@ -32,6 +45,7 @@ vi.mock("@/store/core/researchStore", () => ({
         options?: { persistence: string },
       ) => {
         mocks.task = update(mocks.task!);
+        mocks.saves(mocks.task, options);
         if (mocks.saveError && options?.persistence !== "best-effort")
           throw mocks.saveError;
         return mocks.task;
@@ -120,6 +134,8 @@ const execute = (controller = new AbortController()) =>
 beforeEach(() => {
   mocks.stream.mockReset();
   mocks.snapshotError = null;
+  mocks.saveError = null;
+  mocks.saves.mockClear();
   mocks.sourceContext.mockReset();
   mocks.sourceContext.mockReturnValue({
     approvedKnowledgeAttachments: [
@@ -460,7 +476,7 @@ describe("plan repair regressions", () => {
         "steps: Too big: expected array to have <=8 items",
       );
       expect(repair[3]).not.toContain("received undefined");
-      expect(repair[3]).toContain("2-8");
+      expect(repair[3]).toContain("3-8");
       expect(repair[3]).toContain("Preserve all research questions");
       expect(repair[17]).toMatchObject({ disableTools: true });
     },
@@ -480,7 +496,7 @@ describe("plan repair regressions", () => {
   });
 
   it.each([1, 9])(
-    "keeps %i-step failures bounded and localized without saving a truncated plan",
+    "replaces exhausted %i-step failures with a three-step starter plan",
     async (count) => {
       mocks.stream.mockResolvedValue(
         JSON.stringify({
@@ -490,15 +506,20 @@ describe("plan repair regressions", () => {
       );
       await execute();
       expect(mocks.stream).toHaveBeenCalledTimes(3);
-      expect(mocks.task).toMatchObject({
-        status: "failed",
-        error: {
-          code: "RESEARCH_PLAN_INVALID",
-          message: "runtime.error.planInvalid",
-          recoverable: true,
-        },
-      });
-      expect(mocks.task!.planVersions).toHaveLength(0);
+      expect(mocks.task!.status).toBe("plan_ready");
+      expect(mocks.task!.planVersions).toHaveLength(1);
+      expect(mocks.task!.planVersions[0].steps).toHaveLength(3);
+      expect(isStarterResearchPlan(mocks.task!.planVersions[0])).toBe(true);
+      expect(
+        isStarterResearchPlan({
+          ...mocks.task!.planVersions[0],
+          adjustment: "Edited plan",
+        }),
+      ).toBe(false);
+      expect(mocks.task!.planVersions[0].scope.allowedSourceTypes).toEqual([
+        "web",
+        "knowledge",
+      ]);
     },
   );
 });
@@ -531,3 +552,154 @@ it("records a recoverable planning failure even when its failure-state save cann
   expect(onError).toHaveBeenCalledOnce();
   expect(mocks.stream).not.toHaveBeenCalled();
 });
+
+describe("planning rollback", () => {
+  const existing = () => ({
+    ...mocks.task!,
+    status: "plan_ready" as const,
+    activePlanVersion: 1,
+    planVersions: [
+      {
+        ...plan,
+        id: "existing-plan",
+        version: 1,
+        createdAt: 1,
+        recon: buildResearchReconSnapshot({
+          enabled: false,
+          startedAt: 1,
+          completedAt: 1,
+          executedQueries: [],
+          toolCalls: [],
+        }),
+      },
+    ],
+  });
+
+  it("rejects exhausted edits and retains the approved plan without using a starter", async () => {
+    const previous = existing();
+    mocks.task = previous;
+    mocks.stream.mockResolvedValue("invalid JSON");
+    await expect(execute()).rejects.toThrow("runtime.error.adjustFailed");
+    expect(mocks.stream).toHaveBeenCalledTimes(3);
+    expect(mocks.task!.status).toBe("plan_ready");
+    expect(mocks.task!.planVersions).toEqual(previous.planVersions);
+    expect(mocks.task!.error?.code).toBe("RESEARCH_PLAN_ADJUST_FAILED");
+    expect(mocks.task!.agentRunIds.length).toBeGreaterThan(0);
+  });
+
+  it.each([
+    new ResearchModelUnavailableError(),
+    new AgentRunLeaseConflictError({
+      version: 1,
+      sessionId: "session",
+      runId: "other-run",
+      runIds: ["other-run"],
+      ownerId: "other-tab",
+      acquiredAt: 1,
+      checkpointAt: 1,
+      expiresAt: 1000,
+    }),
+    new Error("invalid API key"),
+    new DOMException("Interrupted", "AbortError"),
+  ])("retains a plan when planning fails with %s", async (error) => {
+    const previous = existing();
+    mocks.task = previous;
+    mocks.snapshotError = error;
+    await expect(execute()).rejects.toThrow("runtime.error.adjustFailed");
+    expect(mocks.task!.status).toBe("plan_ready");
+    expect(mocks.task!.planVersions).toEqual(previous.planVersions);
+    expect(mocks.stream).not.toHaveBeenCalled();
+  });
+
+  it("restores the completed snapshot and evidence after a failed refresh", async () => {
+    const previous = {
+      ...existing(),
+      status: "completed" as const,
+      endedAt: 123,
+    };
+    mocks.task = {
+      ...previous,
+      status: "clarifying",
+      pendingReportKind: "update",
+    };
+    mocks.stream.mockRejectedValue(new Error("invalid API key"));
+    await expect(
+      prepareResearchPlan({
+        taskId: "task",
+        previousTask: previous,
+        controller: new AbortController(),
+        t: ((key: string) => key) as ResearchTranslate,
+        localizedRuntimeError: () => "Failure",
+      }),
+    ).rejects.toThrow("runtime.error.adjustFailed");
+    expect(mocks.task).toMatchObject({
+      status: "completed",
+      endedAt: 123,
+      pendingReportKind: "initial",
+      evidence: previous.evidence,
+    });
+  });
+
+  it("does not undo a cancellation during editing", async () => {
+    mocks.task = existing();
+    mocks.stream.mockImplementation(async () => {
+      mocks.task = { ...mocks.task!, status: "cancelled" };
+      throw new DOMException("Cancelled", "AbortError");
+    });
+    await expect(execute()).rejects.toThrow("runtime.error.adjustFailed");
+    expect(mocks.task!.status).toBe("cancelled");
+  });
+});
+
+describe("safe planning model retry", () => {
+  it("retries closed-book connection loss before any output", async () => {
+    vi.useFakeTimers();
+    mocks.stream
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockResolvedValue(planOutput);
+    const pending = execute();
+    await vi.runAllTimersAsync();
+    await pending;
+    expect(mocks.stream).toHaveBeenCalledTimes(2);
+    expect(mocks.task!.status).toBe("plan_ready");
+  });
+
+  it("does not replay a closed-book round after output", async () => {
+    mocks.stream.mockImplementation(async (...args) => {
+      args[6]("partial plan");
+      throw new TypeError("Failed to fetch");
+    });
+    await execute();
+    expect(mocks.stream).toHaveBeenCalledTimes(1);
+    expect(mocks.task!.status).toBe("failed");
+    expect(mocks.task!.planVersions).toHaveLength(0);
+  });
+});
+
+it.each(["quota", "conflict"] as const)(
+  "preserves typed %s failures and the old plan without a rollback storage write",
+  async (reason) => {
+    mocks.stream.mockResolvedValue(planOutput);
+    await execute();
+    const previous = mocks.task!;
+    mocks.saves.mockClear();
+    const failure = new ResearchPersistenceError(reason);
+    mocks.stream.mockImplementation(async () => {
+      // Fail the final save, after the replacement plan has been validated.
+      mocks.saveError = failure;
+      return planOutput;
+    });
+    await expect(execute()).rejects.toBe(failure);
+    expect(mocks.saves).toHaveBeenCalledTimes(2);
+    expect(mocks.task).toMatchObject({
+      status: "plan_ready",
+      activePlanVersion: previous.activePlanVersion,
+      error: {
+        code: `RESEARCH_STORAGE_${reason}`,
+        message: "runtime.error.persistence",
+        recoverable: true,
+      },
+    });
+    expect(mocks.task!.planVersions).toEqual(previous.planVersions);
+  },
+);

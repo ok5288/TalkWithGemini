@@ -1,26 +1,27 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useId, useState } from "react";
 import { useTranslations } from "next-intl";
 
-import { Button, Dialog } from "@/components/ui/primitives";
-
-import type { FollowupMode } from "./workbenchUtils";
+import { X, RefreshCw } from "lucide-react";
+import { Button, Dialog, IconButton } from "@/components/ui/primitives";
 
 export function ResearchFollowupDialog({
-  mode,
+  open,
   onClose,
   onSubmit,
+  onUpdateLatest,
 }: {
-  mode: FollowupMode | null;
+  open: boolean;
   onClose: () => void;
+  onUpdateLatest?: () => void | Promise<void>;
   onSubmit: (value: string) => void | Promise<void>;
 }) {
   const t = useTranslations("Research");
   const [value, setValue] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(false);
-  const fieldId = `research-followup-${mode ?? "closed"}`;
+  const fieldId = useId();
 
   const close = () => {
     if (submitting) return;
@@ -31,14 +32,22 @@ export function ResearchFollowupDialog({
 
   return (
     <Dialog
-      open={mode !== null}
+      open={open}
       onClose={close}
-      title={mode ? t(`followup.${mode}.title`) : ""}
+      title={t("followup.continue.title")}
+      headerAction={
+        <IconButton
+          label={t("actions.closeWorkbench")}
+          icon={<X size={18} />}
+          onClick={close}
+          disabled={submitting}
+        />
+      }
       placement="responsive-sheet"
     >
-      {mode ? (
+      {open ? (
         <form
-          className="space-y-4 p-4"
+          className="max-h-[calc(92dvh-3.25rem)] space-y-4 overflow-y-auto p-4"
           onSubmit={async (event) => {
             event.preventDefault();
             const input = value.trim();
@@ -61,13 +70,13 @@ export function ResearchFollowupDialog({
               htmlFor={fieldId}
               className="text-sm font-medium text-foreground"
             >
-              {t(`followup.${mode}.label`)}
+              {t("followup.continue.label")}
             </label>
             <p
               id={`${fieldId}-help`}
               className="mt-1 text-xs leading-5 text-muted-foreground"
             >
-              {t(`followup.${mode}.help`)}
+              {t("followup.continue.help")}
             </p>
             <textarea
               id={fieldId}
@@ -75,7 +84,7 @@ export function ResearchFollowupDialog({
               value={value}
               onChange={(event) => setValue(event.target.value)}
               rows={5}
-              placeholder={t(`followup.${mode}.placeholder`)}
+              placeholder={t("followup.continue.placeholder")}
               className="mt-2 w-full resize-y rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             />
             {error ? (
@@ -87,19 +96,38 @@ export function ResearchFollowupDialog({
               </p>
             ) : null}
           </div>
-          <div className="flex justify-end gap-2 [&_button]:h-9 [&_button]:min-h-0 sm:[&_button]:h-8">
-            <Button onClick={close} disabled={submitting}>
-              {t("actions.dismiss")}
-            </Button>
+          <div className="flex flex-wrap justify-end gap-2 [&_button]:h-9 [&_button]:min-h-0 sm:[&_button]:h-8">
+            {onUpdateLatest ? (
+              <Button
+                variant="ghost"
+                disabled={submitting}
+                onClick={async () => {
+                  if (submitting) return;
+                  setSubmitting(true);
+                  setError(false);
+                  try {
+                    await onUpdateLatest();
+                    setValue("");
+                    onClose();
+                  } catch {
+                    setError(true);
+                  } finally {
+                    setSubmitting(false);
+                  }
+                }}
+              >
+                <RefreshCw size={14} aria-hidden="true" />
+                {t("actions.updateLatest")}
+              </Button>
+            ) : null}
             <Button
               type="submit"
-              variant="primary"
+              variant="research"
               disabled={!value.trim() || submitting}
-              className="bg-research-solid text-research-accent-foreground hover:bg-research-accent-hover"
             >
               {submitting
                 ? t("followup.submitting")
-                : t(`followup.${mode}.submit`)}
+                : t("followup.continue.submit")}
             </Button>
           </div>
         </form>

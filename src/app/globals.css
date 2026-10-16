@@ -210,6 +210,54 @@ html.dark {
   --markdown-surface-hover: #1f2937;
 }
 
+[data-panel-accent] {
+  --panel-accent-soft: color-mix(in srgb, var(--panel-accent) 10%, transparent);
+}
+
+[data-panel-accent="assistants"] {
+  --panel-accent: #f43f5e;
+  --panel-accent-2: #f97316;
+  --panel-accent-text: #e11d48;
+}
+
+[data-panel-accent="skills"] {
+  --panel-accent: #10b981;
+  --panel-accent-2: #06b6d4;
+  --panel-accent-text: #059669;
+}
+
+[data-panel-accent="plugins"] {
+  --panel-accent: #3b82f6;
+  --panel-accent-2: #a855f7;
+  --panel-accent-text: #2563eb;
+}
+
+[data-panel-accent="knowledge"] {
+  --panel-accent: #9333ea;
+  --panel-accent-2: #4f46e5;
+  --panel-accent-text: #9333ea;
+}
+
+html.dark [data-panel-accent] {
+  --panel-accent-soft: color-mix(in srgb, var(--panel-accent) 16%, transparent);
+}
+
+html.dark [data-panel-accent="assistants"] {
+  --panel-accent-text: #fb7185;
+}
+
+html.dark [data-panel-accent="skills"] {
+  --panel-accent-text: #34d399;
+}
+
+html.dark [data-panel-accent="plugins"] {
+  --panel-accent-text: #60a5fa;
+}
+
+html.dark [data-panel-accent="knowledge"] {
+  --panel-accent-text: #c084fc;
+}
+
 html[data-font-size="small"] {
   --neo-font-size-base: 12px;
   --neo-font-scale: 87.5%;
@@ -267,6 +315,10 @@ html {
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-brand: var(--brand);
+  --color-panel-accent: var(--panel-accent);
+  --color-panel-accent-2: var(--panel-accent-2);
+  --color-panel-accent-text: var(--panel-accent-text);
+  --color-panel-accent-soft: var(--panel-accent-soft);
   --color-brand-foreground: var(--brand-foreground);
   --color-brand-soft: var(--brand-soft);
   --color-brand-hover: var(--brand-hover);

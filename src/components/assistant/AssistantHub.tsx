@@ -1,14 +1,11 @@
 import React, { useState, useEffect, useMemo, useRef, useId } from "react";
 import { createPortal } from "react-dom";
 import {
-  Search,
   Loader2,
   X,
   Filter,
   Check,
   BotMessageSquare,
-  ChevronLeft,
-  ChevronRight,
   Plus,
   PenLine,
   Trash2,
@@ -60,6 +57,21 @@ import { logDevError } from "@/lib/utils/devLogger";
 import type { MarketLoadResult } from "@/lib/market/loadResult";
 import MarketLoadNotice from "@/components/ui/MarketLoadNotice";
 import { Button } from "@/components/ui/primitives";
+import {
+  PanelRoot,
+  PanelHeader,
+  PanelIconButton,
+  PanelSearch,
+  PanelSection,
+  PanelCard,
+  PanelCardActions,
+  PanelCardAction,
+  PanelBadge,
+  PanelCreateButton,
+  PanelEmpty,
+  PanelLoading,
+  PanelPagination,
+} from "@/components/ui/panel";
 import { CustomSelect, SimpleSwitch } from "@/components/ui/controls";
 import { diffAgentProfiles } from "@/lib/assistant/profileHistory";
 import { useAgentProfileRevisionStore } from "@/store/core/agentProfileRevisionStore";
@@ -635,13 +647,10 @@ const AssistantEditorModal = ({
         aria-labelledby={dialogTitleId}
         tabIndex={-1}
         onKeyDown={handleDialogKeyDown}
-        className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden overscroll-contain rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-border dark:bg-card"
+        className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden overscroll-contain rounded-2xl border border-border bg-card shadow-2xl dark:border-border dark:bg-card"
       >
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-border">
-          <h3
-            id={dialogTitleId}
-            className="text-lg font-bold text-gray-800 dark:text-foreground"
-          >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <h3 id={dialogTitleId} className="text-lg font-bold text-foreground">
             {isEditing ? t("editAssistant") : t("createAssistant")}
           </h3>
           <Button
@@ -650,7 +659,7 @@ const AssistantEditorModal = ({
             type="button"
             aria-label={t("closeEditor")}
             onClick={onClose}
-            className="rounded-full p-1 text-gray-500 transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:hover:bg-muted"
+            className="rounded-full p-1 text-muted-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:hover:bg-muted"
           >
             <X size={20} aria-hidden="true" />
           </Button>
@@ -662,11 +671,11 @@ const AssistantEditorModal = ({
             <div className="space-y-1">
               <label
                 htmlFor={avatarInputId}
-                className="text-xs font-semibold text-gray-500 dark:text-muted-foreground"
+                className="text-xs font-semibold text-muted-foreground"
               >
                 {t("avatar")}
               </label>
-              <div className="w-16 h-16 rounded-xl border border-gray-200 dark:border-border bg-gray-50 dark:bg-muted flex items-center justify-center text-2xl overflow-hidden relative group">
+              <div className="w-16 h-16 rounded-xl border border-border bg-muted flex items-center justify-center text-2xl overflow-hidden relative group">
                 {meta.avatar.startsWith("http") ? (
                   <SafeImage
                     src={meta.avatar}
@@ -675,7 +684,7 @@ const AssistantEditorModal = ({
                     fallback={
                       <BotMessageSquare
                         size={24}
-                        className="text-gray-400"
+                        className="text-muted-foreground/70"
                         aria-hidden="true"
                       />
                     }
@@ -699,7 +708,7 @@ const AssistantEditorModal = ({
                 name="assistant-avatar"
                 autoComplete="off"
                 spellCheck={false}
-                className="w-16 border-b border-gray-200 bg-transparent text-center text-[10px] outline-none focus:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:border-border"
+                className="w-16 border-b border-border bg-transparent text-center text-[10px] outline-none focus:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500/40 dark:border-border"
                 value={meta.avatar}
                 onChange={(e) => setMeta({ ...meta, avatar: e.target.value })}
                 maxLength={MARKET_LIMITS.maxAgentAvatarChars}
@@ -709,7 +718,7 @@ const AssistantEditorModal = ({
             <div className="flex-1 space-y-1">
               <label
                 htmlFor={nameInputId}
-                className="text-xs font-semibold text-gray-500 dark:text-muted-foreground"
+                className="text-xs font-semibold text-muted-foreground"
               >
                 {t("name")}
               </label>
@@ -718,7 +727,7 @@ const AssistantEditorModal = ({
                 name="assistant-name"
                 autoComplete="off"
                 spellCheck={false}
-                className="w-full px-3 py-2 bg-gray-50 dark:bg-muted border border-gray-200 dark:border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm font-medium text-gray-800 dark:text-foreground"
+                className="w-full px-3 py-2 bg-muted border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm font-medium text-foreground"
                 placeholder={t("namePlaceholder")}
                 value={meta.title}
                 maxLength={MARKET_LIMITS.maxAgentTitleChars}
@@ -729,7 +738,7 @@ const AssistantEditorModal = ({
                 <div className="flex-1 space-y-1">
                   <label
                     htmlFor={categoryInputId}
-                    className="text-xs font-semibold text-gray-500 dark:text-muted-foreground"
+                    className="text-xs font-semibold text-muted-foreground"
                   >
                     {t("category")}
                   </label>
@@ -738,7 +747,7 @@ const AssistantEditorModal = ({
                     name="assistant-category"
                     autoComplete="off"
                     spellCheck={false}
-                    className="w-full px-3 py-2 bg-gray-50 dark:bg-muted border border-gray-200 dark:border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-xs"
+                    className="w-full px-3 py-2 bg-muted border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-xs"
                     placeholder={t("category")}
                     value={meta.category}
                     maxLength={MARKET_LIMITS.maxAgentCategoryChars}
@@ -754,14 +763,14 @@ const AssistantEditorModal = ({
           <div className="space-y-1">
             <label
               htmlFor={descriptionInputId}
-              className="text-xs font-semibold text-gray-500 dark:text-muted-foreground"
+              className="text-xs font-semibold text-muted-foreground"
             >
               {t("description")}
             </label>
             <textarea
               id={descriptionInputId}
               name="assistant-description"
-              className="w-full px-3 py-2 bg-gray-50 dark:bg-muted border border-gray-200 dark:border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm resize-none h-20"
+              className="w-full px-3 py-2 bg-muted border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm resize-none h-20"
               placeholder={t("descriptionPlaceholder")}
               value={meta.description}
               maxLength={MARKET_LIMITS.maxAgentDescriptionChars}
@@ -775,7 +784,7 @@ const AssistantEditorModal = ({
             <div className="flex justify-between items-center">
               <label
                 htmlFor={systemPromptInputId}
-                className="flex items-center gap-1 text-xs font-semibold text-gray-500 dark:text-muted-foreground"
+                className="flex items-center gap-1 text-xs font-semibold text-muted-foreground"
               >
                 <Sparkles
                   size={12}
@@ -819,9 +828,9 @@ const AssistantEditorModal = ({
                 <div
                   role="status"
                   aria-live="polite"
-                  className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-white/50 backdrop-blur-[1px] dark:bg-card/50"
+                  className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-card/50 backdrop-blur-[1px] dark:bg-card/50"
                 >
-                  <div className="bg-white dark:bg-muted px-3 py-1.5 rounded-full shadow-sm border border-gray-100 dark:border-border flex items-center gap-2 text-xs font-medium text-blue-600">
+                  <div className="bg-card dark:bg-muted px-3 py-1.5 rounded-full shadow-sm border border-border flex items-center gap-2 text-xs font-medium text-blue-600">
                     <Loader2
                       size={12}
                       className="animate-spin"
@@ -835,7 +844,7 @@ const AssistantEditorModal = ({
                 id={systemPromptInputId}
                 name="assistant-system-prompt"
                 spellCheck={false}
-                className="w-full px-3 py-2 bg-gray-50 dark:bg-muted border border-gray-200 dark:border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm font-mono resize-none h-32 custom-scrollbar"
+                className="w-full px-3 py-2 bg-muted border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm font-mono resize-none h-32 custom-scrollbar"
                 placeholder={t("systemPromptPlaceholder")}
                 value={meta.systemRole}
                 maxLength={MARKET_LIMITS.maxAgentSystemRoleChars}
@@ -1028,10 +1037,6 @@ const AssistantEditorModal = ({
                       "sources",
                       "Source priorities",
                     ),
-                    strategy: researchTemplateText(
-                      "strategy",
-                      "Starting strategy",
-                    ),
                     templateEditor: {
                       title: researchTemplateText(
                         "editor.title",
@@ -1085,10 +1090,6 @@ const AssistantEditorModal = ({
                       addSource: researchTemplateText(
                         "editor.addSource",
                         "Add source priority",
-                      ),
-                      strategy: researchTemplateText(
-                        "editor.strategy",
-                        "Starting strategy",
                       ),
                       cancel: researchTemplateText("editor.cancel", "Cancel"),
                       save: researchTemplateText(
@@ -1570,7 +1571,7 @@ const AssistantEditorModal = ({
           <div className="space-y-2">
             <label
               htmlFor={tagInputId}
-              className="text-xs font-semibold text-gray-500 dark:text-muted-foreground"
+              className="text-xs font-semibold text-muted-foreground"
             >
               {t("tagsOptional")}
             </label>
@@ -1578,7 +1579,7 @@ const AssistantEditorModal = ({
               {meta.tags.map((tag) => (
                 <span
                   key={tag}
-                  className="flex items-center gap-1 px-2 py-1 bg-gray-100 dark:bg-muted rounded-lg text-xs text-gray-600 dark:text-foreground/85"
+                  className="flex items-center gap-1 px-2 py-1 bg-muted rounded-lg text-xs text-foreground/85"
                 >
                   #{tag}
                   <Button
@@ -1599,7 +1600,7 @@ const AssistantEditorModal = ({
                 name="assistant-tag"
                 autoComplete="off"
                 spellCheck={false}
-                className="flex-1 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-border dark:bg-muted"
+                className="flex-1 rounded-xl border border-border bg-muted px-3 py-2 text-xs focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-border dark:bg-muted"
                 placeholder={t("addTagPlaceholder")}
                 value={tagInput}
                 maxLength={MARKET_LIMITS.maxAgentTagChars}
@@ -1617,7 +1618,7 @@ const AssistantEditorModal = ({
                 aria-label={t("addTagAria")}
                 onClick={handleAddTag}
                 disabled={meta.tags.length >= MARKET_LIMITS.maxAgentTags}
-                className="rounded-xl bg-gray-100 px-3 py-2 text-gray-600 hover:bg-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-muted dark:text-foreground/85 dark:hover:bg-accent"
+                className="rounded-xl bg-muted px-3 py-2 text-foreground/85 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-muted dark:text-foreground/85 dark:hover:bg-accent"
               >
                 <Plus size={16} aria-hidden="true" />
               </Button>
@@ -1625,7 +1626,7 @@ const AssistantEditorModal = ({
           </div>
         </div>
 
-        <div className="p-5 border-t border-gray-100 dark:border-border bg-gray-50/50 dark:bg-card/50 flex justify-between gap-3">
+        <div className="p-5 border-t border-border bg-muted/50 dark:bg-card/50 flex justify-between gap-3">
           {onDelete && (
             <Button
               variant="bare"
@@ -1659,7 +1660,7 @@ const AssistantEditorModal = ({
               variant="bare"
               type="button"
               onClick={onClose}
-              className="rounded-xl px-4 py-2 text-sm text-gray-600 transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:text-muted-foreground dark:hover:bg-muted"
+              className="rounded-xl px-4 py-2 text-sm text-foreground/85 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:text-muted-foreground dark:hover:bg-muted"
             >
               {t("cancel")}
             </Button>
@@ -1667,7 +1668,7 @@ const AssistantEditorModal = ({
               variant="bare"
               type="button"
               onClick={handleSubmit}
-              className="flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-2 text-sm font-medium text-white shadow-lg shadow-blue-500/20 transition-colors hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-background"
+              className="flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-2 text-sm font-medium text-white shadow-lg shadow-blue-500/20 transition-colors hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
               <Save size={16} aria-hidden="true" /> {t("saveAssistant")}
             </Button>
@@ -1794,7 +1795,7 @@ const AssistantCard: React.FC<AssistantCardProps> = ({
           fallback={
             <BotMessageSquare
               size={20}
-              className="text-gray-400"
+              className="text-muted-foreground/70"
               aria-hidden="true"
             />
           }
@@ -1809,13 +1810,7 @@ const AssistantCard: React.FC<AssistantCardProps> = ({
   };
 
   return (
-    <article
-      className={`group relative flex h-full overflow-hidden rounded-2xl border bg-white/40 backdrop-blur-md transition-[border-color,box-shadow] duration-300 dark:bg-muted/40 ${
-        hasOverride
-          ? "border-rose-200 dark:border-rose-900/50"
-          : "border-gray-200 hover:border-rose-300 hover:shadow-lg hover:shadow-rose-500/5 dark:border-border dark:hover:border-rose-700"
-      }`}
-    >
+    <PanelCard as="article" highlighted={hasOverride}>
       <Button
         variant="bare"
         type="button"
@@ -1830,46 +1825,54 @@ const AssistantCard: React.FC<AssistantCardProps> = ({
             : t("selectAssistantAria", { title: agent.meta.title })
         }
         onClick={() => onClick(agent)}
-        className="flex h-full w-full flex-col p-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-rose-500 dark:focus-visible:ring-rose-400"
+        className="flex h-full w-full flex-col p-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-panel-accent"
       >
         <div className="mb-3 flex items-center justify-between gap-3 pr-16">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-gray-100 bg-white dark:border-input dark:bg-accent">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-card dark:border-input dark:bg-accent">
               {renderAvatar(agent.meta.avatar)}
             </div>
 
             <div className="flex min-w-0 flex-col items-start gap-1">
               <div className="flex min-w-0 flex-wrap items-center gap-1.5">
                 {agent.isCustom && (
-                  <span className="shrink-0 rounded-full bg-blue-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                  <PanelBadge
+                    tone="info"
+                    className="shrink-0 uppercase tracking-wide"
+                  >
                     <span className="truncate">{t("custom")}</span>
-                  </span>
+                  </PanelBadge>
                 )}
                 {hasOverride && (
-                  <span className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                  <PanelBadge
+                    tone="warning"
+                    className="shrink-0 uppercase tracking-wide"
+                  >
                     <span className="truncate">{t("edited")}</span>
-                  </span>
+                  </PanelBadge>
                 )}
                 {agent.profile?.runtime.agentEnabled && (
-                  <span className="flex shrink-0 items-center gap-1 rounded-full bg-rose-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-rose-700 dark:bg-rose-900/30 dark:text-rose-300">
+                  <PanelBadge className="shrink-0 uppercase tracking-wide">
                     <BotMessageSquare size={9} aria-hidden="true" />
                     <span className="truncate">{t("agentBadge")}</span>
-                  </span>
+                  </PanelBadge>
                 )}
                 {agent.meta.category && (
-                  <span className="max-w-25 shrink-0 truncate rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600 dark:bg-accent dark:text-foreground/85">
-                    {formatCategoryName(agent.meta.category)}
-                  </span>
+                  <PanelBadge tone="neutral" className="max-w-25 shrink-0">
+                    <span className="truncate">
+                      {formatCategoryName(agent.meta.category)}
+                    </span>
+                  </PanelBadge>
                 )}
               </div>
             </div>
           </div>
         </div>
 
-        <h3 className="mb-1 truncate text-sm font-bold text-gray-800 transition-colors group-hover:text-rose-600 dark:text-foreground dark:group-hover:text-rose-400">
+        <h3 className="mb-1 truncate text-sm font-bold text-foreground transition-colors group-hover:text-panel-accent-text">
           {agent.meta.title}
         </h3>
-        <p className="mb-3 line-clamp-2 flex-1 text-xs leading-relaxed text-gray-500 dark:text-muted-foreground">
+        <p className="mb-3 line-clamp-2 flex-1 text-xs leading-relaxed text-muted-foreground">
           {agent.meta.description}
         </p>
 
@@ -1885,15 +1888,12 @@ const AssistantCard: React.FC<AssistantCardProps> = ({
         <div className="mt-auto flex items-center justify-between gap-3">
           <div className="flex min-w-0 flex-wrap gap-1">
             {agent.meta.tags.slice(0, 3).map((tag) => (
-              <span
-                key={tag}
-                className="max-w-24 truncate rounded border border-rose-100 bg-rose-50 px-1.5 py-0.5 text-[9px] text-rose-600 dark:border-rose-900/30 dark:bg-rose-900/10 dark:text-rose-400"
-              >
-                #{tag}
-              </span>
+              <PanelBadge key={tag} className="max-w-24">
+                <span className="truncate">#{tag}</span>
+              </PanelBadge>
             ))}
             {agent.meta.tags.length > 3 && (
-              <span className="px-1.5 py-0.5 text-[9px] text-gray-400">
+              <span className="px-1.5 py-0.5 text-[9px] text-muted-foreground/70">
                 +{agent.meta.tags.length - 3}
               </span>
             )}
@@ -1901,74 +1901,70 @@ const AssistantCard: React.FC<AssistantCardProps> = ({
         </div>
       </Button>
 
-      <div className="absolute right-4 top-4 z-10 flex shrink-0 items-center gap-1 opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-within:opacity-100">
-        <Button
-          variant="bare"
-          type="button"
+      <PanelCardActions>
+        <PanelCardAction
           aria-label={t("editAssistantAria", { title: agent.meta.title })}
           aria-busy={isDetailLoading || undefined}
           onClick={(e) => onEdit(e, agent)}
-          className="relative rounded-lg border border-gray-200 bg-white/90 p-1.5 text-gray-500 shadow-sm backdrop-blur-sm transition-colors hover:bg-blue-50 hover:text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:cursor-not-allowed disabled:opacity-60 dark:border-border dark:bg-popover/90 dark:text-muted-foreground dark:hover:bg-blue-900/30 dark:hover:text-blue-400"
+          className="relative"
           disabled={isDetailLoading}
         >
           {isDetailLoading ? (
             <Loader2
               size={14}
-              className="animate-spin text-blue-500"
+              className="animate-spin text-panel-accent-text"
               aria-hidden="true"
             />
           ) : (
             <PenLine size={14} aria-hidden="true" />
           )}
-        </Button>
+        </PanelCardAction>
         {onDelete && (
-          <Button
-            variant="bare"
-            type="button"
+          <PanelCardAction
+            tone="danger"
             aria-label={
               isDeleteConfirming
                 ? t("confirmDeleteAssistantAria", { title: agent.meta.title })
                 : t("deleteAssistantAria", { title: agent.meta.title })
             }
             onClick={handleDeleteClick}
-            className={`rounded-lg border border-gray-200 bg-white/90 p-1.5 shadow-sm backdrop-blur-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60 dark:border-border dark:bg-popover/90 ${
+            className={
               isDeleteConfirming
                 ? "text-red-600 dark:text-red-300"
-                : "text-gray-500 hover:bg-red-50 hover:text-red-600 dark:text-muted-foreground dark:hover:bg-red-900/30 dark:hover:text-red-400"
-            }`}
+                : "text-muted-foreground hover:text-red-600 dark:hover:text-red-400"
+            }
           >
             {isDeleteConfirming ? (
               <Check size={14} aria-hidden="true" />
             ) : (
               <Trash2 size={14} aria-hidden="true" />
             )}
-          </Button>
+          </PanelCardAction>
         )}
         {hasOverride && onReset && !onDelete && (
-          <Button
-            variant="bare"
-            type="button"
+          <PanelCardAction
+            tone="warning"
             aria-label={
               isResetConfirming
                 ? t("confirmResetAria", { title: agent.meta.title })
                 : t("resetAria", { title: agent.meta.title })
             }
             onClick={handleResetClick}
-            className={`rounded-lg border border-gray-200 bg-white/90 p-1.5 shadow-sm backdrop-blur-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60 dark:border-border dark:bg-popover/90 ${
+            className={
               isResetConfirming
                 ? "text-amber-600 dark:text-amber-300"
-                : "text-gray-500 hover:bg-amber-50 hover:text-amber-600 dark:text-muted-foreground dark:hover:bg-amber-900/30 dark:hover:text-amber-400"
-            }`}
+                : "text-muted-foreground hover:text-amber-600 dark:hover:text-amber-400"
+            }
           >
             {isResetConfirming ? (
               <Check size={14} aria-hidden="true" />
             ) : (
               <RefreshCcw size={14} aria-hidden="true" />
             )}
-          </Button>
+          </PanelCardAction>
         )}
-      </div>
-    </article>
+      </PanelCardActions>
+    </PanelCard>
   );
 };
 
@@ -2320,7 +2316,7 @@ const AssistantHub: React.FC<AssistantHubProps> = ({ onClose, onSelect }) => {
   })();
 
   return (
-    <div className="flex flex-col h-full w-full relative overflow-hidden animate-in fade-in duration-300">
+    <PanelRoot accent="assistants">
       {showEditor && (
         <AssistantEditorModal
           agent={editingAgent}
@@ -2331,53 +2327,30 @@ const AssistantHub: React.FC<AssistantHubProps> = ({ onClose, onSelect }) => {
       )}
 
       {/* Header */}
-      <div className="sticky top-0 z-10 flex shrink-0 items-center justify-between gap-3 border-b border-gray-200/50 bg-white/40 px-6 py-4 backdrop-blur-md dark:border-border dark:bg-card/40">
-        <div className="flex min-w-0 items-center gap-3">
-          <div
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-linear-to-tr from-rose-500 to-orange-500 text-white shadow-lg shadow-rose-500/20"
-            aria-hidden="true"
-          >
-            <BotMessageSquare size={20} />
-          </div>
-          <div className="min-w-0">
-            <h1 className="truncate text-lg font-bold text-gray-800 dark:text-foreground">
-              {t("hubTitle")}
-            </h1>
-            <p className="truncate text-xs text-gray-500 dark:text-muted-foreground">
-              {t("hubSubtitle")}
-            </p>
-          </div>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <Button
-            variant="bare"
-            type="button"
+      <PanelHeader
+        icon={<BotMessageSquare size={20} />}
+        title={t("hubTitle")}
+        subtitle={t("hubSubtitle")}
+        onClose={onClose}
+        closeLabel={t("closeHubAria")}
+        actions={
+          <PanelIconButton
             aria-label={t("refreshAgentsAria")}
             aria-busy={isRefreshing || undefined}
             onClick={handleRefresh}
             disabled={isRefreshing}
-            className="rounded-full p-2 text-gray-500 transition-colors hover:bg-gray-200/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/60 disabled:cursor-not-allowed disabled:opacity-50 dark:text-muted-foreground dark:hover:bg-accent/50"
           >
             <RefreshCw
               size={18}
               className={isRefreshing ? "animate-spin" : ""}
               aria-hidden="true"
             />
-          </Button>
-          <Button
-            variant="bare"
-            type="button"
-            aria-label={t("closeHubAria")}
-            onClick={onClose}
-            className="rounded-full p-2 text-gray-500 transition-colors hover:bg-gray-200/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/60 dark:text-muted-foreground dark:hover:bg-accent/50"
-          >
-            <X size={20} aria-hidden="true" />
-          </Button>
-        </div>
-      </div>
+          </PanelIconButton>
+        }
+      />
 
       {marketNoticeMessage ? (
-        <div className="mx-6 mt-4">
+        <div className="mx-4 mt-4 sm:mx-6">
           <MarketLoadNotice
             status={marketLoadResult?.status}
             message={marketNoticeMessage}
@@ -2389,58 +2362,31 @@ const AssistantHub: React.FC<AssistantHubProps> = ({ onClose, onSelect }) => {
       ) : null}
 
       {/* Search Bar */}
-      <div className="mx-auto flex w-full max-w-7xl shrink-0 gap-3 px-6 pb-6 pt-6">
-        <div className="group relative min-w-0 flex-1">
-          <div className="absolute inset-0 bg-rose-500/20 dark:bg-rose-500/10 rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-          <div className="relative flex items-center rounded-2xl border border-gray-200 bg-white/60 px-4 py-3 shadow-sm backdrop-blur-xl transition-[border-color,box-shadow] focus-within:border-rose-500/50 focus-within:ring-2 focus-within:ring-rose-500/30 dark:border-border dark:bg-muted/60">
-            <label htmlFor={searchInputId} className="sr-only">
-              {t("searchLabel")}
-            </label>
-            <Search
-              size={20}
-              className="mr-3 text-gray-400"
-              aria-hidden="true"
-            />
-            <input
-              id={searchInputId}
-              type="text"
-              name="assistant-search"
-              autoComplete="off"
-              spellCheck={false}
-              placeholder={t("searchPlaceholder")}
-              className="min-w-0 flex-1 border-none bg-transparent text-base text-gray-800 outline-none placeholder-gray-400 dark:text-foreground"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-        </div>
-      </div>
+      <PanelSearch
+        id={searchInputId}
+        name="assistant-search"
+        label={t("searchLabel")}
+        placeholder={t("searchPlaceholder")}
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+      />
 
       {/* Content Grid */}
       <div className="flex-1 overflow-y-auto px-4 pb-10 custom-scrollbar">
         <div className="max-w-7xl mx-auto flex flex-col min-h-full gap-8">
           {/* Local Assistants Section */}
-          <div>
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 px-1">
-              <h2 className="flex min-w-0 items-center gap-2 truncate text-sm font-bold uppercase tracking-wider text-gray-800 dark:text-foreground">
-                <Library
-                  size={16}
-                  className="text-rose-500"
-                  aria-hidden="true"
-                />
-                <span className="truncate">{t("localAssistants")}</span>
-              </h2>
-              <Button
-                variant="bare"
-                type="button"
+          <PanelSection
+            title={t("localAssistants")}
+            icon={<Library size={16} aria-hidden="true" />}
+            actions={
+              <PanelCreateButton
                 aria-label={t("createCustomAria")}
                 onClick={handleCreateNew}
-                className="flex shrink-0 items-center gap-1 rounded-lg bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-600 transition-colors hover:bg-rose-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/60 dark:bg-rose-900/20 dark:text-rose-400 dark:hover:bg-rose-900/30"
               >
-                <Plus size={14} aria-hidden="true" /> {t("custom")}
-              </Button>
-            </div>
-
+                {t("custom")}
+              </PanelCreateButton>
+            }
+          >
             {filteredLocalAgents.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {filteredLocalAgents.map((agent) => (
@@ -2462,99 +2408,87 @@ const AssistantHub: React.FC<AssistantHubProps> = ({ onClose, onSelect }) => {
                 ))}
               </div>
             ) : (
-              <div className="text-center py-12 text-gray-400 text-sm">
-                {t("noLocalAssistants")}
-              </div>
+              <PanelEmpty>{t("noLocalAssistants")}</PanelEmpty>
             )}
-          </div>
+          </PanelSection>
 
           {/* All Assistants Section */}
-          <div className="flex-1 flex flex-col">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 px-1">
-              <h2 className="min-w-0 truncate text-sm font-bold uppercase tracking-wider text-gray-500 dark:text-muted-foreground">
-                {searchTerm
-                  ? t("foundRemote", { count: filteredApiAgents.length })
-                  : t("allAssistants")}
-              </h2>
-
-              {/* Category Filter */}
-              <div className="relative shrink-0">
-                <DropdownMenu
-                  open={showCategoryFilter}
-                  onOpenChange={setShowCategoryFilter}
-                >
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="bare"
-                      type="button"
-                      aria-label={
-                        selectedCategories.length > 0
-                          ? t("filterCategoriesSelectedAria", {
-                              count: selectedCategories.length,
-                            })
-                          : t("filterCategoriesAria")
-                      }
-                      className={`flex shrink-0 items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/60 ${
-                        selectedCategories.length > 0
-                          ? "bg-rose-50 text-rose-600 dark:bg-rose-900/20 dark:text-rose-400"
-                          : "bg-transparent text-gray-600 hover:bg-gray-100 dark:text-foreground/85 dark:hover:bg-muted"
-                      }`}
-                    >
-                      <Filter size={12} aria-hidden="true" />
-                      <span>
-                        {selectedCategories.length > 0
-                          ? t("selectedCount", {
-                              count: selectedCategories.length,
-                            })
-                          : t("filter")}
-                      </span>
-                    </Button>
-                  </DropdownMenuTrigger>
-
-                  <DropdownMenuContent
-                    side="bottom"
-                    align="end"
-                    className="max-h-80 w-64 overflow-y-auto custom-scrollbar"
+          <PanelSection
+            title={
+              searchTerm
+                ? t("foundRemote", { count: filteredApiAgents.length })
+                : t("allAssistants")
+            }
+            muted
+            className="flex flex-1 flex-col"
+            actions={
+              <>
+                {/* Category Filter */}
+                <div className="relative shrink-0">
+                  <DropdownMenu
+                    open={showCategoryFilter}
+                    onOpenChange={setShowCategoryFilter}
                   >
-                    <DropdownMenuItem
-                      variant="destructive"
-                      disabled={selectedCategories.length === 0}
-                      onSelect={() => setSelectedCategories([])}
-                    >
-                      {t("clearSelection")}
-                    </DropdownMenuItem>
-                    {categories.map((cat) => (
-                      <DropdownMenuCheckboxItem
-                        key={cat}
-                        checked={selectedCategories.includes(cat)}
-                        onSelect={(event) => event.preventDefault()}
-                        onCheckedChange={() => toggleCategory(cat)}
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="bare"
+                        type="button"
+                        aria-label={
+                          selectedCategories.length > 0
+                            ? t("filterCategoriesSelectedAria", {
+                                count: selectedCategories.length,
+                              })
+                            : t("filterCategoriesAria")
+                        }
+                        className={`flex shrink-0 items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-panel-accent/60 ${
+                          selectedCategories.length > 0
+                            ? "bg-panel-accent-soft text-panel-accent-text"
+                            : "bg-transparent text-foreground/85 hover:bg-muted dark:text-foreground/85 dark:hover:bg-muted"
+                        }`}
                       >
-                        <span className="truncate">
-                          {formatCategoryName(cat)}
+                        <Filter size={12} aria-hidden="true" />
+                        <span>
+                          {selectedCategories.length > 0
+                            ? t("selectedCount", {
+                                count: selectedCategories.length,
+                              })
+                            : t("filter")}
                         </span>
-                      </DropdownMenuCheckboxItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            </div>
+                      </Button>
+                    </DropdownMenuTrigger>
 
+                    <DropdownMenuContent
+                      side="bottom"
+                      align="end"
+                      className="max-h-80 w-64 overflow-y-auto custom-scrollbar"
+                    >
+                      <DropdownMenuItem
+                        variant="destructive"
+                        disabled={selectedCategories.length === 0}
+                        onSelect={() => setSelectedCategories([])}
+                      >
+                        {t("clearSelection")}
+                      </DropdownMenuItem>
+                      {categories.map((cat) => (
+                        <DropdownMenuCheckboxItem
+                          key={cat}
+                          checked={selectedCategories.includes(cat)}
+                          onSelect={(event) => event.preventDefault()}
+                          onCheckedChange={() => toggleCategory(cat)}
+                        >
+                          <span className="truncate">
+                            {formatCategoryName(cat)}
+                          </span>
+                        </DropdownMenuCheckboxItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </>
+            }
+          >
             {isLoading ? (
-              <div
-                role="status"
-                aria-live="polite"
-                className="flex h-64 flex-col items-center justify-center gap-4 text-gray-400"
-              >
-                <Loader2
-                  size={32}
-                  className="animate-spin text-rose-500"
-                  aria-hidden="true"
-                />
-                <span className="text-sm font-medium">
-                  {t("loadingAssistants")}
-                </span>
-              </div>
+              <PanelLoading label={t("loadingAssistants")} />
             ) : (
               <>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 flex-1 content-start">
@@ -2580,48 +2514,28 @@ const AssistantHub: React.FC<AssistantHubProps> = ({ onClose, onSelect }) => {
                   marketLoadResult &&
                   ["fresh", "cache", "fallback"].includes(
                     marketLoadResult.status,
-                  ) && (
-                    <div className="text-center py-12 text-gray-400">
-                      <p>{t("noAssistantsFound")}</p>
-                    </div>
-                  )}
+                  ) && <PanelEmpty>{t("noAssistantsFound")}</PanelEmpty>}
 
                 {/* Pagination Controls */}
                 {totalPages > 1 && (
-                  <div className="py-6 flex items-center justify-center gap-4 mt-auto">
-                    <Button
-                      variant="bare"
-                      type="button"
-                      aria-label={t("prevPageAria")}
-                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                      disabled={currentPage === 1}
-                      className="rounded-lg border border-gray-200 bg-white p-2 text-gray-600 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/60 disabled:cursor-not-allowed disabled:opacity-50 dark:border-border dark:bg-muted dark:text-foreground/85 dark:hover:bg-accent"
-                    >
-                      <ChevronLeft size={16} aria-hidden="true" />
-                    </Button>
-                    <span className="text-sm font-medium tabular-nums text-gray-600 dark:text-foreground/85">
-                      {t("pageOf", { currentPage, totalPages })}
-                    </span>
-                    <Button
-                      variant="bare"
-                      type="button"
-                      aria-label={t("nextPageAria")}
-                      onClick={() =>
-                        setCurrentPage((p) => Math.min(totalPages, p + 1))
-                      }
-                      disabled={currentPage === totalPages}
-                      className="rounded-lg border border-gray-200 bg-white p-2 text-gray-600 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/60 disabled:cursor-not-allowed disabled:opacity-50 dark:border-border dark:bg-muted dark:text-foreground/85 dark:hover:bg-accent"
-                    >
-                      <ChevronRight size={16} aria-hidden="true" />
-                    </Button>
-                  </div>
+                  <PanelPagination
+                    page={currentPage}
+                    totalPages={totalPages}
+                    onPrev={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    onNext={() =>
+                      setCurrentPage((p) => Math.min(totalPages, p + 1))
+                    }
+                    prevLabel={t("prevPageAria")}
+                    nextLabel={t("nextPageAria")}
+                    label={t("pageOf", { currentPage, totalPages })}
+                  />
                 )}
               </>
             )}
-          </div>
+          </PanelSection>
         </div>
       </div>
-    </div>
+    </PanelRoot>
   );
 };
 

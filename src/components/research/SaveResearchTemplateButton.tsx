@@ -222,7 +222,7 @@ export default function SaveResearchTemplateButton({
       </div>
       {api.error ? (
         <p
-          className="mt-1.5 text-[10px] text-red-600 dark:text-red-400"
+          className="mt-1.5 text-xs text-red-600 dark:text-red-400"
           role="alert"
         >
           {api.error}
@@ -233,7 +233,7 @@ export default function SaveResearchTemplateButton({
           variant="bare"
           type="button"
           onClick={() => setOpen(false)}
-          className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-[10px] text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-research-accent/50"
+          className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-research-accent/50"
         >
           <X size={12} aria-hidden="true" />
           {labels.cancel}
@@ -243,7 +243,7 @@ export default function SaveResearchTemplateButton({
           type="button"
           onClick={() => void handleSave()}
           disabled={!name.trim() || !description.trim() || api.isLoading}
-          className="inline-flex h-7 items-center gap-1 rounded-md bg-research-accent px-2.5 text-[10px] font-medium text-white hover:bg-research-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-research-accent/50 disabled:opacity-50"
+          className="inline-flex h-7 items-center gap-1 rounded-md bg-research-accent px-2.5 text-xs font-medium text-white hover:bg-research-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-research-accent/50 disabled:opacity-50"
         >
           {saved ? <Check size={12} aria-hidden="true" /> : null}
           {saved ? labels.saved : labels.confirm}

@@ -17,6 +17,7 @@ import {
   Message,
   MessageOutputBlock,
   ChatConfig,
+  ChatMode,
   Workspace,
   Attachment,
   SessionConfig,
@@ -58,7 +59,7 @@ import {
   isReasoningEnabled,
   normalizeReasoningMode,
 } from "@/lib/chat/reasoning";
-import { normalizeChatMode } from "@/lib/chat/mode";
+import { applyChatMode, normalizeChatMode } from "@/lib/chat/mode";
 import { deleteFromOPFS } from "@/utils/opfs";
 import { logDevError } from "@/lib/utils/devLogger";
 import { deleteSessionArchives } from "@/services/workspace/sessionArchive";
@@ -336,6 +337,8 @@ interface ChatState {
 
   selectedModel: string;
   chatConfig: ChatConfig;
+  // Runtime-only selection revisions; never persisted with session metadata.
+  sessionModeRevisions: Record<string, number>;
 
   // Actions
   createTemporarySession: () => string;
@@ -454,6 +457,7 @@ interface ChatState {
 
   setModel: (model: string) => void;
   setChatConfig: (config: Partial<ChatConfig>) => void;
+  setSessionChatMode: (sessionId: string, mode: ChatMode) => void;
 
   // Helper to get current session metadata
   getCurrentSession: () => Session | undefined;
@@ -516,6 +520,22 @@ const isReusableEmptySession = (
   );
 };
 
+const hasModeSelection = (config: Partial<SessionConfig>) =>
+  config.chatMode !== undefined ||
+  config.useAgentMode !== undefined ||
+  config.useDeepResearch !== undefined;
+
+const advanceSessionModeRevision = (
+  state: ChatState,
+  sessionId: string | null,
+) =>
+  sessionId && state.sessions.some((session) => session.id === sessionId)
+    ? {
+        ...state.sessionModeRevisions,
+        [sessionId]: (state.sessionModeRevisions[sessionId] ?? 0) + 1,
+      }
+    : state.sessionModeRevisions;
+
 const applySessionConfig = (
   currentConfig: ChatConfig,
   sessionConfig?: SessionConfig,
@@ -563,6 +583,7 @@ export const useChatStore = create<ChatState>()(
       activeSessionLoadError: null,
       selectedModel: "",
       chatConfig: { ...DEFAULT_CHAT_CONFIG },
+      sessionModeRevisions: {},
 
       discardTemporarySession: () => {
         const state = get();
@@ -575,6 +596,11 @@ export const useChatStore = create<ChatState>()(
         );
         set({
           sessions: state.sessions.filter((s) => !isTemporarySession(s)),
+          sessionModeRevisions: Object.fromEntries(
+            Object.entries(state.sessionModeRevisions).filter(
+              ([id]) => !temporary.some((session) => session.id === id),
+            ),
+          ),
           ...(wasTemporary
             ? {
                 currentSessionId: null,
@@ -784,6 +810,11 @@ export const useChatStore = create<ChatState>()(
 
           return {
             sessions: filtered,
+            sessionModeRevisions: Object.fromEntries(
+              Object.entries(state.sessionModeRevisions).filter(
+                ([sessionId]) => sessionId !== id,
+              ),
+            ),
             currentSessionId: nextId,
             activeMessages: nextActiveMessages,
             activeMessageTree: nextMessageTree,
@@ -940,6 +971,9 @@ export const useChatStore = create<ChatState>()(
 
       updateSessionConfig: (id, config) => {
         set((state) => ({
+          ...(hasModeSelection(config)
+            ? { sessionModeRevisions: advanceSessionModeRevision(state, id) }
+            : {}),
           sessions: state.sessions.map((s) =>
             s.id === id
               ? normalizeSession({
@@ -2097,6 +2131,14 @@ export const useChatStore = create<ChatState>()(
 
       setChatConfig: (config) =>
         set((state) => ({
+          ...(hasModeSelection(config)
+            ? {
+                sessionModeRevisions: advanceSessionModeRevision(
+                  state,
+                  state.currentSessionId,
+                ),
+              }
+            : {}),
           chatConfig: normalizeChatConfig({
             ...state.chatConfig,
             ...config,
@@ -2105,6 +2147,32 @@ export const useChatStore = create<ChatState>()(
               : {}),
           }),
         })),
+
+      setSessionChatMode: (sessionId, mode) =>
+        set((state) => {
+          if (!state.sessions.some((session) => session.id === sessionId))
+            return state;
+          return {
+            sessionModeRevisions: advanceSessionModeRevision(state, sessionId),
+            sessions: state.sessions.map((session) =>
+              session.id === sessionId
+                ? {
+                    ...session,
+                    config: normalizeSessionConfig(
+                      applyChatMode(session.config || {}, mode),
+                    ),
+                  }
+                : session,
+            ),
+            ...(state.currentSessionId === sessionId
+              ? {
+                  chatConfig: normalizeChatConfig(
+                    applyChatMode(state.chatConfig, mode),
+                  ),
+                }
+              : {}),
+          };
+        }),
 
       getCurrentSession: () => {
         const state = get();

@@ -17,6 +17,8 @@ import type { BuiltinResearchHostContext } from "../services/api/chat/builtinToo
 import { createKnowledgeCollectionAttachment } from "../lib/utils/knowledgeAttachments";
 
 const mocks = vi.hoisted(() => ({
+  researchTasks: {} as Record<string, import("@/lib/research").ResearchTask>,
+  readReport: vi.fn(),
   executePluginFunction: vi.fn(),
   settingsState: {} as Record<string, unknown>,
   memoryState: {} as Record<string, unknown>,
@@ -30,6 +32,19 @@ const mocks = vi.hoisted(() => ({
   retrieveKnowledgeSources: vi.fn(),
   writeWorkspaceText: vi.fn(),
   readWorkspaceText: vi.fn(),
+}));
+
+vi.mock("@/store/core/researchStore", () => ({
+  useResearchStore: {
+    getState: () => ({
+      tasksById: mocks.researchTasks,
+      loadSessionTasks: vi.fn(),
+    }),
+  },
+}));
+vi.mock("@/utils/opfs", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/utils/opfs")>()),
+  resolveOPFSBlob: mocks.readReport,
 }));
 
 vi.mock("@/utils/pluginUtils", () => ({
@@ -361,6 +376,8 @@ const imagePlugin: Plugin = {
 describe("chat service tool execution", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    mocks.researchTasks = {};
+    mocks.readReport.mockReset();
     mocks.executePluginFunction.mockReset();
     mocks.settingsState = {
       system: { enableDestructiveToolConfirmation: false },
@@ -534,6 +551,132 @@ describe("chat service tool execution", () => {
     };
     return { message, block: parsed.block };
   }
+
+  it.each([true, false])(
+    "keeps dynamic report references through compression into provider history (attachments %s)",
+    async (attachment) => {
+      mocks.settingsState.customModelMetadata = {
+        "openai:gpt-test": { attachment },
+      };
+      const { createResearchTask } = await import("@/lib/research");
+      const { prepareHistoryForLLM } =
+        await import("@/services/api/chat/compression");
+      const report = {
+        id: "report",
+        version: 1,
+        artifactId: "artifact",
+        summary: "Fallback summary",
+        keyFindings: ["Finding"],
+        gaps: ["Gap"],
+      } as import("@/lib/research").ResearchReportVersion;
+      mocks.researchTasks = {
+        visible: {
+          ...createResearchTask({
+            id: "visible",
+            sessionId: "session-1",
+            goal: "Research",
+          }),
+          status: "completed",
+          reportVersions: [report],
+          activeReportVersion: 1,
+        },
+      };
+      mocks.researchTasks.hidden = {
+        ...mocks.researchTasks.visible,
+        id: "hidden",
+      };
+      mocks.researchTasks.foreign = {
+        ...mocks.researchTasks.visible,
+        id: "foreign",
+        sessionId: "other-session",
+      };
+      mocks.readReport.mockResolvedValue(
+        new Blob([
+          "Report v1 [Source 1]\n[Source 1] https://example.com/evidence",
+        ]),
+      );
+      const history: Message[] = [
+        { id: "first", role: "user", content: "Research", timestamp: 1 },
+        {
+          id: "card",
+          role: "model",
+          content: "Completed",
+          timestamp: 2,
+          outputBlocks: [
+            { id: "ref", type: "research_task", taskId: "visible" },
+            { id: "duplicate", type: "research_task", taskId: "visible" },
+            { id: "foreign", type: "research_task", taskId: "foreign" },
+          ],
+        },
+        { id: "tail", role: "user", content: "Explain", timestamp: 3 },
+      ];
+      const compression = {
+        compressedContent: "Conversation summary",
+        lastCompressedMessageId: "card",
+      };
+      const prepared = await prepareHistoryForLLM(
+        history,
+        compression,
+        "openai:gpt-test",
+      );
+      expect(
+        prepared[1].outputBlocks?.map(
+          (block) => block.type === "research_task" && block.taskId,
+        ),
+      ).toEqual(["visible", "foreign"]);
+      const fetchMock = vi
+        .spyOn(globalThis, "fetch")
+        .mockImplementation(async () => sseResponse([{ type: "done" }]));
+      const payloadText = async () => {
+        await sendUiHistory(prepared);
+        const payload = JSON.parse(
+          String(fetchMock.mock.calls.at(-1)![1]?.body),
+        );
+        const { MessageSchema } = await import("@/lib/api/schemas");
+        const { prepareOpenAIHistory } = await import("@/lib/utils/history");
+        return JSON.stringify(
+          prepareOpenAIHistory(
+            payload.history.map((item: unknown) => MessageSchema.parse(item)),
+          ),
+        );
+      };
+      expect(await payloadText()).toContain("https://example.com/evidence");
+      expect(mocks.readReport).toHaveBeenCalledTimes(1);
+      mocks.researchTasks.visible = {
+        ...mocks.researchTasks.visible,
+        activeReportVersion: 2,
+        reportVersions: [report, { ...report, version: 2, artifactId: "v2" }],
+      };
+      mocks.readReport.mockResolvedValue(new Blob(["Report v2 current body"]));
+      const updated = await payloadText();
+      expect(updated).toContain("Report v2 current body");
+      expect(updated).not.toContain("Report v1");
+      mocks.readReport.mockRejectedValue(new Error("missing"));
+      expect(await payloadText()).toContain("Fallback summary");
+      mocks.readReport.mockResolvedValue(new Blob(["x".repeat(25_000)]));
+      const oversized = await payloadText();
+      expect(oversized).toContain("Fallback summary");
+      expect(oversized).not.toContain("x".repeat(25_000));
+      mocks.settingsState.customModelMetadata = {
+        "openai:gpt-test": {
+          attachment,
+          limit: { context: 3500, output: 500 },
+        },
+      };
+      mocks.readReport.mockResolvedValue(new Blob(["Report ".repeat(3000)]));
+      await payloadText();
+      const bounded = JSON.parse(String(fetchMock.mock.calls.at(-1)![1]?.body));
+      expect(
+        bounded.history.reduce(
+          (sum: number, item: Message) => sum + item.content.length,
+          0,
+        ),
+      ).toBeLessThan(3500 * 4);
+      delete mocks.researchTasks.visible;
+      expect(await payloadText()).not.toContain("Research report context");
+      expect(compression.compressedContent).toBe("Conversation summary");
+    },
+  );
 
   it("sends persisted current UI results in provider history content", async () => {
     const fetchMock = vi
@@ -4203,6 +4346,143 @@ describe("chat service tool execution", () => {
     ).toBe(false);
   });
 
+  it.each(["research", "agent"] as const)(
+    "keeps online connection failures recoverable only for %s execution",
+    async (mode) => {
+      vi.stubGlobal("navigator", { onLine: true });
+      vi.spyOn(globalThis, "fetch").mockRejectedValueOnce(
+        new TypeError("Failed to fetch"),
+      );
+      const { streamChatResponse } =
+        await import("../services/api/chatService");
+      const { useAgentRunStore } = await import("../store/core/agentRunStore");
+      const runId = `online-network-${mode}`;
+      await expect(
+        streamChatResponse(
+          "session-1",
+          "openai:gpt-4",
+          [],
+          "Research",
+          [],
+          { chatMode: mode },
+          vi.fn(),
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          {
+            agentRun: { id: runId },
+            abortAgentRunAsInterrupted: true,
+            ...(mode === "research"
+              ? {
+                  executionWorkflow: {
+                    kind: "research",
+                    phase: "execute",
+                  } as const,
+                }
+              : {}),
+          },
+        ),
+      ).rejects.toThrow("Failed to fetch");
+      expect(useAgentRunStore.getState().runsById[runId].status).toBe(
+        mode === "research" ? "interrupted" : "failed",
+      );
+      vi.unstubAllGlobals();
+    },
+  );
+
+  it.each([429, 400])(
+    "retains host search refund receipts after normalizing HTTP %i",
+    async (status) => {
+      mocks.searchCompatibility = { enabled: true, mode: "external" };
+      mocks.settingsState = {
+        ...mocks.settingsState,
+        search: { provider: "firecrawl", configs: { firecrawl: {} } },
+      };
+      const { SearchRequestError } = await import("@/lib/search/errors");
+      vi.mocked(createSearchProvider).mockRejectedValueOnce(
+        new SearchRequestError(
+          "failure",
+          status,
+          "SEARCH_HTTP_ERROR",
+          "provider",
+        ),
+      );
+      vi.spyOn(globalThis, "fetch")
+        .mockResolvedValueOnce(
+          sseResponse([
+            {
+              type: "tool_call",
+              toolCall: {
+                id: "search",
+                name: "web_search",
+                args: { query: "solar physics" },
+                status: "pending",
+              },
+            },
+            { type: "done" },
+          ]),
+        )
+        .mockResolvedValueOnce(
+          sseResponse([
+            { type: "content", content: "Search unavailable" },
+            { type: "done" },
+          ]),
+        );
+      const { streamChatResponse } =
+        await import("../services/api/chatService");
+      let calls: ToolCall[] = [];
+      const queryBudget = { remainingQueries: 1, maxResultsPerQuery: 5 };
+      await streamChatResponse(
+        "session-1",
+        "openai:gpt-4",
+        [],
+        "Find solar physics",
+        [],
+        { chatMode: "research", useSearch: true },
+        vi.fn(),
+        undefined,
+        undefined,
+        (value) => {
+          calls = value;
+        },
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        {
+          researchQueryBudget: queryBudget,
+          executionWorkflow: { kind: "research", phase: "execute" },
+        },
+      );
+      expect(calls[0].result).toMatchObject({
+        ok: false,
+        error: { code: "SEARCH_HTTP_ERROR" },
+        refundedQueries: status === 429 ? ["solar physics"] : [],
+      });
+      const { getResearchQueriesFromToolCalls } =
+        await import("@/lib/research/toolCallInsights");
+      const { sanitizeCheckpointToolCall, isCommittedCheckpointToolCall } =
+        await import("@/lib/research/checkpointCodec");
+      expect(
+        getResearchQueriesFromToolCalls(
+          calls
+            .filter(isCommittedCheckpointToolCall)
+            .map(sanitizeCheckpointToolCall),
+        ),
+      ).toEqual(status === 429 ? [] : ["solar physics"]);
+    },
+  );
+
   it("streams Agent web-search results through the existing citation channel", async () => {
     mocks.searchCompatibility = { enabled: true, mode: "external" };
     mocks.settingsState = {
@@ -5100,6 +5380,97 @@ describe("chat service tool execution", () => {
       expect(chunks).toEqual(["Complete"]);
     });
 
+    it("preserves upstream HTTP status and provider error code", async () => {
+      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ error: "Rejected key", code: "PROVIDER_AUTH" }),
+          { status: 401, headers: { "content-type": "application/json" } },
+        ),
+      );
+      const { streamChatResponse } =
+        await import("../services/api/chatService");
+      await expect(
+        streamChatResponse(
+          "session-1",
+          "openai:gpt-4",
+          [],
+          "Answer",
+          [],
+          {},
+          vi.fn(),
+        ),
+      ).rejects.toMatchObject({
+        status: 401,
+        code: "PROVIDER_AUTH",
+        message: "Rejected key",
+      });
+    });
+
+    it("preserves the host research start failure", async () => {
+      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        sseResponse([
+          {
+            type: "tool_call",
+            toolCall: {
+              id: "start",
+              name: "start_deep_research",
+              args: {
+                query: "Research this question",
+                budgetPreset: "standard",
+              },
+              status: "pending",
+            },
+          },
+          { type: "done" },
+        ]),
+      );
+      const { registerResearchToolEmitters } =
+        await import("../services/research/runtime");
+      const error = Object.assign(
+        new Error("Research persistence unavailable"),
+        { code: "RESEARCH_PERSISTENCE_FAILED" },
+      );
+      const unregister = registerResearchToolEmitters({
+        start: vi.fn().mockRejectedValue(error),
+        adjustPlan: vi.fn(),
+        confirmPlan: vi.fn(),
+      });
+      try {
+        const { streamChatResponse } =
+          await import("../services/api/chatService");
+        await expect(
+          streamChatResponse(
+            "session-1",
+            "openai:gpt-4",
+            [],
+            "Research",
+            [],
+            { chatMode: "research" },
+            vi.fn(),
+          ),
+        ).rejects.toBe(error);
+      } finally {
+        unregister();
+      }
+    });
+
+    it("returns a specific error when research lacks tool calling", async () => {
+      mocks.supportsToolCalls.mockReturnValueOnce(false);
+      const { streamChatResponse } =
+        await import("../services/api/chatService");
+      await expect(
+        streamChatResponse(
+          "session-1",
+          "openai:gpt-4",
+          [],
+          "Research",
+          [],
+          { chatMode: "research" },
+          vi.fn(),
+        ),
+      ).rejects.toMatchObject({ code: "RESEARCH_TOOL_CALLING_REQUIRED" });
+    });
+
     it("rejects an early EOF as a recoverable incomplete stream while preserving chunks", async () => {
       const chunks: string[] = [];
       vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
@@ -5407,4 +5778,119 @@ describe("chat service tool execution", () => {
       ).rejects.toMatchObject({ name: "IncompleteChatStreamError" });
     });
   });
+  it.each([false, true])(
+    "commits specialized search reservations before dispatch (quota failure: %s)",
+    async (failCommit) => {
+      const { RESEARCH_SOURCE_PLUGINS } =
+        await import("@/lib/plugin/researchSources/catalog");
+      const { createPluginFunctionFingerprint } =
+        await import("@/lib/plugin/confirmation");
+      const { ResearchPersistenceError } =
+        await import("@/services/research/taskRepository/errors");
+      const plugin = RESEARCH_SOURCE_PLUGINS.find(
+        (item) => item.id === "arxiv",
+      )!;
+      const fingerprint = await createPluginFunctionFingerprint(
+        plugin,
+        plugin.functions[0],
+      );
+      mocks.settingsState = {
+        ...mocks.settingsState,
+        installedPlugins: [plugin],
+      };
+      mocks.executePluginFunction.mockResolvedValue({
+        provider: "arxiv",
+        operation: "search",
+        documents: [],
+      });
+      vi.spyOn(globalThis, "fetch")
+        .mockResolvedValueOnce(
+          sseResponse([
+            {
+              type: "tool_call",
+              toolCall: {
+                id: "reserved-arxiv",
+                name: "search_arxiv",
+                args: { query: "retrieval research" },
+                status: "pending",
+              },
+            },
+            { type: "done" },
+          ]),
+        )
+        .mockResolvedValueOnce(
+          sseResponse([
+            { type: "content", content: "No documents." },
+            { type: "done" },
+          ]),
+        );
+      let announce!: () => void;
+      let release!: () => void;
+      const started = new Promise<void>((resolve) => {
+        announce = resolve;
+      });
+      const committed = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const error = new ResearchPersistenceError("quota");
+      const queryBudget = {
+        remainingQueries: 2,
+        maxResultsPerQuery: 5,
+        seenQueries: new Set<string>(),
+        persistQueries: async () => {
+          announce();
+          await committed;
+          if (failCommit) throw error;
+        },
+      };
+      const { streamChatResponse } =
+        await import("../services/api/chatService");
+      const running = streamChatResponse(
+        "session-1",
+        "openai:gpt-4",
+        [],
+        "Search approved sources",
+        [],
+        { chatMode: "research" },
+        vi.fn(),
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        ["arxiv"],
+        undefined,
+        undefined,
+        createAllowOnceController(),
+        {
+          executionWorkflow: { kind: "research", phase: "execute" },
+          allowedToolIds: ["search_arxiv"],
+          enforceAllowedToolIds: true,
+          allowedToolEffects: ["network_read"],
+          researchQueryBudget: queryBudget,
+          researchSourceContracts: {
+            search_arxiv: {
+              pluginId: "arxiv",
+              functionFingerprint: fingerprint,
+            },
+          },
+        },
+      );
+      const completion = failCommit
+        ? expect(running).rejects.toBe(error)
+        : expect(running).resolves.toBe("No documents.");
+      await started;
+      expect(queryBudget.remainingQueries).toBe(1);
+      expect([...queryBudget.seenQueries]).toEqual([
+        "arxiv:retrieval research:::",
+      ]);
+      expect(mocks.executePluginFunction).not.toHaveBeenCalled();
+      release();
+      await completion;
+      expect(mocks.executePluginFunction).toHaveBeenCalledTimes(
+        failCommit ? 0 : 1,
+      );
+    },
+  );
 });

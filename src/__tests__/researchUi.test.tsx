@@ -23,7 +23,6 @@ import {
 import messageMessages from "@/i18n/locales/en/Message.json";
 import researchMessages from "@/i18n/locales/en/Research.json";
 import evidenceQuestionMessages from "@/i18n/locales/en/EvidenceQuestions.json";
-import steeringMessages from "@/i18n/locales/en/ResearchSteering.json";
 import templateMessages from "@/i18n/locales/en/ResearchTemplates.json";
 import japaneseResearchMessages from "@/i18n/locales/ja/Research.json";
 import chineseResearchMessages from "@/i18n/locales/zh/Research.json";
@@ -373,7 +372,6 @@ function renderWithResearchMessages(node: React.ReactNode) {
       locale="en"
       messages={{
         EvidenceQuestions: evidenceQuestionMessages,
-        ResearchSteering: steeringMessages,
         ResearchTemplates: templateMessages,
         Message: messageMessages,
         Research: researchMessages,
@@ -389,23 +387,213 @@ async function flushDialogFocus() {
 }
 
 describe("ResearchTaskCard", () => {
-  it("localizes legacy report headings in the chat document preview", () => {
+  it("requires approval and changes real thoroughness through the task action", async () => {
+    const start = vi.fn();
+    const preset = vi.fn();
+    renderWithResearchMessages(
+      <ResearchTaskCard
+        task={approvalTask}
+        onOpenWorkbench={vi.fn()}
+        onConfirmPlan={start}
+        onUpdatePlanPreset={preset}
+      />,
+    );
+    expect(start).not.toHaveBeenCalled();
+    expect(screen.queryByRole("spinbutton")).toBeNull();
+    expect(screen.queryByText("Full research contract")).toBeNull();
+    await userEvent.click(screen.getByRole("radio", { name: "Quick" }));
+    expect(preset).toHaveBeenCalledExactlyOnceWith("quick");
+    await userEvent.click(screen.getByRole("button", { name: "Start" }));
+    expect(start).toHaveBeenCalledOnce();
+  });
+  it("edits in a sheet and keeps failed edit text available", async () => {
+    const adjust = vi.fn().mockRejectedValue(new Error("network"));
+    renderWithResearchMessages(
+      <ResearchTaskCard
+        task={baseTask}
+        onOpenWorkbench={vi.fn()}
+        onAdjustPlan={adjust}
+      />,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Edit plan" }));
+    const dialog = await screen.findByRole("dialog");
+    await flushDialogFocus();
+    const input = within(dialog).getByRole("textbox");
+    await userEvent.type(input, "Focus on primary sources");
+    await userEvent.click(
+      within(dialog).getByRole("button", {
+        name: researchMessages.adjust.submit,
+      }),
+    );
+    expect(adjust).toHaveBeenCalledWith("Focus on primary sources");
+    expect((input as HTMLTextAreaElement).value).toBe(
+      "Focus on primary sources",
+    );
+    expect(within(dialog).getByRole("alert")).toBeTruthy();
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Edit plan" }));
+    const reopened = await screen.findByRole("dialog");
+    await flushDialogFocus();
+    expect(
+      (within(reopened).getByRole("textbox") as HTMLTextAreaElement).value,
+    ).toBe("");
+    expect(within(reopened).queryByRole("alert")).toBeNull();
+  });
+  it("labels starter plans and links the frozen search-off scope to settings", async () => {
+    const navigate = vi.fn();
+    window.addEventListener("neo-chat:settings-tab-navigate", navigate);
+    renderWithResearchMessages(
+      <ResearchTaskCard
+        task={{
+          ...baseTask,
+          plan: { ...baseTask.plan!, isStarter: true },
+          sourceScope: { ...baseTask.sourceScope!, searchEnabled: false },
+        }}
+        onOpenWorkbench={vi.fn()}
+      />,
+    );
+    expect(screen.getByText(researchMessages.card.starterNotice)).toBeTruthy();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Open search settings" }),
+    );
+    expect(navigate.mock.calls[0][0].detail.tab).toBe("search");
+    window.removeEventListener("neo-chat:settings-tab-navigate", navigate);
+  });
+  it("shows only the latest activity without metrics or estimated progress", () => {
+    renderWithResearchMessages(
+      <ResearchTaskCard
+        task={{
+          ...orchestratedTask,
+          activities: [
+            ...baseTask.activities,
+            {
+              ...baseTask.activities[0],
+              id: "latest",
+              title: "Reading the latest source",
+            },
+          ],
+        }}
+        onOpenWorkbench={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("Reading the latest source")).toBeTruthy();
+    expect(screen.queryByText(baseTask.activities[0].title)).toBeNull();
+    expect(screen.queryByRole("progressbar")).toBeNull();
+    expect(screen.queryByText("Queries")).toBeNull();
+  });
+  it("offers a clear paused reason and resumes committed work", async () => {
+    const resume = vi.fn();
+    renderWithResearchMessages(
+      <ResearchTaskCard
+        task={{
+          ...orchestratedTask,
+          status: "paused",
+          error: {
+            code: "RESEARCH_CONNECTION_LOST",
+            message: "Connection lost; progress saved.",
+            recoverable: true,
+          },
+        }}
+        onOpenWorkbench={vi.fn()}
+        onResume={resume}
+      />,
+    );
+    expect(screen.getByText("Connection lost; progress saved.")).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Resume" }));
+    expect(resume).toHaveBeenCalledOnce();
+  });
+  it("confirms Discard and directs authentication failures to model settings", async () => {
+    const discard = vi.fn();
+    const navigate = vi.fn();
+    window.addEventListener("neo-chat:settings-tab-navigate", navigate);
+    renderWithResearchMessages(
+      <ResearchTaskCard
+        task={{
+          ...baseTask,
+          status: "failed",
+          error: {
+            code: "RESEARCH_MODEL_AUTH",
+            message: "API key rejected.",
+            recoverable: true,
+          },
+        }}
+        onOpenWorkbench={vi.fn()}
+        onDismiss={discard}
+        onRetry={vi.fn()}
+      />,
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Open model settings" }),
+    );
+    expect(navigate.mock.calls[0][0].detail.tab).toBe("providers");
+    await userEvent.click(screen.getByRole("button", { name: "Discard" }));
+    expect(discard).not.toHaveBeenCalled();
+    await userEvent.click(
+      screen.getByRole("button", {
+        name: researchMessages.actions.confirmDiscard,
+      }),
+    );
+    expect(discard).toHaveBeenCalledOnce();
+    window.removeEventListener("neo-chat:settings-tab-navigate", navigate);
+  });
+  it("collapses finished details, retains the report and opens deliberate follow-up", async () => {
+    const more = vi.fn();
+    renderWithResearchMessages(
+      <ResearchTaskCard
+        task={partialTask}
+        onOpenWorkbench={vi.fn()}
+        onContinueResearch={more}
+      />,
+    );
+    const summary = screen
+      .getByText(/Research finished with limits/)
+      .closest("summary")!;
+    expect(summary.parentElement?.hasAttribute("open")).toBe(false);
+    expect(
+      screen.getByTestId("research-report-markdown").textContent,
+    ).toContain("Full report body");
+    await userEvent.click(summary);
+    expect(screen.getByText(partialTask.gapSummary!)).toBeTruthy();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Research more" }),
+    );
+    const dialog = await screen.findByRole("dialog");
+    await flushDialogFocus();
+    await userEvent.type(
+      within(dialog).getByRole("textbox"),
+      "Investigate remaining gaps",
+    );
+    await userEvent.click(
+      within(dialog).getByRole("button", {
+        name: researchMessages.followup.continue.submit,
+      }),
+    );
+    expect(more).toHaveBeenCalledWith("Investigate remaining gaps");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Research more" }),
+    );
+    const reopened = await screen.findByRole("dialog");
+    await flushDialogFocus();
+    expect(
+      (within(reopened).getByRole("textbox") as HTMLTextAreaElement).value,
+    ).toBe("");
+  });
+  it("localizes legacy report headings in the chat preview", () => {
     render(
       <NextIntlClientProvider
         locale="zh"
         messages={{
           Research: chineseResearchMessages,
           Message: messageMessages,
-          ResearchSteering: steeringMessages,
-          ResearchTemplates: templateMessages,
-          EvidenceQuestions: evidenceQuestionMessages,
         }}
       >
         <ResearchTaskCard
           task={{
             ...completedTask,
-            reportVersions: completedTask.reportVersions.map((report) => ({
-              ...report,
+            reportVersions: completedTask.reportVersions.map((r) => ({
+              ...r,
               markdown: "# Report\n\n## Executive summary\nBody.",
             })),
           }}
@@ -416,1074 +604,244 @@ describe("ResearchTaskCard", () => {
     expect(
       screen.getByTestId("research-report-markdown").textContent,
     ).toContain("## 执行摘要");
-    expect(
-      screen.getByTestId("research-report-markdown").textContent,
-    ).not.toContain("## Executive summary");
-  });
-
-  it("omits volatile coverage progress and uses activity lifecycle status", () => {
-    renderWithResearchMessages(
-      <ResearchTaskCard task={orchestratedTask} onOpenWorkbench={vi.fn()} />,
-    );
-
-    expect(screen.queryByRole("progressbar")).toBeNull();
-    expect(screen.queryByText(/Verified coverage/)).toBeNull();
-    const activity = screen
-      .getByText("Collected primary documentation")
-      .closest("h3");
-    expect(activity?.querySelector(".lucide-circle-check")).toBeTruthy();
-    expect(activity?.querySelector(".lucide-loader-circle")).toBeNull();
-  });
-
-  it("explains that a legacy scope pause resumes from committed evidence", async () => {
-    const onResume = vi.fn();
-    const user = userEvent.setup();
-    renderWithResearchMessages(
-      <ResearchTaskCard
-        task={{
-          ...orchestratedTask,
-          status: "paused",
-          error: {
-            code: "RESEARCH_SCOPE_APPROVAL_REQUIRED",
-            message: "Scope expansion requires approval.",
-            recoverable: true,
-          },
-        }}
-        onOpenWorkbench={vi.fn()}
-        onResume={onResume}
-      />,
-    );
-
-    expect(
-      screen.getByText(/Resume to continue from committed evidence/),
-    ).toBeTruthy();
-    await user.click(screen.getByRole("button", { name: "Resume" }));
-    expect(onResume).toHaveBeenCalledOnce();
-  });
-
-  it("shows the active final report without repeating summary or findings", async () => {
-    const onOpenWorkbench = vi.fn();
-    renderWithResearchMessages(
-      <ResearchTaskCard
-        task={completedTask}
-        onOpenWorkbench={onOpenWorkbench}
-      />,
-    );
-
-    expect(screen.queryByText("A concise card summary.")).toBeNull();
-    expect(screen.queryByText("Finding one")).toBeNull();
-    expect(screen.queryByText("Finding four")).toBeNull();
-    expect(
-      screen.getByText(/# Updated research systems report\s+Full report body/),
-    ).toBeTruthy();
-    expect(screen.queryByText(/# Research systems report\s+Older/)).toBeNull();
-    expect(
-      screen.getByLabelText(
-        "Long text document: Updated research systems report",
-      ),
-    ).toBeTruthy();
-    expect(screen.queryByText(/One source could not/)).toBeNull();
-
-    await userEvent.click(
-      screen.getAllByRole("button", {
-        name: "Open long text document Updated research systems report in full screen",
-      })[0],
-    );
-    expect(onOpenWorkbench).toHaveBeenCalledOnce();
-  });
-
-  it("shows a partial report in the chat document block", () => {
-    renderWithResearchMessages(
-      <ResearchTaskCard task={partialTask} onOpenWorkbench={vi.fn()} />,
-    );
-
-    expect(screen.getByText(/One source could not/)).toBeTruthy();
-    expect(screen.queryByText("A concise card summary.")).toBeNull();
-    expect(screen.queryByText("Finding one")).toBeNull();
-    expect(
-      screen.getByText(/# Updated research systems report\s+Full report body/),
-    ).toBeTruthy();
-    expect(
-      screen.getByLabelText(
-        "Long text document: Updated research systems report",
-      ),
-    ).toBeTruthy();
-  });
-
-  it("confirms a plan and submits a natural-language adjustment", async () => {
-    const onConfirmPlan = vi.fn();
-    const onAdjustPlan = vi.fn();
-    const user = userEvent.setup();
-    renderWithResearchMessages(
-      <ResearchTaskCard
-        task={baseTask}
-        onOpenWorkbench={vi.fn()}
-        onConfirmPlan={onConfirmPlan}
-        onAdjustPlan={onAdjustPlan}
-        onCancel={vi.fn()}
-      />,
-    );
-
-    for (const step of [
-      "Collect sources",
-      "Verify claims",
-      "Write report",
-      "Audit citations",
-    ]) {
-      expect(screen.getByText(step)).toBeTruthy();
-    }
-    expect(
-      screen.queryByText("Compare the systems using primary documentation."),
-    ).toBeNull();
-
-    await user.click(screen.getByRole("button", { name: "Start research" }));
-    expect(onConfirmPlan).toHaveBeenCalledOnce();
-
-    await user.click(screen.getByRole("button", { name: "Adjust plan" }));
-    await user.type(
-      screen.getByRole("textbox", { name: "Describe the change" }),
-      "Prioritize primary sources",
-    );
-    await user.click(screen.getByRole("button", { name: "Create new plan" }));
-    expect(onAdjustPlan).toHaveBeenCalledWith("Prioritize primary sources");
-  });
-
-  it("shows a recoverable error separately with retry and dismiss actions", async () => {
-    const onRetry = vi.fn();
-    const onDismiss = vi.fn();
-    const user = userEvent.setup();
-    renderWithResearchMessages(
-      <ResearchTaskCard
-        task={{
-          ...baseTask,
-          status: "failed",
-          summary: "The original research goal.",
-          error: {
-            message: "The research run lost its model connection.",
-            recoverable: true,
-          },
-        }}
-        onOpenWorkbench={vi.fn()}
-        onRetry={onRetry}
-        onDismiss={onDismiss}
-      />,
-    );
-
-    expect(
-      screen.getByText("The research run lost its model connection."),
-    ).toBeTruthy();
-    expect(screen.getByText("The original research goal.")).toBeTruthy();
-    await user.click(screen.getByRole("button", { name: "Retry" }));
-    await user.click(screen.getByRole("button", { name: "Dismiss" }));
-    expect(onRetry).toHaveBeenCalledOnce();
-    expect(onDismiss).toHaveBeenCalledOnce();
-  });
-
-  it("offers retry while a recoverable plan conflict stays clarifying", async () => {
-    const onRetry = vi.fn();
-    const user = userEvent.setup();
-    renderWithResearchMessages(
-      <ResearchTaskCard
-        task={{
-          ...baseTask,
-          status: "clarifying",
-          error: {
-            message: "Another tab is running this session.",
-            recoverable: true,
-          },
-        }}
-        onOpenWorkbench={vi.fn()}
-        onRetry={onRetry}
-      />,
-    );
-
-    await user.click(screen.getByRole("button", { name: "Retry" }));
-    expect(onRetry).toHaveBeenCalledOnce();
-    expect(screen.queryByRole("button", { name: "Dismiss" })).toBeNull();
-  });
-
-  it("submits bounded advanced strategy values before plan approval", async () => {
-    const onUpdatePlanStrategy = vi.fn();
-    const user = userEvent.setup();
-    renderWithResearchMessages(
-      <ResearchTaskCard
-        task={approvalTask}
-        onOpenWorkbench={vi.fn()}
-        onUpdatePlanStrategy={onUpdatePlanStrategy}
-      />,
-    );
-
-    await user.click(screen.getByRole("button", { name: "Tune strategy" }));
-    const breadth = screen.getByRole("spinbutton", { name: "Breadth" });
-    const depth = screen.getByRole("spinbutton", { name: "Depth" });
-    const queries = screen.getByRole("spinbutton", { name: "Queries" });
-    const results = screen.getByRole("spinbutton", { name: "Results" });
-    expect(breadth.getAttribute("min")).toBe("1");
-    expect(breadth.getAttribute("max")).toBe("8");
-    expect(depth.getAttribute("max")).toBe("4");
-    expect(queries.getAttribute("min")).toBe("2");
-    expect(queries.getAttribute("max")).toBe("48");
-    expect(results.getAttribute("min")).toBe("3");
-    expect(results.getAttribute("max")).toBe("10");
-
-    await user.clear(breadth);
-    await user.type(breadth, "6");
-    await user.clear(depth);
-    await user.type(depth, "3");
-    await user.clear(queries);
-    await user.type(queries, "32");
-    await user.clear(results);
-    await user.type(results, "8");
-    await user.click(screen.getByRole("button", { name: "Save strategy" }));
-
-    expect(onUpdatePlanStrategy).toHaveBeenCalledWith({
-      initialBreadth: 6,
-      maxDepth: 3,
-      maxQueries: 32,
-      resultsPerQuery: 8,
-    });
   });
 });
 
 describe("ResearchGlobalBar", () => {
-  it("freezes elapsed time at the recorded end even when reopened days later", () => {
+  it("ticks live elapsed time and freezes stopped runs", () => {
     vi.useFakeTimers();
-    vi.setSystemTime(10 * 24 * 60 * 60 * 1_000);
-    renderWithResearchMessages(
-      <ResearchGlobalBar
-        task={{
-          ...orchestratedTask,
-          status: "completed",
-          run: {
-            ...orchestratedTask.run!,
-            startedAt: 1_000,
-            endedAt: 61_000,
-          },
-        }}
-        onOpenWorkbench={vi.fn()}
-      />,
-    );
-
-    expect(screen.getByText("1m 0s")).toBeTruthy();
-  });
-
-  it("falls back to persisted usage for a stopped run without an end time", () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(10 * 24 * 60 * 60 * 1_000);
-    renderWithResearchMessages(
-      <ResearchGlobalBar
-        task={{
-          ...orchestratedTask,
-          status: "paused",
-          run: { ...orchestratedTask.run!, startedAt: 1_000 },
-        }}
-        onOpenWorkbench={vi.fn()}
-      />,
-    );
-
-    expect(screen.getByText("1m 30s")).toBeTruthy();
-  });
-
-  it("ticks elapsed time only while the run is active", () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(11_000);
-    renderWithResearchMessages(
-      <ResearchGlobalBar
-        task={{
-          ...orchestratedTask,
-          run: { ...orchestratedTask.run!, startedAt: 1_000 },
-        }}
-        onOpenWorkbench={vi.fn()}
-      />,
-    );
-
-    expect(screen.getByText("10s")).toBeTruthy();
-    act(() => vi.advanceTimersByTime(2_000));
-    expect(screen.getByText("12s")).toBeTruthy();
-  });
-
-  it("announces the active task and exposes return and pause actions", async () => {
-    const onOpenWorkbench = vi.fn();
-    const onPause = vi.fn();
-    const user = userEvent.setup();
-    renderWithResearchMessages(
-      <ResearchGlobalBar
-        task={{ ...baseTask, status: "researching" }}
-        onOpenWorkbench={onOpenWorkbench}
-        onPause={onPause}
-      />,
-    );
-
-    await user.click(screen.getByRole("button", { name: "Pause safely" }));
-    const returnButton = screen.getByRole("button", {
-      name: "Return to research",
-    });
-    expect(returnButton.className).toContain("border-gray-200");
-    expect(returnButton.className).not.toContain("bg-research-solid");
-    await user.click(returnButton);
-    expect(onPause).toHaveBeenCalledOnce();
-    expect(onOpenWorkbench).toHaveBeenCalledOnce();
-    expect(screen.getByLabelText("Active deep research")).toBeTruthy();
-  });
-
-  it("prioritizes a running activity and falls back to the current phase", () => {
+    vi.setSystemTime(new Date(100_000));
+    const task = {
+      ...orchestratedTask,
+      run: { ...orchestratedTask.run!, startedAt: 90_000, endedAt: undefined },
+    };
     const { rerender } = renderWithResearchMessages(
-      <ResearchGlobalBar
-        task={{
-          ...orchestratedTask,
-          activities: [
-            { ...orchestratedTask.activities[0], status: "committed" },
-            {
-              id: "activity-running",
-              createdAt: Date.UTC(2026, 7, 24, 1),
-              phase: "researching",
-              status: "running",
-              title: "Fetching the primary policy",
-            },
-          ],
-        }}
-        onOpenWorkbench={vi.fn()}
-      />,
+      <ResearchGlobalBar task={task} onOpenWorkbench={vi.fn()} />,
     );
-
-    expect(screen.getByText("Fetching the primary policy")).toBeTruthy();
+    expect(screen.getByText("10s")).toBeTruthy();
+    act(() => vi.advanceTimersByTime(1000));
+    expect(screen.getByText("11s")).toBeTruthy();
     rerender(
       <NextIntlClientProvider
         locale="en"
-        messages={{
-          EvidenceQuestions: evidenceQuestionMessages,
-          ResearchSteering: steeringMessages,
-          ResearchTemplates: templateMessages,
-          Message: messageMessages,
-          Research: researchMessages,
-        }}
+        messages={{ Research: researchMessages }}
       >
         <ResearchGlobalBar
           task={{
-            ...orchestratedTask,
-            activities: [
-              { ...orchestratedTask.activities[0], status: "committed" },
-            ],
+            ...task,
+            status: "paused",
+            run: { ...task.run, endedAt: 100_000 },
           }}
           onOpenWorkbench={vi.fn()}
         />
       </NextIntlClientProvider>,
     );
-    expect(screen.getByText("Exploring sources")).toBeTruthy();
+    act(() => vi.advanceTimersByTime(60_000));
+    expect(screen.getByText("10s")).toBeTruthy();
   });
-
-  it("offers a paused task for explicit resume", async () => {
-    const onResume = vi.fn();
-    const user = userEvent.setup();
+  it("exposes view progress and pause/resume actions", async () => {
+    const open = vi.fn(),
+      pause = vi.fn();
     renderWithResearchMessages(
       <ResearchGlobalBar
-        task={{ ...orchestratedTask, status: "paused" }}
-        onOpenWorkbench={vi.fn()}
-        onResume={onResume}
+        task={orchestratedTask}
+        onOpenWorkbench={open}
+        onPause={pause}
       />,
     );
-
-    expect(screen.getByLabelText("Deep research ready to resume")).toBeTruthy();
-    await user.click(screen.getByRole("button", { name: "Resume" }));
-    expect(onResume).toHaveBeenCalledOnce();
+    await userEvent.click(
+      screen.getByRole("button", { name: "View progress" }),
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Pause" }));
+    expect(open).toHaveBeenCalledOnce();
+    expect(pause).toHaveBeenCalledOnce();
   });
 });
 
 describe("ResearchWorkbench", () => {
-  it("keeps the review brief and dialog keys in all research locales", () => {
+  it("opens reports first, has exactly three keyboard-navigable tabs and a 3xl reader", async () => {
+    renderWithResearchMessages(
+      <ResearchWorkbench task={partialTask} onClose={vi.fn()} />,
+    );
+    const tabs = screen.getAllByRole("tab");
+    expect(tabs).toHaveLength(3);
+    expect(tabs.map((t) => t.textContent)).toEqual([
+      "Report",
+      "Sources (1)",
+      "How it was researched",
+    ]);
+    expect(tabs[0].getAttribute("aria-selected")).toBe("true");
+    fireEvent.keyDown(tabs[0], { key: "End" });
+    expect(tabs[2].getAttribute("aria-selected")).toBe("true");
+    expect(document.activeElement).toBe(tabs[2]);
+    expect(screen.getByRole("tabpanel").firstElementChild?.className).toContain(
+      "max-w-3xl",
+    );
+    expect(screen.queryByText("Research topology")).toBeNull();
+  });
+  it("defaults to process before a report is available and opens editing in a dialog", async () => {
+    renderWithResearchMessages(
+      <ResearchWorkbench
+        task={approvalTask}
+        onClose={vi.fn()}
+        onAdjustPlan={vi.fn()}
+      />,
+    );
+    expect(
+      screen
+        .getByRole("tab", { name: "How it was researched" })
+        .getAttribute("aria-selected"),
+    ).toBe("true");
+    await userEvent.click(screen.getByRole("button", { name: "Edit plan" }));
+    expect(await screen.findByRole("dialog")).toBeTruthy();
+  });
+  it("binds version selection to report, notes, Q&A and export", async () => {
+    const selected = vi.fn(),
+      download = vi.fn();
+    renderWithResearchMessages(
+      <ResearchWorkbench
+        task={partialTask}
+        onClose={vi.fn()}
+        onSelectReportVersion={selected}
+        onDownloadMarkdown={download}
+      />,
+    );
+    await userEvent.click(
+      screen.getByRole("combobox", {
+        name: researchMessages.report.selectVersion,
+      }),
+    );
+    await userEvent.click(
+      await screen.findByRole("option", { name: "Version 1" }),
+    );
+    expect(selected).toHaveBeenCalledWith("report-1");
+    await userEvent.click(
+      screen.getByRole("button", { name: "Ask about this report" }),
+    );
+    expect(
+      (await screen.findByTestId("evidence-topic-panel")).getAttribute(
+        "data-report-id",
+      ),
+    ).toBe("report-1");
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    await userEvent.click(screen.getByRole("button", { name: "Download" }));
+    await userEvent.click(
+      await screen.findByRole("menuitem", { name: "Markdown" }),
+    );
+    expect(download).toHaveBeenCalledWith("report-1");
+  });
+  it("hides version selection for a single report and separates notes and sources", async () => {
+    const report = {
+      ...partialTask.reportVersions[1],
+      markdown:
+        "# Report\n\n## Executive summary\nMain finding.\n\n## Evidence gaps\nA missing primary source.\n\n## Sources\nA report citation.",
+    };
+    renderWithResearchMessages(
+      <ResearchWorkbench
+        task={{ ...completedTask, reportVersions: [report] }}
+        onClose={vi.fn()}
+      />,
+    );
+    expect(screen.queryByRole("combobox")).toBeNull();
+    expect(
+      screen.getAllByTestId("research-report-markdown")[0].textContent,
+    ).not.toContain("A missing primary source.");
+    await userEvent.click(
+      screen.getByRole("button", { name: "Notes and limits" }),
+    );
+    expect(
+      screen
+        .getAllByTestId("research-report-markdown")
+        .some((n) => n.textContent?.includes("A missing primary source.")),
+    ).toBe(true);
+    await userEvent.click(screen.getByRole("tab", { name: /^Sources/ }));
+    expect(screen.getByText("Cited in the report")).toBeTruthy();
+    expect(
+      screen
+        .getAllByTestId("research-report-markdown")
+        .some((n) => n.textContent?.includes("A report citation.")),
+    ).toBe(true);
+  });
+  it("keeps source search visible and additional filters collapsed", async () => {
+    renderWithResearchMessages(
+      <ResearchWorkbench task={partialTask} onClose={vi.fn()} />,
+    );
+    await userEvent.click(screen.getByRole("tab", { name: /^Sources/ }));
+    expect(screen.getByRole("searchbox")).toBeTruthy();
+    const filters = screen.getByRole("button", { name: "More filters" });
+    expect(filters.getAttribute("aria-expanded")).toBe("false");
+    await userEvent.click(filters);
+    expect(filters.getAttribute("aria-expanded")).toBe("true");
+    fireEvent.change(screen.getByRole("searchbox"), {
+      target: { value: "missing source" },
+    });
+    expect(screen.queryByText("Primary product documentation")).toBeNull();
+  });
+  it("retains failed continuation text and offers latest-information refresh", async () => {
+    const more = vi.fn().mockRejectedValue(new Error("lost")),
+      refresh = vi.fn();
+    renderWithResearchMessages(
+      <ResearchWorkbench
+        task={completedTask}
+        onClose={vi.fn()}
+        onContinueResearch={more}
+        onUpdateLatest={refresh}
+      />,
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Research more" }),
+    );
+    const dialog = await screen.findByRole("dialog");
+    await flushDialogFocus();
+    const text = within(dialog).getByRole("textbox");
+    await userEvent.type(text, "Check updates");
+    await userEvent.click(
+      within(dialog).getByRole("button", {
+        name: researchMessages.followup.continue.submit,
+      }),
+    );
+    expect((text as HTMLTextAreaElement).value).toBe("Check updates");
+    expect(within(dialog).getByRole("alert")).toBeTruthy();
+    await userEvent.click(
+      within(dialog).getByRole("button", {
+        name: "Refresh with the latest information",
+      }),
+    );
+    expect(refresh).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+  it("keeps new labels available in every locale", () => {
     for (const messages of [
       researchMessages,
       chineseResearchMessages,
       japaneseResearchMessages,
     ]) {
-      expect(messages.plan.willResearch).toBeTruthy();
-      expect(messages.plan.willNotResearch).toBeTruthy();
-      expect(messages.plan.advancedDisclosure).toBeTruthy();
-      expect(messages.adjust.title).toBeTruthy();
-      expect(messages.actions.closeAdjust).toBeTruthy();
-      expect(messages.actions.closeStrategy).toBeTruthy();
-      expect(messages.activity.degradedWaveTitle).toBeTruthy();
+      expect(messages.tabs.sources).toBeTruthy();
+      expect(messages.tabs.process).toBeTruthy();
+      expect(messages.card.starterNotice).toBeTruthy();
+      expect(messages.runtime.error.adjustFailed).toBeTruthy();
     }
   });
-
-  it("keeps the selected report version across body, supplements, and exports", async () => {
-    const onDownloadMarkdown = vi.fn();
-    const onPrintPdf = vi.fn();
-    const onSelectReportVersion = vi.fn();
-    const user = userEvent.setup();
-    renderWithResearchMessages(
-      <ResearchWorkbench
-        task={partialTask}
-        onClose={vi.fn()}
-        onDownloadMarkdown={onDownloadMarkdown}
-        onPrintPdf={onPrintPdf}
-        onSelectReportVersion={onSelectReportVersion}
-      />,
-    );
-
-    expect(
-      screen.getByTestId("research-report-markdown").textContent,
-    ).toContain("Full report body");
-    expect(
-      screen.getByTestId("research-report-markdown").textContent,
-    ).not.toContain("# Updated research systems report");
-    expect(screen.queryByText("3 of 4 research steps covered")).toBeNull();
-    expect(
-      screen.queryByText("One source could not be independently verified."),
-    ).toBeNull();
-    await user.click(
-      screen.getByRole("tab", { name: "Supplementary material" }),
-    );
-    expect(screen.getByText("3 of 4 research steps covered")).toBeTruthy();
-    expect(
-      screen.getByText("One source could not be independently verified."),
-    ).toBeTruthy();
-    expect(
-      screen.getByText("1 publication check needs attention."),
-    ).toBeTruthy();
-    expect(screen.getByText("1 evidence item added")).toBeTruthy();
-    await user.click(screen.getByRole("tab", { name: "Report" }));
-    await user.click(screen.getByRole("combobox", { name: "Report version" }));
-    await user.click(
-      screen.getByRole("option", {
-        name: "Version 1",
-      }),
-    );
-    expect(onSelectReportVersion).toHaveBeenCalledWith("report-1");
-    expect(
-      screen.getByTestId("research-report-markdown").textContent,
-    ).toContain("Older full report");
-
-    await user.click(screen.getByRole("button", { name: "Download" }));
-    await user.click(screen.getByRole("menuitem", { name: "Markdown" }));
-    await user.click(screen.getByRole("button", { name: "Download" }));
-    await user.click(screen.getByRole("menuitem", { name: "PDF" }));
-    expect(onDownloadMarkdown).toHaveBeenCalledWith("report-1");
-    expect(onPrintPdf).toHaveBeenCalledWith("report-1");
-  });
-
-  it("projects report appendices into supplementary material", async () => {
-    const user = userEvent.setup();
-    const task = {
-      ...completedTask,
-      reportVersions: [
-        {
-          ...completedTask.reportVersions[1],
-          markdown: `# Updated research systems report
-
-## Executive summary
-
-Body summary.
-
-## Sources
-
-- Primary documentation [Source 1]
-
-## Evidence gaps
-
-- One gap remains.
-
-## Knowledge supplement (not verified in this research)
-
-Model context is clearly labeled.`,
+  it.each([approvalTask, orchestratedTask, partialTask])(
+    "has no automated WCAG A/AA violations for $status",
+    async (task) => {
+      const { container } = renderWithResearchMessages(
+        <ResearchWorkbench
+          task={task}
+          onClose={vi.fn()}
+          onConfirmPlan={vi.fn()}
+          onUpdatePlanPreset={vi.fn()}
+        />,
+      );
+      await flushDialogFocus();
+      const result = await axe.run(container, {
+        runOnly: {
+          type: "tag",
+          values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"],
         },
-      ],
-      activeReportVersionId: "report-2",
-    };
-    renderWithResearchMessages(
-      <ResearchWorkbench task={task} onClose={vi.fn()} />,
-    );
-
-    expect(
-      screen.getByTestId("research-report-markdown").textContent,
-    ).toContain("Body summary.");
-    expect(
-      screen.getByTestId("research-report-markdown").textContent,
-    ).not.toContain("Primary documentation");
-
-    await user.click(
-      screen.getByRole("tab", { name: "Supplementary material" }),
-    );
-    expect(
-      screen.getByTestId("research-report-markdown").textContent,
-    ).toContain("Primary documentation");
-    expect(
-      screen.getByTestId("research-report-markdown").textContent,
-    ).toContain("Model context is clearly labeled.");
-    expect(
-      screen.getByTestId("research-report-markdown").textContent,
-    ).toContain("One gap remains.");
-  });
-
-  it("opens version-scoped evidence topics and collects continuation goals", async () => {
-    const onContinueResearch = vi.fn();
-    const user = userEvent.setup();
-    renderWithResearchMessages(
-      <ResearchWorkbench
-        task={completedTask}
-        onClose={vi.fn()}
-        onContinueResearch={onContinueResearch}
-      />,
-    );
-
-    await user.click(
-      screen.getByRole("button", { name: "Ask existing evidence" }),
-    );
-    expect(
-      screen
-        .getByRole("tab", { name: "Questions" })
-        .getAttribute("aria-selected"),
-    ).toBe("true");
-    expect(
-      (await screen.findByTestId("evidence-topic-panel")).getAttribute(
-        "data-report-id",
-      ),
-    ).toBe(completedTask.activeReportVersionId);
-    expect(screen.queryByRole("dialog")).toBeNull();
-
-    await user.click(screen.getByRole("button", { name: "New follow-up" }));
-    expect(
-      screen.getByRole("dialog", { name: "Continue the research" }),
-    ).toBeTruthy();
-    await flushDialogFocus();
-    await user.type(
-      screen.getByRole("textbox", { name: "Additional research goal" }),
-      "Check another primary source",
-    );
-    await user.click(screen.getByRole("button", { name: "Prepare plan" }));
-    expect(onContinueResearch).toHaveBeenCalledWith(
-      "Check another primary source",
-    );
-  });
-
-  it("uses one tab strip and an inspectable, filterable evidence list", async () => {
-    const user = userEvent.setup();
-    renderWithResearchMessages(
-      <ResearchWorkbench task={completedTask} onClose={vi.fn()} />,
-    );
-
-    expect(screen.getAllByRole("tab")).toHaveLength(7);
-    await user.click(screen.getByRole("tab", { name: "Evidence" }));
-    expect(screen.getByRole("tabpanel", { name: "Evidence" })).toBeTruthy();
-    expect(screen.queryByLabelText("Select evidence")).toBeNull();
-    expect(
-      screen.getByText(
-        "The documented workflow separates discovery from verification.",
-      ),
-    ).toBeTruthy();
-    expect(
-      screen.getByRole("button", { name: "Step 1: Collect sources" }),
-    ).toBeTruthy();
-    const sourceLinks = screen.getAllByRole("link", {
-      name: "Open source: Primary product documentation",
-    });
-    expect(sourceLinks[0].getAttribute("href")).toBe(
-      "https://example.com/research",
-    );
-
-    await user.type(
-      screen.getByRole("searchbox", { name: "Search evidence" }),
-      "discovery from verification",
-    );
-    expect(screen.getByText("1 evidence item")).toBeTruthy();
-    await user.clear(
-      screen.getByRole("searchbox", { name: "Search evidence" }),
-    );
-    await user.click(
-      screen.getByRole("combobox", { name: "Source authority" }),
-    );
-    await user.click(screen.getByRole("option", { name: "Primary source" }));
-    expect(screen.getByText("0 evidence items")).toBeTruthy();
-  });
-
-  it("explains claim verification and links back to evidence", async () => {
-    const user = userEvent.setup();
-    renderWithResearchMessages(
-      <ResearchWorkbench task={completedTask} onClose={vi.fn()} />,
-    );
-
-    await user.click(screen.getByRole("tab", { name: "Claims" }));
-    expect(
-      screen.getByText(
-        "The documented workflow separates discovery from verification.",
-      ),
-    ).toBeTruthy();
-    expect(screen.getByText("2 independent publishers")).toBeTruthy();
-    await user.click(
-      screen.getByText(
-        "The documented workflow separates discovery from verification.",
-      ),
-    );
-    await user.click(
-      screen.getByRole("button", {
-        name: "Inspect evidence: Primary product documentation",
-      }),
-    );
-    expect(screen.getByRole("tabpanel", { name: "Evidence" })).toBeTruthy();
-  });
-
-  it("shows internal results as subdued metadata instead of claim titles", async () => {
-    const user = userEvent.setup();
-    const internalPath =
-      "workspace:///tool-results/call_20c0093384754c92a9e8eef2.json";
-    renderWithResearchMessages(
-      <ResearchWorkbench
-        task={{
-          ...completedTask,
-          evidence: [
-            {
-              id: "evidence-internal",
-              title: "tool-results/call_20c0093384754c92a9e8eef2.json",
-              sourceType: "workspace",
-              locator: internalPath,
-              retrievedAt: Date.UTC(2026, 7, 24),
-              linkedClaims: [],
-            },
-          ],
-        }}
-        onClose={vi.fn()}
-      />,
-    );
-
-    await user.click(screen.getByRole("tab", { name: "Evidence" }));
-    expect(screen.getByText("Not yet linked to a formal claim.")).toBeTruthy();
-    expect(screen.getAllByText("Internal tool result").length).toBeGreaterThan(
-      0,
-    );
-    expect(
-      screen.queryByRole("heading", {
-        name: "tool-results/call_20c0093384754c92a9e8eef2.json",
-      }),
-    ).toBeNull();
-    const technicalDetails = screen.getByText("Technical details");
-    expect(
-      (technicalDetails.closest("details") as HTMLDetailsElement).open,
-    ).toBe(false);
-  });
-
-  it("uses max-w-5xl for every tab and opens the first pre-run step", async () => {
-    const user = userEvent.setup();
-    renderWithResearchMessages(
-      <ResearchWorkbench task={completedTask} onClose={vi.fn()} />,
-    );
-
-    for (const tabName of [
-      "Report",
-      "Research plan",
-      "Evidence",
-      "Claims",
-      "Activity",
-      "Supplementary material",
-    ]) {
-      await user.click(screen.getByRole("tab", { name: tabName }));
-      expect(
-        screen.getByRole("tabpanel", { name: tabName }).firstElementChild
-          ?.className,
-      ).toContain("max-w-5xl");
-    }
-
-    await user.click(screen.getByRole("tab", { name: "Research plan" }));
-    const firstStepTrigger = screen
-      .getAllByText("Collect sources")
-      .map((item) => item.closest("button"))
-      .find(Boolean)!;
-    expect(firstStepTrigger.getAttribute("aria-expanded")).toBe("true");
-    const contentId = firstStepTrigger.getAttribute("aria-controls")!;
-    const content = document.getElementById(contentId)!;
-    expect(content.className).toContain("grid-rows-[1fr]");
-    expect(content.className).toContain("duration-200");
-    expect(content.className).toContain("ease-out");
-    expect(content.hasAttribute("inert")).toBe(false);
-    await user.click(firstStepTrigger);
-    expect(firstStepTrigger.getAttribute("aria-expanded")).toBe("false");
-    expect(content.getAttribute("aria-hidden")).toBe("true");
-    expect(content.hasAttribute("inert")).toBe(true);
-    expect(content.className).toContain("grid-rows-[0fr]");
-  });
-
-  it("shows the review brief and closes adjustment dialogs with button, backdrop, or Escape", async () => {
-    const onAdjustPlan = vi.fn();
-    const onUpdatePlanStrategy = vi.fn();
-    const user = userEvent.setup();
-    renderWithResearchMessages(
-      <ResearchWorkbench
-        task={approvalTask}
-        onClose={vi.fn()}
-        onConfirmPlan={vi.fn()}
-        onAdjustPlan={onAdjustPlan}
-        onUpdatePlanStrategy={onUpdatePlanStrategy}
-      />,
-    );
-
-    expect(screen.getByText("Will research")).toBeTruthy();
-    expect(screen.getByText("Will not research")).toBeTruthy();
-    expect(
-      screen.getByRole("heading", {
-        name: "Recommend a research workflow using verifiable evidence.",
-      }),
-    ).toBeTruthy();
-    expect(screen.getByText("Anonymous social posts")).toBeTruthy();
-    expect(
-      screen.getAllByText("Preferred domains: docs.example.com").length,
-    ).toBeGreaterThan(0);
-    expect(
-      screen.getAllByText("Excluded domains: archive.example.com").length,
-    ).toBeGreaterThan(0);
-    expect(screen.getByText("Web search")).toBeTruthy();
-    expect(screen.getByText("Fetch URL")).toBeTruthy();
-    expect(screen.getByText("Knowledge (2)")).toBeTruthy();
-    expect(
-      screen.getByRole("heading", { name: "Research steps" }),
-    ).toBeTruthy();
-    expect(screen.getByText("16")).toBeTruthy();
-    expect(
-      within(document.querySelector("footer")!)
-        .getAllByRole("button")
-        .map((button) => button.textContent),
-    ).toEqual(["Advanced strategy", "Adjust plan", "Start research"]);
-    for (const step of approvalTask.plan!.steps) {
-      expect(screen.getByText(step.title)).toBeTruthy();
-    }
-    const advancedDisclosure = screen
-      .getByText("Reconnaissance and advanced strategy")
-      .closest("button")!;
-    expect(advancedDisclosure.getAttribute("aria-expanded")).toBe("false");
-    expect(advancedDisclosure.parentElement?.className).toContain("rounded-lg");
-    const advancedContent = document.getElementById(
-      advancedDisclosure.getAttribute("aria-controls")!,
-    )!;
-    expect(advancedContent.getAttribute("aria-hidden")).toBe("true");
-    expect(advancedContent.hasAttribute("inert")).toBe(true);
-    expect(
-      screen.getAllByRole("button", { name: "Start research" }),
-    ).toHaveLength(1);
-
-    const adjustPlan = screen.getByRole("button", { name: "Adjust plan" });
-    await user.click(adjustPlan);
-    await flushDialogFocus();
-    let dialog = screen.getByRole("dialog", { name: "Adjust research plan" });
-
-    await user.click(
-      within(dialog).getByRole("button", { name: "Close plan adjustment" }),
-    );
-    expect(
-      screen.queryByRole("dialog", { name: "Adjust research plan" }),
-    ).toBeNull();
-    expect(document.activeElement).toBe(adjustPlan);
-
-    await user.click(adjustPlan);
-    await flushDialogFocus();
-    dialog = screen.getByRole("dialog", { name: "Adjust research plan" });
-    fireEvent.mouseDown(dialog.parentElement!);
-    expect(
-      screen.queryByRole("dialog", { name: "Adjust research plan" }),
-    ).toBeNull();
-    expect(document.activeElement).toBe(adjustPlan);
-
-    await user.click(adjustPlan);
-    await flushDialogFocus();
-    dialog = screen.getByRole("dialog", { name: "Adjust research plan" });
-    fireEvent.keyDown(dialog, { key: "Escape" });
-    expect(
-      screen.queryByRole("dialog", { name: "Adjust research plan" }),
-    ).toBeNull();
-    expect(document.activeElement).toBe(adjustPlan);
-
-    const strategy = screen.getByRole("button", {
-      name: "Advanced strategy",
-    });
-    await user.click(strategy);
-    await flushDialogFocus();
-    const strategyDialog = screen.getByRole("dialog", {
-      name: "Advanced research strategy",
-    });
-    expect(
-      within(strategyDialog).getByRole("spinbutton", { name: "Breadth" }),
-    ).toBeTruthy();
-    await user.click(
-      within(strategyDialog).getByRole("button", {
-        name: "Close advanced strategy",
-      }),
-    );
-    expect(document.activeElement).toBe(strategy);
-  });
-
-  it("lets the activity list use the full workbench width", async () => {
-    const user = userEvent.setup();
-    renderWithResearchMessages(
-      <ResearchWorkbench task={completedTask} onClose={vi.fn()} />,
-    );
-
-    await user.click(screen.getByRole("tab", { name: "Activity" }));
-    const panel = screen
-      .getByRole("heading", { name: "Research activity" })
-      .closest(".max-w-5xl")!;
-    expect(panel.className).toContain("w-full");
-    expect(panel.className).not.toContain("max-w-3xl");
-    expect(
-      screen.getByText("Collected primary documentation").className,
-    ).toContain("wrap-break-word");
-  });
-
-  it("warns before approval when web search is outside the source scope", () => {
-    renderWithResearchMessages(
-      <ResearchWorkbench
-        task={{
-          ...baseTask,
-          sourceScope: {
-            ...baseTask.sourceScope!,
-            searchEnabled: false,
-          },
-        }}
-        onClose={vi.fn()}
-        onConfirmPlan={vi.fn()}
-      />,
-    );
-
-    expect(
-      screen.getByText(
-        "Web search is not available in this source scope. Enable a compatible external search provider before starting.",
-      ),
-    ).toBeTruthy();
-  });
-
-  it("discloses the approved strategy, scope, deliverable, and reconnaissance", async () => {
-    const user = userEvent.setup();
-    renderWithResearchMessages(
-      <ResearchWorkbench
-        task={approvalTask}
-        onClose={vi.fn()}
-        onConfirmPlan={vi.fn()}
-      />,
-    );
-
-    const advancedDisclosure = screen
-      .getByText("Reconnaissance and advanced strategy")
-      .closest("button")!;
-    await user.click(advancedDisclosure);
-    expect(advancedDisclosure.getAttribute("aria-expanded")).toBe("true");
-
-    expect(screen.getAllByText("Decision memo").length).toBeGreaterThan(0);
-    expect(screen.getByText(/Product and engineering leads/)).toBeTruthy();
-    expect(screen.getAllByText("16").length).toBeGreaterThan(0);
-    expect(
-      screen.getAllByText(
-        "Planning precheck is on demand: it checks selected knowledge bases first, then public search summaries only if needed. Results inform the plan and are not formal evidence.",
-      ).length,
-    ).toBeGreaterThan(0);
-    expect(
-      screen.getAllByText("Planning reconnaissance: 2/2 queries").length,
-    ).toBeGreaterThan(0);
-    expect(
-      screen.getAllByText("Verify claims primary sources").length,
-    ).toBeGreaterThan(0);
-    expect(
-      screen.getAllByText("Major claims require independent support.").length,
-    ).toBeGreaterThan(0);
-    const strategyGrid = screen.getAllByText("Deliverable")[0].closest("dl")!;
-    expect(strategyGrid.className).toContain("rounded-lg");
-
-    const reconDisclosure = screen.getByRole("button", {
-      name: /Planning reconnaissance: 2\/2 queries/,
-    });
-    expect(reconDisclosure.getAttribute("aria-expanded")).toBe("false");
-    const closedChevron = reconDisclosure.lastElementChild!;
-    expect(closedChevron.getAttribute("class")).not.toContain("rotate-180");
-    await user.click(reconDisclosure);
-    expect(reconDisclosure.getAttribute("aria-expanded")).toBe("true");
-    expect(reconDisclosure.lastElementChild?.getAttribute("class")).toContain(
-      "rotate-180",
-    );
-    const reconContent = document.getElementById(
-      reconDisclosure.getAttribute("aria-controls")!,
-    )!;
-    expect(
-      reconContent.firstElementChild?.firstElementChild?.className,
-    ).toContain("rounded-md");
-    expect(
-      reconContent.firstElementChild?.firstElementChild?.className,
-    ).toContain("border");
-  });
-
-  it("uses one responsive semantic topology and inspects nodes by keyboard", async () => {
-    const user = userEvent.setup();
-    renderWithResearchMessages(
-      <ResearchWorkbench task={orchestratedTask} onClose={vi.fn()} />,
-    );
-
-    await user.click(screen.getByRole("tab", { name: "Activity" }));
-    expect(screen.getByLabelText("Research run status")).toBeTruthy();
-    expect(screen.getAllByText("9/16").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("2/4").length).toBeGreaterThan(0);
-
-    await user.click(screen.getByRole("tab", { name: "Research plan" }));
-    const waves = screen.getByRole("list", { name: "Research rounds" });
-    expect(waves.tagName).toBe("OL");
-    expect(
-      screen.getAllByRole("list", { name: "Research rounds" }),
-    ).toHaveLength(1);
-    expect(waves.parentElement?.parentElement?.className).toContain(
-      "lg:grid-cols",
-    );
-    expect(screen.getByText("Round 1")).toBeTruthy();
-    expect(screen.getByText("Round 2")).toBeTruthy();
-
-    const pendingNodeTrigger = screen
-      .getByText("Check regional deployment variants")
-      .closest("button")!;
-    expect(pendingNodeTrigger.getAttribute("aria-expanded")).toBe("false");
-    expect(pendingNodeTrigger.className).toContain("rounded-md");
-    expect(pendingNodeTrigger.className).toContain("border-transparent");
-    pendingNodeTrigger.focus();
-    await user.keyboard("{Enter}");
-    expect(pendingNodeTrigger.getAttribute("aria-expanded")).toBe("true");
-    expect(pendingNodeTrigger.className).toContain("border-research-border");
-
-    const inspector = screen.getByLabelText("Research node inspector");
-    expect(
-      within(inspector).getByRole("heading", {
-        name: "Check regional deployment variants",
-      }),
-    ).toBeTruthy();
-    expect(
-      within(inspector).getByText(
-        "This direction expands the approved source or research scope and requires approval before access.",
-      ),
-    ).toBeTruthy();
-    const activeStepSummary = screen
-      .getAllByText("Verify claims")
-      .map((item) => item.closest("button"))
-      .find(Boolean)!;
-    expect(activeStepSummary.getAttribute("aria-expanded")).toBe("true");
-    const stepLedger = screen.getByRole("heading", {
-      name: "Research steps",
-    }).parentElement!;
-    const topologyHeading = screen.getByRole("heading", {
-      name: "Research topology",
-    });
-    const topology = topologyHeading.parentElement!.parentElement!;
-    const topologyFrame = waves.parentElement!.parentElement!;
-    expect(topologyFrame.className).toContain("rounded-lg");
-    expect(
-      within(inspector).getByRole("heading", {
-        name: "Check regional deployment variants",
-      }).parentElement?.previousElementSibling?.className,
-    ).toContain("rounded-md");
-    const metricGrid = within(inspector).getByText("Evidence").closest("dl")!;
-    expect(metricGrid.className).toContain("rounded-lg");
-    expect(
-      stepLedger.compareDocumentPosition(topology) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-  });
-
-  it("shows degraded wave warnings as non-blocking research activity", async () => {
-    const user = userEvent.setup();
-    renderWithResearchMessages(
-      <ResearchWorkbench
-        task={{
-          ...orchestratedTask,
-          activities: [
-            ...orchestratedTask.activities,
-            {
-              id: "wave-2-degraded",
-              createdAt: Date.UTC(2026, 7, 24, 1),
-              phase: "researching",
-              status: "completed",
-              title: "Round 2 archived with evidence gaps",
-              detail:
-                "One research node produced no valid learning packet; preserved evidence remains available.",
-              tone: "warning",
-            },
-          ],
-        }}
-        onClose={vi.fn()}
-      />,
-    );
-
-    await user.click(screen.getByRole("tab", { name: "Activity" }));
-    const warning = screen.getByRole("heading", {
-      name: "Round 2 archived with evidence gaps",
-    });
-    expect(warning.className).toContain("text-amber");
-    const warningItem = warning.closest("li")!;
-    expect(warningItem.querySelector('[class*="bg-amber"]')).toBeNull();
-    expect(warningItem.querySelector('[class*="rounded-md"]')).toBeNull();
-    expect(warningItem.querySelector("svg")?.className.baseVal).toContain(
-      "text-amber",
-    );
-    expect(
-      screen.getByText(/preserved evidence remains available/i),
-    ).toBeTruthy();
-  });
-
-  it("has no automated WCAG A/AA violations in the orchestration view", async () => {
-    const { container } = renderWithResearchMessages(
-      <ResearchWorkbench task={orchestratedTask} onClose={vi.fn()} />,
-    );
-    const results = await axe.run(container, {
-      runOnly: {
-        type: "tag",
-        values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"],
-      },
-      rules: { "color-contrast": { enabled: false } },
-    });
-
-    expect(results.violations.map((violation) => violation.id)).toEqual([]);
-  });
-
-  it("has no automated WCAG A/AA violations before plan approval", async () => {
-    const { container } = renderWithResearchMessages(
-      <ResearchWorkbench
-        task={approvalTask}
-        onClose={vi.fn()}
-        onConfirmPlan={vi.fn()}
-        onAdjustPlan={vi.fn()}
-        onUpdatePlanStrategy={vi.fn()}
-      />,
-    );
-    const results = await axe.run(container, {
-      runOnly: {
-        type: "tag",
-        values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"],
-      },
-      rules: { "color-contrast": { enabled: false } },
-    });
-
-    expect(results.violations.map((violation) => violation.id)).toEqual([]);
-  });
-
-  it("has no automated WCAG A/AA violations in degraded activity", async () => {
-    const user = userEvent.setup();
-    const { container } = renderWithResearchMessages(
-      <ResearchWorkbench
-        task={{
-          ...orchestratedTask,
-          activities: [
-            ...orchestratedTask.activities,
-            {
-              id: "wave-degraded-a11y",
-              createdAt: Date.UTC(2026, 7, 24, 2),
-              phase: "researching",
-              status: "completed",
-              title: "Round 2 archived with evidence gaps",
-              detail: "Preserved evidence remains available.",
-              tone: "warning",
-            },
-          ],
-        }}
-        onClose={vi.fn()}
-      />,
-    );
-    await user.click(screen.getByRole("tab", { name: "Activity" }));
-    const results = await axe.run(container, {
-      runOnly: {
-        type: "tag",
-        values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"],
-      },
-      rules: { "color-contrast": { enabled: false } },
-    });
-
-    expect(results.violations.map((violation) => violation.id)).toEqual([]);
-  });
+        rules: { "color-contrast": { enabled: false } },
+      });
+      expect(result.violations.map((v) => v.id)).toEqual([]);
+    },
+  );
 });

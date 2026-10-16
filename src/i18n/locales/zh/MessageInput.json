@@ -189,5 +189,6 @@
   "compressContextDone": "上下文已压缩。",
   "compressContextNothingToDo": "暂时没有可压缩的新内容。",
   "compressContextChanged": "会话在压缩完成前已发生变化，已丢弃过期结果。",
-  "compressContextFailed": "压缩上下文失败，请重试。"
+  "compressContextFailed": "压缩上下文失败，请重试。",
+  "researchModeUnavailable": "深度研究需要支持工具调用的模型，请在设置中选择兼容模型。"
 }

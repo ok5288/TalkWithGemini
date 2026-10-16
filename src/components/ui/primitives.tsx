@@ -16,7 +16,7 @@ export type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
    * focus ring and disabled affordance. It exists so an existing call site can
    * adopt the primitive without its own look changing.
    */
-  variant?: "primary" | "secondary" | "danger" | "ghost" | "bare";
+  variant?: "primary" | "research" | "secondary" | "danger" | "ghost" | "bare";
   size?: "sm" | "md";
 };
 
@@ -48,6 +48,8 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
           styled && size === "md" && "h-9 px-3 text-sm",
           variant === "primary" &&
             "bg-red-600 text-white hover:bg-red-700 dark:bg-red-500 dark:text-white dark:hover:bg-red-400",
+          variant === "research" &&
+            "bg-research-solid text-research-accent-foreground hover:bg-research-accent-hover",
           variant === "secondary" &&
             "border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 dark:border-border dark:bg-card dark:text-foreground dark:hover:bg-muted",
           variant === "danger" &&
@@ -309,6 +311,7 @@ export function Dialog({
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (event.key === "Escape") {
       event.preventDefault();
+      event.stopPropagation();
       onClose();
       return;
     }

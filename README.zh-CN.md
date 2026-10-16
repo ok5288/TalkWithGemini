@@ -86,7 +86,7 @@ docker run --rm -p 127.0.0.1:3000:3000 \
 
 对话和工作区文件默认保存在浏览器存储中。请求会将必要内容发送给你使用的模型供应商及服务，通常经过应用的 API 路由。本地优先存储不代表模型在离线运行。
 
-加密同步需要主动开启。备份不包含凭据和外部服务数据；自定义模板、研究方向调整、报告问答等 Research 扩展数据目前仅保存在当前浏览器，不包含在 ZIP 备份或加密同步中。
+加密同步需要主动开启。备份不包含凭据和外部服务数据；自定义模板、报告问答等 Research 扩展数据目前仅保存在当前浏览器，不包含在 ZIP 备份或加密同步中。
 
 Agent 和 Research 在浏览器前台编排运行。关闭页面会中断执行，已保存的任务需要显式恢复。部署访问密码是访问门禁，不是多用户账号系统。
 
@@ -101,7 +101,7 @@ Agent 和 Research 在浏览器前台编排运行。关闭页面会中断执行�
 | [配置参考](docs/environment-variables.md)      | 模型供应商、搜索、RAG、语音与服务端默认值     |
 | [部署指南](docs/deployment-hardening.md)       | Docker、Vercel、Cloudflare Workers 与生产配置 |
 | [Agent 运行时](docs/agent-runtime.md)          | 工具、权限、工作区与执行恢复                  |
-| [深度研究](docs/research-workflows.md)         | 模板、来源、研究方向调整与报告问答            |
+| [深度研究](docs/research-workflows.md)         | 计划批准、故障恢复、报告阅读与问答            |
 | [插件开发](docs/plugin-development.md)         | 开发和集成工具                                |
 | [本地 MCP 桥接](docs/mcp-stdio-bridge.md)      | 通过 Docker 连接允许列表中的 stdio 服务器     |
 | [对话分享](docs/conversation-sharing.md)       | 发布、更新、设置有效期与撤销只读快照          |

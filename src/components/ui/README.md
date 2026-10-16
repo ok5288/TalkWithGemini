@@ -12,6 +12,7 @@ The `src/components/ui` directory contains small reusable primitives shared by f
 - `SafeImage.tsx` renders images with safe loading and fallback behavior.
 - `Tooltip.tsx` renders reusable tooltip behavior.
 - `primitives.tsx` contains small shared UI building blocks.
+- `panel.tsx` contains the shared capability panel shell, cards, and accent-aware controls.
 
 ## Guidelines
 

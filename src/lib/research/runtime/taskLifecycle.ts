@@ -21,6 +21,7 @@ export type PrepareResearchPlanAction = (
   adjustment?: string,
   requestModel?: string,
   lease?: ResearchTaskExecutionLease,
+  previousTask?: ResearchTask,
 ) => Promise<void>;
 export interface ResearchTaskContinuation {
   run: (lease: ResearchTaskExecutionLease) => Promise<void>;
@@ -69,7 +70,8 @@ export function runResearchTaskAction(
                   tasksById: {
                     ...state.tasksById,
                     [taskId]: {
-                      ...(isTerminalResearchStatus(task.status)
+                      ...(isTerminalResearchStatus(task.status) ||
+                      task.error?.code === `RESEARCH_STORAGE_${error.reason}`
                         ? task
                         : transitionResearchTask(task, "paused", {
                             checkpoint: task.checkpoint,
@@ -77,7 +79,10 @@ export function runResearchTaskAction(
                       error: {
                         code: `RESEARCH_STORAGE_${error.reason}`,
                         message:
-                          "Research progress could not be saved. Please retry or reload the task.",
+                          task.error?.code ===
+                          `RESEARCH_STORAGE_${error.reason}`
+                            ? task.error.message
+                            : "Research progress could not be saved. Please retry or reload the task.",
                         recoverable: true,
                       },
                     },
@@ -90,7 +95,14 @@ export function runResearchTaskAction(
       }
     }).then(
       (result) => {
-        if (!result.acquired) onConflict?.();
+        if (!result.acquired) {
+          try {
+            onConflict?.();
+          } catch (error) {
+            reject(error);
+            return;
+          }
+        }
         resolve();
       },
       (error) => {

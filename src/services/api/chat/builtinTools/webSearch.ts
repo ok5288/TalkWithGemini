@@ -1,3 +1,4 @@
+import { ResearchPersistenceError } from "@/services/research/taskRepository/errors";
 import { SEARCH_CONFIG_LIMITS, SEARCH_RESULT_LIMITS } from "@/config/limits";
 import {
   normalizeImageSources,
@@ -25,6 +26,8 @@ import type { BuiltinResearchQueryBudget, BuiltinToolBinding } from "./types";
 
 import {
   consumeResearchQueries,
+  commitResearchQueryBudget,
+  refundResearchQuery,
   queryBudgetError,
   createQuerySignal,
   errorResult,
@@ -126,6 +129,8 @@ export function createWebSearchBinding(
       }
       const budgetResult = consumeResearchQueries(options.queryBudget, [query]);
       if (budgetResult !== "ok") return queryBudgetError(budgetResult);
+      await commitResearchQueryBudget(options.queryBudget);
+      context.signal?.throwIfAborted();
 
       const requestedMax =
         typeof input.max_results === "number" &&
@@ -147,13 +152,29 @@ export function createWebSearchBinding(
         context.signal,
         options.queryBudget?.deadlineAt,
       );
+      const refundedQueries: string[] = [];
       try {
         const effectiveQuery = buildFilteredQuery(query, scopedFilters);
         const result = await search(
           { query: effectiveQuery, maxResults },
           querySignal.signal,
           options.queryBudget,
-        );
+        ).catch(async (error: unknown) => {
+          if (
+            refundResearchQuery(
+              options.queryBudget,
+              query,
+              querySignal.signal?.reason instanceof Error &&
+                querySignal.signal.reason.name === "TimeoutError"
+                ? querySignal.signal.reason
+                : error,
+            )
+          ) {
+            refundedQueries.push(query);
+            await commitResearchQueryBudget(options.queryBudget);
+          }
+          throw error;
+        });
         context.signal?.throwIfAborted();
         const sources = await Promise.all(
           normalizeSearchSources(
@@ -190,6 +211,7 @@ export function createWebSearchBinding(
         context.emit.search?.({ phase: "complete", sources, images });
         return { query, sources, images };
       } catch (error) {
+        if (error instanceof ResearchPersistenceError) throw error;
         const timedOut =
           querySignal.signal?.aborted &&
           querySignal.signal.reason instanceof Error &&
@@ -197,7 +219,10 @@ export function createWebSearchBinding(
         if (timedOut) {
           const message = "The research search deadline elapsed.";
           context.emit.search?.({ phase: "error", message });
-          return errorResult("RESEARCH_RECON_TIMEOUT", message);
+          return {
+            ...errorResult("RESEARCH_RECON_TIMEOUT", message),
+            ...(options.queryBudget ? { refundedQueries } : {}),
+          };
         }
         if (
           context.signal?.aborted ||
@@ -209,7 +234,11 @@ export function createWebSearchBinding(
         }
         const failure = describeSearchFailure(error);
         context.emit.search?.({ phase: "error", message: failure.message });
-        return { ok: false, error: failure };
+        return {
+          ok: false,
+          error: failure,
+          ...(options.queryBudget ? { refundedQueries } : {}),
+        };
       } finally {
         querySignal.cleanup();
       }
@@ -488,6 +517,8 @@ export function createSearchWebV2Binding(
       }
       const budgetResult = consumeResearchQueries(options.queryBudget, queries);
       if (budgetResult !== "ok") return queryBudgetError(budgetResult);
+      await commitResearchQueryBudget(options.queryBudget);
+      context.signal?.throwIfAborted();
       const { domains, excludedDomains, dateFrom, dateTo } = scopedFilters;
       const mode = input.mode === "news" ? "news" : "web";
       const timeRange =
@@ -515,6 +546,7 @@ export function createSearchWebV2Binding(
         context.signal,
         options.queryBudget?.deadlineAt,
       );
+      const refundedQueries: string[] = [];
       try {
         const runQuery = async (query: string) => {
           const effectiveQuery = buildFilteredQuery(query, {
@@ -533,7 +565,22 @@ export function createSearchWebV2Binding(
             },
             querySignal.signal,
             options.queryBudget,
-          );
+          ).catch(async (error: unknown) => {
+            if (
+              refundResearchQuery(
+                options.queryBudget,
+                query,
+                querySignal.signal?.reason instanceof Error &&
+                  querySignal.signal.reason.name === "TimeoutError"
+                  ? querySignal.signal.reason
+                  : error,
+              )
+            ) {
+              refundedQueries.push(query);
+              await commitResearchQueryBudget(options.queryBudget);
+            }
+            throw error;
+          });
           const normalized = normalizeSearchSources(
             result.sources.filter((source) =>
               isAllowedSearchResult(source, domains, excludedDomains),
@@ -569,6 +616,13 @@ export function createSearchWebV2Binding(
               status: "fulfilled" as const,
               value,
             }));
+        const persistenceFailure = settled.find(
+          (result) =>
+            result.status === "rejected" &&
+            result.reason instanceof ResearchPersistenceError,
+        );
+        if (persistenceFailure?.status === "rejected")
+          throw persistenceFailure.reason;
         // A deadline may end a later query after an earlier one succeeded.
         // Preserve those results; explicit user cancellation still aborts all.
         const stageTimedOut =
@@ -616,6 +670,7 @@ export function createSearchWebV2Binding(
         return {
           queries,
           mode,
+          ...(options.queryBudget ? { refundedQueries } : {}),
           sources,
           images,
           ...(failedCount > 0 ? { partial: true, failedCount, results } : {}),
@@ -639,6 +694,7 @@ export function createSearchWebV2Binding(
           },
         };
       } catch (error) {
+        if (error instanceof ResearchPersistenceError) throw error;
         const timedOut =
           querySignal.signal?.aborted &&
           querySignal.signal.reason instanceof Error &&
@@ -646,7 +702,10 @@ export function createSearchWebV2Binding(
         if (timedOut) {
           const message = "The research search deadline elapsed.";
           context.emit.search?.({ phase: "error", message });
-          return errorResult("RESEARCH_RECON_TIMEOUT", message);
+          return {
+            ...errorResult("RESEARCH_RECON_TIMEOUT", message),
+            ...(options.queryBudget ? { refundedQueries } : {}),
+          };
         }
         if (
           context.signal?.aborted ||
@@ -657,7 +716,11 @@ export function createSearchWebV2Binding(
         }
         const failure = describeSearchFailure(error);
         context.emit.search?.({ phase: "error", message: failure.message });
-        return { ok: false, error: failure };
+        return {
+          ok: false,
+          error: failure,
+          ...(options.queryBudget ? { refundedQueries } : {}),
+        };
       } finally {
         querySignal.cleanup();
       }

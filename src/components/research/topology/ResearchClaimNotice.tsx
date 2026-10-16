@@ -14,7 +14,7 @@ export function ResearchClaimNotice({ run }: { run: ResearchRunView }) {
     return null;
   }
   return (
-    <InlineStatus tone="warning">
+    <InlineStatus tone="warning" className="flex items-start gap-2">
       <ShieldCheck size={15} aria-hidden="true" />
       {t("run.claimWarning", {
         conflicts: run.claimCounts.conflicting,

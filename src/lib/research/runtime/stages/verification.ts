@@ -10,6 +10,7 @@ import {
 
 import { persistRun, type ResearchExecutionContext } from "../executionContext";
 import { remainingBudget } from "../usage";
+import { ResearchCheckpointUnavailableError } from "../dependencyErrors";
 import { executeWave } from "../wave";
 
 /**
@@ -31,32 +32,42 @@ export async function runVerificationStage(ctx: ResearchExecutionContext) {
     ctx,
     ctx.run,
     ctx.evidence,
-    ctx.resumeAtVerification
+    ctx.resumeAtVerification ||
+      ctx.store.tasksById[ctx.taskId].checkpoint?.historyPath
       ? ctx.store.tasksById[ctx.taskId].checkpoint
       : undefined,
   );
   let waveGuard = 0;
   while (
     waveGuard < 64 &&
-    ctx.run.stopReason?.code !== "invalid_model_output" &&
-    ctx.run.stopReason?.code !== "coverage_satisfied" &&
-    ctx.run.stopReason?.code !== "coverage_sufficient"
+    (ctx.store.tasksById[ctx.taskId].checkpoint?.historyPath ||
+      (ctx.run.stopReason?.code !== "invalid_model_output" &&
+        ctx.run.stopReason?.code !== "coverage_satisfied" &&
+        ctx.run.stopReason?.code !== "coverage_sufficient"))
   ) {
     waveGuard += 1;
     ctx.controller.signal.throwIfAborted();
+    const recovering = Boolean(
+      ctx.store.tasksById[ctx.taskId].checkpoint?.historyPath,
+    );
     const verificationQueryAllowance = getResearchVerificationQueryAllowance(
       ctx.run.strategy,
       ctx.run.usage.queryCount,
     );
     if (
-      verificationQueryAllowance <= 0 ||
-      !remainingBudget(ctx.store.tasksById[ctx.taskId])
+      !recovering &&
+      (verificationQueryAllowance <= 0 ||
+        !remainingBudget(ctx.store.tasksById[ctx.taskId]))
     ) {
       break;
     }
     const resumableWave = ctx.run.waves.find((wave) =>
       ["queued", "running", "paused"].includes(wave.status),
     );
+    if (recovering && !resumableWave)
+      throw new ResearchCheckpointUnavailableError(
+        ctx.dependencyText.checkpointUnavailable,
+      );
     const targetNodeIds = resumableWave
       ? [...resumableWave.nodeIds]
       : getResearchVerificationTargetNodeIds(ctx.run, ctx.plan);

@@ -1,3 +1,4 @@
+import { getResearchModelErrorCode } from "@/lib/chat/providerErrors";
 import type { ResearchTaskExecutionLease } from "@/services/research/taskExecutionLock";
 import { useResearchStore } from "@/store/core/researchStore";
 import {
@@ -121,7 +122,7 @@ export async function executeResearchRun({
                   }),
                   usage: aggregateTaskUsage(withRun),
                   error: {
-                    code: "RESEARCH_EXECUTION_FAILED",
+                    code: getResearchModelErrorCode(error),
                     message: localizedRuntimeError(error, "executionFallback"),
                     recoverable: true,
                   },

@@ -27,7 +27,6 @@
   "deliverable": "交付类型",
   "sections": "必需章节",
   "sources": "来源优先级",
-  "strategy": "初始策略",
   "editor": {
     "title": "模板详情",
     "name": "名称",
@@ -43,7 +42,6 @@
     "rationale": "理由",
     "rationalePlaceholder": "此来源为何有用",
     "addSource": "添加来源优先级",
-    "strategy": "初始策略",
     "cancel": "取消",
     "save": "保存模板",
     "required": "请先补全必填字段。",

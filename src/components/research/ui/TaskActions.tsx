@@ -1,273 +1,136 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import React, { useState } from "react";
 import {
   Pause,
   Play,
-  Plus,
   RotateCcw,
-  SlidersHorizontal,
+  Settings2,
+  Square,
   Sparkles,
   X,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 
-import {
-  Button,
-  DangerAction,
-  Dialog,
-  IconButton,
-} from "@/components/ui/primitives";
+import { Button, DangerAction } from "@/components/ui/primitives";
+import { openSettingsTab } from "@/lib/settings/navigation";
 import { cn } from "@/lib/utils/cn";
 
 import type { ResearchTaskActions, ResearchTaskViewModel } from "../types";
-import { AdjustmentForm, StrategyAdjustmentForm } from "./AdjustmentForm";
 import { ACTIVE_RESEARCH_STATUSES } from "./status";
+
+const ResearchAdjustmentDialog = dynamic(
+  () => import("./ResearchAdjustmentDialog"),
+  { ssr: false },
+);
 
 export function TaskActions({
   task,
   actions,
-  compact = false,
-  presentation = "default",
+  layout = "card",
 }: {
   task: ResearchTaskViewModel;
   actions: ResearchTaskActions;
-  compact?: boolean;
-  presentation?: "default" | "decision-bar";
+  layout?: "card" | "footer";
 }) {
   const t = useTranslations("Research");
   const [adjusting, setAdjusting] = useState(false);
-  const [tuningStrategy, setTuningStrategy] = useState(false);
-  const isRunning = ACTIVE_RESEARCH_STATUSES.has(task.status);
+  const running = ACTIVE_RESEARCH_STATUSES.has(task.status);
+  const needsModelSettings =
+    /RESEARCH_(?:MODEL_(?:AUTH|MODEL_NOT_FOUND)|TOOL_CALLING_REQUIRED)$/.test(
+      task.error?.code || "",
+    );
+  const missingModel =
+    task.status === "paused" &&
+    task.error?.code === "RESEARCH_MODEL_UNAVAILABLE";
   const canRetry =
     (task.status === "failed" || task.status === "clarifying") &&
     task.error?.recoverable;
-  const retryLabel = t("actions.retry");
-  const newFollowUpLabel = t("actions.newFollowUp");
-  const isDecisionBar = presentation === "decision-bar";
-  const isPlanDecision = isDecisionBar && task.status === "plan_ready";
-
-  const openAdjustment = () => {
-    setTuningStrategy(false);
-    setAdjusting(true);
-  };
-  const openStrategy = () => {
-    setAdjusting(false);
-    setTuningStrategy(true);
-  };
+  const canEdit = ["plan_ready", "paused"].includes(task.status);
+  const canCancel = ![
+    "completed",
+    "partial_completed",
+    "failed",
+    "cancelled",
+  ].includes(task.status);
 
   return (
     <>
       <div
         className={cn(
-          isDecisionBar
-            ? "w-full [&_button]:h-auto [&_button]:min-h-11 md:w-auto md:[&_button]:h-8 md:[&_button]:min-h-0"
-            : "[&_button]:h-9 [&_button]:min-h-0 sm:[&_button]:h-8",
+          "flex flex-wrap items-center justify-end gap-2 [&_button]:min-h-9 sm:[&_button]:min-h-8",
+          layout === "footer" && "w-full md:w-auto",
         )}
       >
-        <div
-          className={cn(
-            "flex flex-wrap gap-2",
-            compact && "justify-end",
-            isPlanDecision &&
-              "grid w-full grid-cols-1 md:flex md:w-auto md:justify-end",
-          )}
-        >
-          {isPlanDecision &&
-          task.plan?.strategy &&
-          actions.onUpdatePlanStrategy ? (
-            <Button size="sm" onClick={openStrategy}>
-              <SlidersHorizontal size={14} aria-hidden="true" />
-              {t("actions.advancedStrategy")}
-            </Button>
-          ) : null}
-          {isPlanDecision && actions.onAdjustPlan ? (
-            <Button size="sm" onClick={openAdjustment}>
-              <Sparkles size={14} aria-hidden="true" />
-              {t("actions.adjust")}
-            </Button>
-          ) : null}
-          {isPlanDecision && actions.onConfirmPlan ? (
-            <Button
-              size="sm"
-              variant="primary"
-              onClick={actions.onConfirmPlan}
-              className="bg-research-solid text-research-accent-foreground hover:bg-research-accent-hover"
-            >
-              <Play size={14} aria-hidden="true" />
-              {t("actions.start")}
-            </Button>
-          ) : null}
-          {!isPlanDecision &&
-          task.status === "plan_ready" &&
-          actions.onConfirmPlan ? (
-            <Button
-              size="sm"
-              variant="primary"
-              onClick={actions.onConfirmPlan}
-              className="bg-research-solid text-research-accent-foreground hover:bg-research-accent-hover"
-            >
-              <Play size={14} aria-hidden="true" />
-              {t("actions.start")}
-            </Button>
-          ) : null}
-          {!isPlanDecision &&
-          (task.status === "plan_ready" ||
-            task.status === "paused" ||
-            isRunning) &&
-          actions.onAdjustPlan ? (
-            <Button
-              size="sm"
-              onClick={() => {
-                setTuningStrategy(false);
-                setAdjusting((value) => !value);
-              }}
-            >
-              <Sparkles size={14} aria-hidden="true" />
-              {t("actions.adjust")}
-            </Button>
-          ) : null}
-          {!isPlanDecision &&
-          task.status === "plan_ready" &&
-          task.plan?.strategy &&
-          actions.onUpdatePlanStrategy ? (
-            <Button
-              size="sm"
-              onClick={() => {
-                setAdjusting(false);
-                setTuningStrategy((value) => !value);
-              }}
-            >
-              <SlidersHorizontal size={14} aria-hidden="true" />
-              {t("actions.tuneStrategy")}
-            </Button>
-          ) : null}
-          {isRunning && actions.onPause ? (
-            <Button size="sm" onClick={actions.onPause}>
-              <Pause size={14} aria-hidden="true" />
-              {t("actions.pause")}
-            </Button>
-          ) : null}
-          {task.status === "paused" && actions.onResume ? (
-            <Button
-              size="sm"
-              variant="primary"
-              onClick={actions.onResume}
-              className="bg-research-solid text-research-accent-foreground hover:bg-research-accent-hover"
-            >
-              <Play size={14} aria-hidden="true" />
-              {t("actions.resume")}
-            </Button>
-          ) : null}
-          {canRetry && actions.onRetry ? (
-            <Button
-              size="sm"
-              variant="primary"
-              onClick={actions.onRetry}
-              className="bg-research-solid text-research-accent-foreground hover:bg-research-accent-hover"
-            >
-              <RotateCcw size={14} aria-hidden="true" />
-              {retryLabel}
-            </Button>
-          ) : null}
-          {task.status === "failed" &&
-          task.error?.recoverable &&
-          actions.onDismiss ? (
-            <Button size="sm" onClick={actions.onDismiss}>
-              <X size={14} aria-hidden="true" />
-              {t("actions.dismiss")}
-            </Button>
-          ) : null}
-          {(task.status === "completed" ||
-            task.status === "partial_completed") &&
-          actions.onNewFollowUp ? (
-            <Button size="sm" onClick={actions.onNewFollowUp}>
-              <Plus size={14} aria-hidden="true" />
-              {newFollowUpLabel}
-            </Button>
-          ) : null}
-          {!isPlanDecision &&
-          !["completed", "partial_completed", "failed", "cancelled"].includes(
-            task.status,
-          ) &&
-          actions.onCancel ? (
+        {task.status === "failed" && actions.onDismiss ? (
+          <DangerAction
+            onConfirm={actions.onDismiss}
+            confirmLabel={t("actions.confirmDiscard")}
+          >
+            <X size={14} aria-hidden="true" />
+            {t("actions.dismiss")}
+          </DangerAction>
+        ) : null}
+        {canCancel && actions.onCancel ? (
+          running || task.status === "paused" ? (
             <DangerAction
               onConfirm={actions.onCancel}
               confirmLabel={t("actions.confirmCancel")}
-              className="h-9 px-2.5 py-0 sm:h-8"
             >
-              <X size={14} aria-hidden="true" />
-              {t("actions.cancel")}
+              <Square size={14} aria-hidden="true" />
+              {t("actions.stop")}
             </DangerAction>
-          ) : null}
-        </div>
-        {!isDecisionBar && adjusting && actions.onAdjustPlan ? (
-          <AdjustmentForm
-            onSubmit={actions.onAdjustPlan}
-            onDismiss={() => setAdjusting(false)}
-          />
+          ) : (
+            <Button size="sm" onClick={actions.onCancel}>
+              {t("actions.cancel")}
+            </Button>
+          )
         ) : null}
-        {!isDecisionBar &&
-        tuningStrategy &&
-        task.plan?.strategy &&
-        actions.onUpdatePlanStrategy ? (
-          <StrategyAdjustmentForm
-            strategy={task.plan.strategy}
-            onSubmit={actions.onUpdatePlanStrategy}
-            onDismiss={() => setTuningStrategy(false)}
-          />
+        {canEdit && actions.onAdjustPlan ? (
+          <Button size="sm" onClick={() => setAdjusting(true)}>
+            <Sparkles size={14} aria-hidden="true" />
+            {t("actions.adjust")}
+          </Button>
+        ) : null}
+        {running && actions.onPause ? (
+          <Button size="sm" onClick={actions.onPause}>
+            <Pause size={14} aria-hidden="true" />
+            {t("actions.pause")}
+          </Button>
+        ) : null}
+        {needsModelSettings || missingModel ? (
+          <Button
+            size="sm"
+            variant="research"
+            onClick={() => openSettingsTab("providers")}
+          >
+            <Settings2 size={14} aria-hidden="true" />
+            {t("actions.openModelSettings")}
+          </Button>
+        ) : task.status === "paused" && actions.onResume ? (
+          <Button size="sm" variant="research" onClick={actions.onResume}>
+            <Play size={14} aria-hidden="true" />
+            {t("actions.resume")}
+          </Button>
+        ) : canRetry && actions.onRetry ? (
+          <Button size="sm" variant="research" onClick={actions.onRetry}>
+            <RotateCcw size={14} aria-hidden="true" />
+            {t("actions.retry")}
+          </Button>
+        ) : null}
+        {task.status === "plan_ready" && actions.onConfirmPlan ? (
+          <Button size="sm" variant="research" onClick={actions.onConfirmPlan}>
+            <Play size={14} aria-hidden="true" />
+            {t("actions.start")}
+          </Button>
         ) : null}
       </div>
-      {isDecisionBar && adjusting && actions.onAdjustPlan ? (
-        <Dialog
-          open
+      {adjusting && actions.onAdjustPlan ? (
+        <ResearchAdjustmentDialog
           onClose={() => setAdjusting(false)}
-          title={t("adjust.title")}
-          headerAction={
-            <IconButton
-              label={t("actions.closeAdjust")}
-              icon={<X size={16} aria-hidden="true" />}
-              onClick={() => setAdjusting(false)}
-              className="h-11 w-11 md:h-9 md:w-9"
-            />
-          }
-          placement="responsive-sheet"
-          closeOnBackdropClick
-        >
-          <AdjustmentForm
-            embeddedInDialog
-            onSubmit={actions.onAdjustPlan}
-            onDismiss={() => setAdjusting(false)}
-          />
-        </Dialog>
-      ) : null}
-      {isDecisionBar &&
-      tuningStrategy &&
-      task.plan?.strategy &&
-      actions.onUpdatePlanStrategy ? (
-        <Dialog
-          open
-          onClose={() => setTuningStrategy(false)}
-          title={t("strategyAdjust.title")}
-          headerAction={
-            <IconButton
-              label={t("actions.closeStrategy")}
-              icon={<X size={16} aria-hidden="true" />}
-              onClick={() => setTuningStrategy(false)}
-              className="h-11 w-11 md:h-9 md:w-9"
-            />
-          }
-          placement="responsive-sheet"
-          closeOnBackdropClick
-          className="max-w-2xl"
-        >
-          <StrategyAdjustmentForm
-            embeddedInDialog
-            strategy={task.plan.strategy}
-            onSubmit={actions.onUpdatePlanStrategy}
-            onDismiss={() => setTuningStrategy(false)}
-          />
-        </Dialog>
+          onSubmit={actions.onAdjustPlan}
+        />
       ) : null}
     </>
   );

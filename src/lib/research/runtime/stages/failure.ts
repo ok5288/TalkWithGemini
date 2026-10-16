@@ -1,3 +1,5 @@
+import { getResearchModelErrorCode } from "@/lib/chat/providerErrors";
+import { isResearchConnectionError } from "../connectionErrors";
 import { ResearchPersistenceError } from "@/services/research/taskRepository/errors";
 import {
   applyResearchRunUserStop,
@@ -10,7 +12,10 @@ import {
 import { logDevError } from "@/lib/utils/devLogger";
 
 import type { ResearchExecutionContext } from "../executionContext";
-import { ResearchWorkspaceUnavailableError } from "../dependencyErrors";
+import {
+  ResearchCheckpointUnavailableError,
+  ResearchWorkspaceUnavailableError,
+} from "../dependencyErrors";
 import { isAbortError } from "../operations";
 import {
   deliverResearchReport,
@@ -30,7 +35,11 @@ export async function handleExecutionFailure(
 ): Promise<void> {
   const current = ctx.store.tasksById[ctx.taskId];
   if (!current || current.status === "cancelled") return;
-  if (error instanceof ResearchWorkspaceUnavailableError) {
+  if (
+    error instanceof ResearchWorkspaceUnavailableError ||
+    error instanceof ResearchCheckpointUnavailableError
+  ) {
+    const dependencyCode = error.code;
     const pausedAt = Date.now();
     const pausedRun = {
       ...applyResearchRunUserStop(ctx.run, "pause", pausedAt),
@@ -40,20 +49,27 @@ export async function handleExecutionFailure(
         detail: error.message,
       },
     };
-    const checkpoint: ResearchCheckpoint = current.checkpoint || {
-      createdAt: pausedAt,
-      resumeStatus: "researching",
-      committedEvidenceIds: ctx.evidence.map((item) => item.id),
-      committedToolExecutionIds:
-        pausedRun.checkpoint?.committedToolExecutionIds || [],
-      ...(ctx.imageSources?.length
-        ? {
-            committedImageSourceIds: ctx.imageSources.map((image) => image.id),
-          }
-        : {}),
-      researchRunId: pausedRun.id,
-    };
-    const message = ctx.dependencyText.sourceUnavailable("workspace");
+    const checkpoint: ResearchCheckpoint = current.checkpoint
+      ? { ...current.checkpoint }
+      : {
+          createdAt: pausedAt,
+          resumeStatus: "researching",
+          committedEvidenceIds: ctx.evidence.map((item) => item.id),
+          committedToolExecutionIds:
+            pausedRun.checkpoint?.committedToolExecutionIds || [],
+          ...(ctx.imageSources?.length
+            ? {
+                committedImageSourceIds: ctx.imageSources.map(
+                  (image) => image.id,
+                ),
+              }
+            : {}),
+          researchRunId: pausedRun.id,
+        };
+    const message =
+      error instanceof ResearchCheckpointUnavailableError
+        ? error.message
+        : ctx.dependencyText.sourceUnavailable("workspace");
     await ctx.store.updateTask(
       ctx.taskId,
       (latest) => ({
@@ -64,7 +80,7 @@ export async function handleExecutionFailure(
         ),
         checkpoint,
         error: {
-          code: "RESEARCH_WORKSPACE_UNAVAILABLE",
+          code: dependencyCode,
           message,
           recoverable: true,
         },
@@ -75,7 +91,17 @@ export async function handleExecutionFailure(
     ctx.onNotice?.(message);
     return;
   }
-  if (isAbortError(error) || ctx.controller.signal.aborted) {
+  const connectionLost =
+    !isAbortError(error) &&
+    !ctx.controller.signal.aborted &&
+    !(error instanceof ResearchPersistenceError) &&
+    !(error instanceof ResearchReportDeliveryError) &&
+    isResearchConnectionError(error);
+  if (
+    !(error instanceof ResearchPersistenceError) &&
+    !(error instanceof ResearchReportDeliveryError) &&
+    (isAbortError(error) || ctx.controller.signal.aborted || connectionLost)
+  ) {
     if (
       current.status === "completed" ||
       current.status === "partial_completed"
@@ -84,34 +110,47 @@ export async function handleExecutionFailure(
       return;
     }
     const pausedRun = applyResearchRunUserStop(ctx.run, "pause");
-    const checkpoint: ResearchCheckpoint = current.checkpoint || {
-      createdAt: Date.now(),
-      resumeStatus:
-        current.status === "synthesizing"
-          ? "synthesizing"
-          : current.status === "verifying"
-            ? "verifying"
-            : "researching",
-      committedEvidenceIds: ctx.evidence.map((item) => item.id),
-      committedToolExecutionIds:
-        pausedRun.checkpoint?.committedToolExecutionIds || [],
-      ...(ctx.imageSources?.length
-        ? {
-            committedImageSourceIds: (ctx.imageSources ?? []).map(
-              (image) => image.id,
-            ),
-          }
-        : {}),
-      researchRunId: pausedRun.id,
-    };
+    const checkpoint: ResearchCheckpoint = current.checkpoint
+      ? { ...current.checkpoint }
+      : {
+          createdAt: Date.now(),
+          resumeStatus:
+            current.status === "synthesizing"
+              ? "synthesizing"
+              : current.status === "verifying"
+                ? "verifying"
+                : "researching",
+          committedEvidenceIds: ctx.evidence.map((item) => item.id),
+          committedToolExecutionIds:
+            pausedRun.checkpoint?.committedToolExecutionIds || [],
+          ...(ctx.imageSources?.length
+            ? {
+                committedImageSourceIds: (ctx.imageSources ?? []).map(
+                  (image) => image.id,
+                ),
+              }
+            : {}),
+          researchRunId: pausedRun.id,
+        };
     await ctx.store.updateTask(
       ctx.taskId,
       (latest) => {
         if (latest.status === "cancelled") return latest;
         const withRun = upsertResearchReportRun(latest, pausedRun);
-        return latest.status === "paused"
-          ? { ...withRun, checkpoint }
-          : transitionResearchTask(withRun, "paused", { checkpoint });
+        const paused =
+          latest.status === "paused"
+            ? { ...withRun, checkpoint }
+            : transitionResearchTask(withRun, "paused", { checkpoint });
+        return connectionLost
+          ? {
+              ...paused,
+              error: {
+                code: "RESEARCH_CONNECTION_LOST",
+                message: ctx.t("runtime.error.connectionLost"),
+                recoverable: true,
+              },
+            }
+          : paused;
       },
       { persistence: "best-effort" },
     );
@@ -126,10 +165,19 @@ export async function handleExecutionFailure(
       await deliverResearchReport(ctx, { interruption: error });
       return;
     } catch (salvageError) {
-      if (isAbortError(salvageError) || ctx.controller.signal.aborted) {
+      if (
+        !(salvageError instanceof ResearchPersistenceError) &&
+        !(salvageError instanceof ResearchReportDeliveryError) &&
+        (isAbortError(salvageError) || ctx.controller.signal.aborted)
+      ) {
         return handleExecutionFailure(ctx, salvageError, onError);
       }
       logDevError("Failed to salvage Deep Research report", salvageError);
+      if (
+        salvageError instanceof ResearchPersistenceError ||
+        salvageError instanceof ResearchReportDeliveryError
+      )
+        error = salvageError;
     }
   }
   const failedAt = Date.now();
@@ -145,7 +193,11 @@ export async function handleExecutionFailure(
         ...transitionResearchTask(withRun, "failed", { now: failedAt }),
         usage: aggregateTaskUsage(withRun),
         error: {
-          code: "RESEARCH_EXECUTION_FAILED",
+          code:
+            error instanceof ResearchPersistenceError ||
+            error instanceof ResearchReportDeliveryError
+              ? "RESEARCH_EXECUTION_FAILED"
+              : getResearchModelErrorCode(error),
           message: ctx.localizedRuntimeError(error, "executionFallback"),
           recoverable: true,
         },

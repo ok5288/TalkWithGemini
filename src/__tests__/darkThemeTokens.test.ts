@@ -25,7 +25,7 @@ function contrastRatio(foreground: string, background: string): number {
 }
 
 describe("dark theme token contract", () => {
-  it("defines every brand and surface utility referenced by components", () => {
+  it("defines every brand, surface, and panel utility referenced by components", () => {
     const globals = readProjectFile("src/app/globals.css");
     const themeBlock = globals.slice(
       globals.indexOf("@theme inline {"),
@@ -38,7 +38,7 @@ describe("dark theme token contract", () => {
     );
 
     const utility =
-      /(?<![\w-])(?:bg|text|border|ring|outline|fill|stroke|from|via|to|divide|caret|decoration|shadow|accent)-(brand|surface)(?:-([a-z0-9-]+))?(?![\w-])/g;
+      /(?<![\w-])(?:bg|text|border|ring|outline|fill|stroke|from|via|to|divide|caret|decoration|shadow|accent)-(brand|surface|panel)(?:-([a-z0-9-]+))?(?![\w-])/g;
 
     const missing = new Set<string>();
     for (const entry of readdirSync(resolve(process.cwd(), "src"), {

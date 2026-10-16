@@ -1,3 +1,5 @@
+import { ResearchPersistenceError } from "@/services/research/taskRepository/errors";
+import { SearchRequestError } from "@/lib/search/errors";
 import { areResearchQueriesSimilar } from "@/lib/research/orchestration/strategy";
 import type { BuiltinResearchQueryBudget } from "./types";
 
@@ -101,4 +103,42 @@ export function errorResult(code: string, message: string) {
       recoverable: true,
     },
   };
+}
+
+/** Only temporary search failures release the reservation and replay ledger. */
+export function refundResearchQuery(
+  budget: BuiltinResearchQueryBudget | undefined,
+  query: string,
+  error: unknown,
+) {
+  const transient =
+    error instanceof SearchRequestError
+      ? error.status === 429 ||
+        (error.status >= 500 && error.status < 600) ||
+        (error.status === 0 && error.code === "SEARCH_NETWORK_ERROR") ||
+        (error.location === "search_transport" && error.status === 408)
+      : error instanceof Error &&
+        (error.name === "TimeoutError" ||
+          error.name === "ResponseTimeoutError" ||
+          (error instanceof TypeError && /fetch|network/i.test(error.message)));
+  if (!budget || !transient) return false;
+  budget.remainingQueries += 1;
+  budget.seenQueries?.delete(
+    query.normalize("NFKC").trim().replace(/\s+/g, " ").toLowerCase(),
+  );
+  budget.onQueriesRefunded?.([query]);
+  return true;
+}
+
+/** Reservations stay synchronous; their durable commit precedes network access. */
+export async function commitResearchQueryBudget(
+  budget: BuiltinResearchQueryBudget | undefined,
+): Promise<void> {
+  try {
+    await budget?.persistQueries?.();
+  } catch (error) {
+    throw error instanceof ResearchPersistenceError
+      ? error
+      : new ResearchPersistenceError("checkpoint");
+  }
 }

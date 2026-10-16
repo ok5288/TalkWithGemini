@@ -1,3 +1,4 @@
+import { getResearchModelErrorCode } from "@/lib/chat/providerErrors";
 import { transitionResearchTask } from "@/lib/research/task";
 import { useResearchStore } from "@/store/core/researchStore";
 import {
@@ -12,12 +13,14 @@ export async function recordResearchModuleLoadFailure({
   lease,
   signal,
   message,
+  error,
 }: {
   taskId: string;
   phase: "planning" | "research";
   lease?: ResearchTaskExecutionLease;
   signal: AbortSignal;
   message: string;
+  error?: unknown;
 }): Promise<boolean> {
   if (signal.aborted) return false;
   const result = await withResearchTaskExecutionLock(
@@ -39,10 +42,7 @@ export async function recordResearchModuleLoadFailure({
             : {
                 ...transitionResearchTask(current, "failed"),
                 error: {
-                  code:
-                    phase === "planning"
-                      ? "RESEARCH_PLAN_FAILED"
-                      : "RESEARCH_EXECUTION_FAILED",
+                  code: getResearchModelErrorCode(error ?? new Error(message)),
                   message,
                   recoverable: true,
                 },

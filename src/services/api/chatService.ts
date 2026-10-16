@@ -1,3 +1,6 @@
+import { ResearchPersistenceError } from "@/services/research/taskRepository/errors";
+import { commitResearchQueryBudget } from "@/services/api/chat/builtinTools/researchQueryBudget";
+import { isResearchConnectionError } from "@/lib/research/runtime/connectionErrors";
 import { projectUiBlock, projectUiText } from "@/lib/intelligentUi/projection";
 import { INTELLIGENT_UI_PROMPT_MARKER } from "@/lib/intelligentUi/prompt";
 import {
@@ -594,8 +597,9 @@ export const streamChatResponse = async (
       researchPhase !== "start" &&
       Boolean(options?.agentRun?.id));
   if (researchPhase && !toolCallsSupported) {
-    throw new Error(
-      "Deep Research requires a model with Tool Calling support.",
+    throw Object.assign(
+      new Error("Deep Research requires a model with Tool Calling support."),
+      { code: "RESEARCH_TOOL_CALLING_REQUIRED", recoverable: true },
     );
   }
   let agentRun: AgentRun | null = null;
@@ -1168,6 +1172,7 @@ export const streamChatResponse = async (
       }
     };
     const allToolCalls: ToolCall[] = [];
+    let researchStartError: unknown;
     const assertForcedPluginsCalled = () => {
       const missing = forcedPluginRequirements.filter(
         (requirement) =>
@@ -1263,6 +1268,19 @@ export const streamChatResponse = async (
               }),
             ),
           );
+    if (
+      !researchPhase &&
+      requestHistory.some((message) =>
+        message.outputBlocks?.some((block) => block.type === "research_task"),
+      )
+    ) {
+      const { resolveResearchReportHistory } =
+        await import("@/lib/research/runtime/reportContext");
+      requestHistory = await resolveResearchReportHistory(
+        requestHistory,
+        sessionId,
+      );
+    }
     const withUiSource = (message: string) => {
       if (!uiSource) return message;
       const combined = `${message}\n\nInteractive interface context (host-reported data):\n${uiSource.content}`;
@@ -1804,8 +1822,23 @@ export const streamChatResponse = async (
       const isSSE = contentType?.includes("text/event-stream");
 
       if (!response.ok && !isSSE) {
-        throw new Error(
-          await getResponseErrorMessage(response, "Stream request failed"),
+        const details = await response
+          .clone()
+          .json()
+          .catch(() => null);
+        throw Object.assign(
+          new Error(
+            await getResponseErrorMessage(response, "Stream request failed"),
+          ),
+          {
+            status: response.status,
+            code:
+              typeof details?.error?.code === "string"
+                ? details.error.code
+                : typeof details?.code === "string"
+                  ? details.code
+                  : undefined,
+          },
         );
       }
 
@@ -2723,7 +2756,15 @@ export const streamChatResponse = async (
                     boundedResearch ? options?.researchQueryBudget : undefined,
                   );
                   if ("error" in prepared) sourceCallFailure = prepared.error;
-                  else toolCall = { ...toolCall, args: prepared.args };
+                  else {
+                    toolCall = { ...toolCall, args: prepared.args };
+                    if (boundedResearch && prepared.queryKey) {
+                      await commitResearchQueryBudget(
+                        options?.researchQueryBudget,
+                      );
+                      signal?.throwIfAborted();
+                    }
+                  }
                 }
               }
               const consumesResearchSource =
@@ -3107,6 +3148,22 @@ export const streamChatResponse = async (
                 ...(effectReceipt ? { receipt: effectReceipt } : {}),
               },
             );
+            // Preserve host-authored per-call refunds through the generic error
+            // envelope, which intentionally strips provider-specific fields.
+            if (
+              builtinBinding &&
+              ["web_search", "search_web"].includes(toolCall.name) &&
+              resultData &&
+              typeof resultData === "object" &&
+              "refundedQueries" in resultData &&
+              Array.isArray(resultData.refundedQueries)
+            ) {
+              Object.assign(storedResultData, {
+                refundedQueries: resultData.refundedQueries.filter(
+                  (query): query is string => typeof query === "string",
+                ),
+              });
+            }
             const committedResultHash = !isError
               ? await hashToolArguments(storedResultData)
               : undefined;
@@ -3186,7 +3243,16 @@ export const streamChatResponse = async (
             upsertToolCall(completed);
             return completed;
           } catch (toolError) {
+            if (toolError instanceof ResearchPersistenceError) throw toolError;
             if (isAbortError(toolError, signal)) throw toolError;
+            // A failed host launch has not started a workflow. Preserve its
+            // actionable cause rather than reducing it to a generic tool error.
+            if (
+              researchPhase === "start" &&
+              toolCall.name === "start_deep_research"
+            ) {
+              researchStartError = toolError;
+            }
             const endedAt = Date.now();
             if (toolCall.executionRecordId) {
               await updateAgentRun((current) =>
@@ -3261,6 +3327,18 @@ export const streamChatResponse = async (
           (toolCall) => toolCall.name === "start_deep_research",
         );
         if (!startCall || startCall.status !== "success" || startCall.isError) {
+          if (researchStartError !== undefined) throw researchStartError;
+          const failure =
+            startCall?.errorInfo ??
+            (startCall && isToolResultFailure(startCall.result)
+              ? startCall.result.error
+              : undefined);
+          if (failure?.message) {
+            throw Object.assign(new Error(failure.message), {
+              code: failure.code,
+              recoverable: failure.recoverable,
+            });
+          }
           throw new ResearchStartRequiredError();
         }
         notifyAgentExecutionPhase("idle");
@@ -3485,6 +3563,15 @@ export const streamChatResponse = async (
         if (typeof navigator !== "undefined" && !navigator.onLine) {
           return transitionAgentRunStatus(recovered, "interrupted", {
             stop: { reason: "offline" },
+          });
+        }
+        if (
+          researchPhase === "execute" &&
+          options?.abortAgentRunAsInterrupted &&
+          isResearchConnectionError(error)
+        ) {
+          return transitionAgentRunStatus(recovered, "interrupted", {
+            stop: { reason: "page_interrupted" },
           });
         }
         if (isAbortError(error, signal)) {

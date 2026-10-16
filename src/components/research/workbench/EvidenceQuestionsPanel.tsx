@@ -20,7 +20,9 @@ export default function EvidenceQuestionsPanel({
   reportId,
   reportVersions,
   onSelectVersion,
+  embedded = false,
 }: {
+  embedded?: boolean;
   taskId: string;
   reportId?: string;
   reportVersions: readonly { id: string; version: number }[];
@@ -50,39 +52,45 @@ export default function EvidenceQuestionsPanel({
 
   if (!reportId)
     return (
-      <div className="mx-auto max-w-5xl p-4 sm:p-6">
-        <h2 className="text-lg font-semibold">{t("title")}</h2>
+      <div className="mx-auto max-w-3xl p-4 sm:p-6">
+        {!embedded ? (
+          <h2 className="text-lg font-semibold">{t("title")}</h2>
+        ) : null}
         <p className="mt-3 text-sm text-muted-foreground">{t("noReport")}</p>
       </div>
     );
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 p-4 sm:p-6">
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 p-4 sm:p-6">
       <header>
-        <h2 className="text-lg font-semibold">{t("title")}</h2>
+        {!embedded ? (
+          <h2 className="text-lg font-semibold">{t("title")}</h2>
+        ) : null}
         <p className="mt-1 text-sm leading-6 text-muted-foreground">
           {t("description")}
         </p>
       </header>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-        <label className="grid gap-1 text-xs font-medium sm:w-40">
-          {t("version")}
-          <CustomSelect
-            ariaLabel={t("version")}
-            selectButtonClassName="min-h-10 text-sm"
-            value={reportId}
-            onChange={onSelectVersion}
-            options={reportVersions.map((report) => ({
-              value: report.id,
-              label: t("versionValue", { version: report.version }),
-            }))}
-          />
-        </label>
+        {reportVersions.length > 1 ? (
+          <label className="grid gap-1 text-xs font-medium sm:w-40">
+            {t("version")}
+            <CustomSelect
+              ariaLabel={t("version")}
+              selectButtonClassName="mt-1 flex h-11 w-full items-center justify-between gap-2 rounded-md border border-border bg-background px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:h-9"
+              value={reportId}
+              onChange={onSelectVersion}
+              options={reportVersions.map((report) => ({
+                value: report.id,
+                label: t("versionValue", { version: report.version }),
+              }))}
+            />
+          </label>
+        ) : null}
         <label className="grid min-w-0 flex-1 gap-1 text-xs font-medium">
           {t("topic")}
           <CustomSelect
             ariaLabel={t("topic")}
-            selectButtonClassName="min-h-10 text-sm"
+            selectButtonClassName="mt-1 flex h-11 w-full items-center justify-between gap-2 rounded-md border border-border bg-background px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:h-9"
             value={conversation.selectedId ?? ""}
             disabled={!conversation.threads.length}
             emptyLabel={t("noTopics")}

@@ -593,3 +593,212 @@ describe("search_web v2 built-in binding", () => {
     });
   });
 });
+
+describe("research transient query refunds", () => {
+  beforeEach(() => mocks.createSearchProvider.mockReset());
+
+  it.each([429, 500, 503, 400, 401])(
+    "refunds only transient HTTP %i failures",
+    async (status) => {
+      const { SearchRequestError } = await import("@/lib/search/errors");
+      const refunded = vi.fn();
+      const queryBudget = {
+        remainingQueries: 1,
+        maxResultsPerQuery: 5,
+        seenQueries: new Set<string>(),
+        onQueriesRefunded: refunded,
+      };
+      const binding = createWebSearchBinding({ queryBudget });
+      mocks.createSearchProvider.mockRejectedValueOnce(
+        new SearchRequestError(
+          "failed",
+          status,
+          "SEARCH_HTTP_ERROR",
+          "provider",
+        ),
+      );
+      await binding.execute({ query: "solar physics" }, createContext(vi.fn()));
+      const transient = status === 429 || status >= 500;
+      expect(queryBudget.remainingQueries).toBe(transient ? 1 : 0);
+      expect(queryBudget.seenQueries.has("solar physics")).toBe(!transient);
+      expect(refunded).toHaveBeenCalledTimes(transient ? 1 : 0);
+      if (transient) {
+        mocks.createSearchProvider.mockResolvedValueOnce({
+          sources: [],
+          images: [],
+        });
+        await binding.execute(
+          { query: "solar physics" },
+          createContext(vi.fn()),
+        );
+        expect(queryBudget.remainingQueries).toBe(0);
+        expect(queryBudget.seenQueries.has("solar physics")).toBe(true);
+      }
+    },
+  );
+
+  it("refunds only failed temporary queries in a mixed batch", async () => {
+    const { SearchRequestError } = await import("@/lib/search/errors");
+    const refunded = vi.fn();
+    const queryBudget = {
+      remainingQueries: 3,
+      maxResultsPerQuery: 5,
+      seenQueries: new Set<string>(),
+      onQueriesRefunded: refunded,
+    };
+    mocks.createSearchProvider
+      .mockResolvedValueOnce({ sources: [], images: [] })
+      .mockRejectedValueOnce(
+        new SearchRequestError("busy", 503, "SEARCH_HTTP_ERROR", "provider"),
+      )
+      .mockRejectedValueOnce(
+        new SearchRequestError(
+          "bad query",
+          400,
+          "SEARCH_HTTP_ERROR",
+          "provider",
+        ),
+      );
+    const result = await createSearchWebV2Binding({ queryBudget }).execute(
+      { queries: ["solar physics", "ocean currents", "forest ecology"] },
+      createContext(vi.fn()),
+    );
+    expect(result).toMatchObject({ partial: true, failedCount: 2 });
+    expect(queryBudget.remainingQueries).toBe(1);
+    expect([...queryBudget.seenQueries]).toEqual([
+      "solar physics",
+      "forest ecology",
+    ]);
+    expect(refunded).toHaveBeenCalledExactlyOnceWith(["ocean currents"]);
+  });
+
+  it("does not refund explicit user cancellation", async () => {
+    const controller = new AbortController();
+    const queryBudget = { remainingQueries: 1, maxResultsPerQuery: 5 };
+    mocks.createSearchProvider.mockImplementationOnce(async () => {
+      controller.abort();
+      controller.signal.throwIfAborted();
+    });
+    await expect(
+      createWebSearchBinding({ queryBudget }).execute(
+        { query: "solar physics" },
+        createContext(vi.fn(), controller.signal),
+      ),
+    ).rejects.toMatchObject({ name: "AbortError" });
+    expect(queryBudget.remainingQueries).toBe(0);
+  });
+
+  it.each([
+    new DOMException("Timed out", "TimeoutError"),
+    new TypeError("Failed to fetch"),
+  ])("refunds transport failure %s", async (error) => {
+    const queryBudget = { remainingQueries: 1, maxResultsPerQuery: 5 };
+    mocks.createSearchProvider.mockRejectedValueOnce(error);
+    await createWebSearchBinding({ queryBudget }).execute(
+      { query: "solar physics" },
+      createContext(vi.fn()),
+    );
+    expect(queryBudget.remainingQueries).toBe(1);
+  });
+});
+
+it.each(["single", "batch"])(
+  "awaits durable %s query reservation before dispatch",
+  async (kind) => {
+    mocks.createSearchProvider
+      .mockReset()
+      .mockResolvedValue({ sources: [], images: [] });
+    let release!: () => void;
+    const queryBudget = {
+      remainingQueries: 4,
+      maxResultsPerQuery: 5,
+      persistQueries: vi.fn(
+        () =>
+          new Promise<void>((resolve) => {
+            release = resolve;
+          }),
+      ),
+    };
+    const binding =
+      kind === "single"
+        ? createWebSearchBinding({ queryBudget })
+        : createSearchWebV2Binding({ queryBudget });
+    const running = binding.execute(
+      kind === "single"
+        ? { query: "solar physics" }
+        : { queries: ["solar physics", "ocean currents"] },
+      createContext(vi.fn()),
+    );
+    await Promise.resolve();
+    expect(queryBudget.persistQueries).toHaveBeenCalledOnce();
+    expect(mocks.createSearchProvider).not.toHaveBeenCalled();
+    release();
+    await running;
+    expect(mocks.createSearchProvider).toHaveBeenCalledTimes(
+      kind === "single" ? 1 : 2,
+    );
+  },
+);
+
+it.each(["single", "batch"])(
+  "does not dispatch %s when the reservation cannot be committed",
+  async (kind) => {
+    const { ResearchPersistenceError } =
+      await import("@/services/research/taskRepository/errors");
+    const error = new ResearchPersistenceError("quota");
+    mocks.createSearchProvider.mockReset();
+    const queryBudget = {
+      remainingQueries: 4,
+      maxResultsPerQuery: 5,
+      persistQueries: vi.fn(async () => {
+        throw error;
+      }),
+    };
+    const binding =
+      kind === "single"
+        ? createWebSearchBinding({ queryBudget })
+        : createSearchWebV2Binding({ queryBudget });
+    await expect(
+      binding.execute(
+        kind === "single"
+          ? { query: "solar physics" }
+          : { queries: ["solar physics", "ocean currents"] },
+        createContext(vi.fn()),
+      ),
+    ).rejects.toBe(error);
+    expect(mocks.createSearchProvider).not.toHaveBeenCalled();
+  },
+);
+
+it("awaits partial refund persistence and propagates storage failure even with a successful batch result", async () => {
+  const { SearchRequestError } = await import("@/lib/search/errors");
+  const { ResearchPersistenceError } =
+    await import("@/services/research/taskRepository/errors");
+  const error = new ResearchPersistenceError("quota");
+  const snapshots: string[][] = [];
+  const queryBudget = {
+    remainingQueries: 2,
+    maxResultsPerQuery: 5,
+    seenQueries: new Set<string>(),
+    persistQueries: vi.fn(async () => {
+      snapshots.push([...queryBudget.seenQueries]);
+      if (snapshots.length === 2) throw error;
+    }),
+  };
+  mocks.createSearchProvider
+    .mockReset()
+    .mockResolvedValueOnce({ sources: [], images: [] })
+    .mockRejectedValueOnce(
+      new SearchRequestError("busy", 429, "SEARCH_HTTP_ERROR", "provider"),
+    );
+  await expect(
+    createSearchWebV2Binding({ queryBudget }).execute(
+      { queries: ["solar physics", "ocean currents"] },
+      createContext(vi.fn()),
+    ),
+  ).rejects.toBe(error);
+  expect(snapshots).toEqual([
+    ["solar physics", "ocean currents"],
+    ["solar physics"],
+  ]);
+});

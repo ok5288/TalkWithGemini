@@ -1,3 +1,5 @@
+import type { ResearchTask } from "@/lib/research/types";
+import { restoreResearchTaskAfterPlanning } from "@/lib/research/task";
 import {
   withResearchTaskExecutionLock,
   type ResearchTaskExecutionLease,
@@ -41,6 +43,7 @@ export function usePreparePlan({
       adjustment?: string,
       requestModel?: string,
       lease?: ResearchTaskExecutionLease,
+      previousTask?: ResearchTask,
     ) => {
       const result = await withResearchTaskExecutionLock(
         taskId,
@@ -53,25 +56,47 @@ export function usePreparePlan({
             )
           )
             return;
+          const beforePlanning = previousTask || task;
           await runOperation(taskId, "planning", async (controller) => {
+            const restore = async (error: unknown) => {
+              const message = t("runtime.error.adjustFailed");
+              await useResearchStore.getState().updateTask(
+                taskId,
+                (current) =>
+                  restoreResearchTaskAfterPlanning(current, beforePlanning, {
+                    code: "RESEARCH_PLAN_FAILED",
+                    message,
+                    recoverable: true,
+                  }),
+                { persistence: "best-effort" },
+              );
+              throw new Error(message, { cause: error });
+            };
             const runtime =
               await import("@/lib/research/runtime/preparePlan").catch(
                 async (error) => {
+                  if (beforePlanning.planVersions.length) return restore(error);
                   const failed = await recordResearchModuleLoadFailure({
                     taskId,
                     phase: "planning",
                     lease: planningLease,
                     signal: controller.signal,
                     message: localizedRuntimeError(error, "planFallback"),
+                    error,
                   });
                   if (failed) onError?.(t("runtime.error.plan"));
                   return null;
                 },
               );
             if (!runtime) return;
-            if (controller.signal.aborted) return;
+            if (controller.signal.aborted) {
+              if (beforePlanning.planVersions.length)
+                await restore(controller.signal.reason);
+              return;
+            }
             await runtime.prepareResearchPlan({
               taskId,
+              previousTask: beforePlanning,
               adjustment,
               requestModel,
               controller,
@@ -86,7 +111,11 @@ export function usePreparePlan({
         },
         lease,
       );
-      if (!result.acquired) onNotice?.(t("runtime.dependency.leaseConflict"));
+      if (!result.acquired) {
+        const message = t("runtime.dependency.leaseConflict");
+        onNotice?.(message);
+        throw new Error(message);
+      }
     },
     [
       onError,

@@ -1758,7 +1758,10 @@ const MessageItem: React.FC<MessageItemProps> = ({
                 >
                   <div className="font-semibold">{t("generationFailed")}</div>
                   <div className="mt-1 wrap-break-word">
-                    {generationError.message}
+                    {generationError.code &&
+                    t.has(`generationErrors.${generationError.code}`)
+                      ? t(`generationErrors.${generationError.code}`)
+                      : generationError.message}
                   </div>
                   {generationError.recoverable ? (
                     <div className="mt-1 text-xs opacity-80">

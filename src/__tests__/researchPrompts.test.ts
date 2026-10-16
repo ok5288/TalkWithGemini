@@ -132,7 +132,7 @@ describe("Deep Research prompts", () => {
       JSON.stringify({ ...planDraft, steps: planDraft.steps.slice(0, 2) }),
       "Fallback goal",
     );
-    expect(twoStepPlan.valid).toBe(true);
+    expect(twoStepPlan.valid).toBe(false);
 
     const legacy = parseResearchPlan(
       JSON.stringify({
@@ -316,7 +316,7 @@ describe("Deep Research prompts", () => {
     const prompt = buildResearchPlanPrompt({ task });
     expect(prompt).toContain('"maxQueries":16');
     expect(prompt).toContain('"initialBreadth":4');
-    expect(prompt).toContain("2-8 non-overlapping steps");
+    expect(prompt).toContain("3-8 non-overlapping steps");
     expect(prompt).not.toContain("request_user_input");
     expect(prompt).toContain("Do not ask the user questions in this call");
     expect(prompt).toContain("omit `scope.timeRange` entirely");

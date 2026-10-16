@@ -125,7 +125,6 @@ export async function initializeResearchSteering(
     // A resumed run may already contain durable steering intent: fail closed.
     if (ctx.run.waves.length > 0) throw error;
     ctx.steeringRecord = undefined;
-    ctx.onNotice?.(ctx.t("runtime.notice.steeringUnavailable"));
   }
 }
 

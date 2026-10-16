@@ -5,16 +5,9 @@ import { CheckCircle2, ChevronDown, CircleX, SearchCheck } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { cn } from "@/lib/utils/cn";
-import { ResearchSteeringPanel } from "../ui/ResearchSteeringPanel";
-import SaveResearchTemplateButton from "../SaveResearchTemplateButton";
 
 import ResearchDisclosure from "../ResearchDisclosure";
-import {
-  ResearchClaimNotice,
-  ResearchPlanContract,
-  ResearchTopology,
-} from "../topology";
-import { ResearchSourceScope, StatusLabel } from "../ui";
+import { ResearchSourceScope } from "../ui";
 import type {
   ResearchEvidenceView,
   ResearchPlanView,
@@ -52,7 +45,7 @@ function PlanStepDisclosure({
         triggerClassName="flex min-h-16 w-full cursor-pointer flex-wrap items-start gap-x-3 gap-y-2 px-4 py-3.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring md:flex-nowrap md:items-center"
         summary={(isOpen) => (
           <>
-            <span className="w-7 shrink-0 pt-0.5 font-mono text-lg font-medium tabular-nums text-foreground/85 md:pt-0">
+            <span className="w-7 shrink-0 pt-0.5 text-sm font-medium tabular-nums text-muted-foreground md:pt-0">
               {String(index + 1).padStart(2, "0")}
             </span>
             <span className="min-w-0 flex-1">
@@ -140,7 +133,7 @@ function PlanStepDisclosure({
   );
 }
 
-function PlanBoundary({ task }: { task: ResearchTaskViewModel }) {
+export function PlanBoundary({ task }: { task: ResearchTaskViewModel }) {
   const t = useTranslations("Research");
   const scope = task.plan?.scope;
   const included = [
@@ -235,9 +228,8 @@ function PlanBoundary({ task }: { task: ResearchTaskViewModel }) {
   );
 }
 
-export function PlanPanel({ task }: { task: ResearchTaskViewModel }) {
+export function PlanStepLedger({ task }: { task: ResearchTaskViewModel }) {
   const t = useTranslations("Research");
-  const [advancedOpen, setAdvancedOpen] = useState(false);
   const evidenceByStepId = useMemo(() => {
     const result = new Map<string, ResearchEvidenceView[]>();
     for (const [index, step] of (task.plan?.steps ?? []).entries()) {
@@ -261,7 +253,7 @@ export function PlanPanel({ task }: { task: ResearchTaskViewModel }) {
 
   if (!task.plan) {
     return (
-      <div className="mx-auto flex min-h-72 w-full max-w-5xl flex-col items-center justify-center px-5 text-center">
+      <div className="mx-auto flex min-h-72 w-full max-w-3xl flex-col items-center justify-center px-5 text-center">
         <SearchCheck
           size={26}
           className="text-muted-foreground"
@@ -274,43 +266,8 @@ export function PlanPanel({ task }: { task: ResearchTaskViewModel }) {
     );
   }
 
-  const hasAdvancedInformation = Boolean(
-    task.plan.recon ||
-    task.plan.assumptions?.length ||
-    task.plan.deliverable ||
-    task.plan.strategy ||
-    task.plan.completionCriteria?.length,
-  );
-
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-8 p-4 pb-8 sm:p-6 sm:pb-10">
-      <section aria-labelledby={`research-plan-overview-${task.id}`}>
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          <span className="rounded-full border border-research-border bg-research-soft px-2.5 py-1">
-            <StatusLabel status={task.status} />
-          </span>
-          <span className="font-mono tabular-nums text-muted-foreground">
-            {t("plan.version", { version: task.plan.version })}
-          </span>
-        </div>
-        <h2
-          id={`research-plan-overview-${task.id}`}
-          className="mt-5 max-w-4xl text-2xl font-semibold tracking-tight text-foreground sm:text-3xl"
-        >
-          {task.plan.objective || task.title}
-        </h2>
-        <p className="mt-3 max-w-4xl text-sm leading-6 text-muted-foreground sm:text-base sm:leading-7">
-          {task.plan.summary}
-        </p>
-        <div className="mt-4">
-          <SaveResearchTemplateButton plan={task.plan} />
-        </div>
-      </section>
-
-      <PlanBoundary task={task} />
-
-      <ResearchSteeringPanel key={task.id} taskId={task.id} />
-
+    <div>
       <section aria-labelledby={`research-step-ledger-${task.id}`}>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2
@@ -319,7 +276,7 @@ export function PlanPanel({ task }: { task: ResearchTaskViewModel }) {
           >
             {t("plan.steps")}
           </h2>
-          <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
+          <span className="text-xs tabular-nums text-muted-foreground">
             {task.completedQuestions}/{task.totalQuestions}
           </span>
         </div>
@@ -338,42 +295,6 @@ export function PlanPanel({ task }: { task: ResearchTaskViewModel }) {
           })}
         </ol>
       </section>
-
-      {hasAdvancedInformation ? (
-        <ResearchDisclosure
-          open={advancedOpen}
-          onOpenChange={setAdvancedOpen}
-          className="overflow-hidden rounded-lg border border-border"
-          triggerClassName="flex min-h-11 w-full cursor-pointer items-center gap-2 px-3 py-2 text-left text-sm font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-          summary={(isOpen) => (
-            <>
-              <ChevronDown
-                size={16}
-                className={cn(
-                  "shrink-0 transition-transform duration-200 ease-out motion-reduce:transition-none",
-                  isOpen && "rotate-180",
-                )}
-                aria-hidden="true"
-              />
-              <span>{t("plan.advancedDisclosure")}</span>
-              <span className="ml-auto hidden text-xs font-normal text-muted-foreground md:inline">
-                {t("plan.advancedDisclosureHint")}
-              </span>
-            </>
-          )}
-        >
-          <div className="border-t border-border p-4 sm:p-5">
-            <ResearchPlanContract plan={task.plan} advancedOnly />
-          </div>
-        </ResearchDisclosure>
-      ) : null}
-
-      {task.run ? (
-        <div className="space-y-6 border-t border-border pt-7">
-          <ResearchClaimNotice run={task.run} />
-          <ResearchTopology task={task} />
-        </div>
-      ) : null}
     </div>
   );
 }

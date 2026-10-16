@@ -106,3 +106,11 @@ describe("Button primitive", () => {
     );
   });
 });
+
+it("keeps research actions blue without primary red overrides in either theme", () => {
+  render(<Button variant="research">Start research</Button>);
+  const button = screen.getByRole("button", { name: "Start research" });
+  expect(button.className).toContain("bg-research-solid");
+  expect(button.className).toContain("text-research-accent-foreground");
+  expect(button.className).not.toMatch(/(?:dark:)?(?:bg|text|hover:bg)-red-/);
+});

@@ -96,5 +96,8 @@
   "archiveDownloadAria": "下载压缩包 {title}",
   "archiveEntryCount": "{count, plural, other {# 个文件}}",
   "archiveMissing": "该压缩包已不可用。",
-  "knowledgePrepareFailed": "无法准备此消息。请检查来源是否仍可用，然后重试。"
+  "knowledgePrepareFailed": "无法准备此消息。请检查来源是否仍可用，然后重试。",
+  "generationErrors": {
+    "RESEARCH_TOOL_CALLING_REQUIRED": "深度研究需要支持工具调用的模型，请在设置中选择兼容模型。"
+  }
 }

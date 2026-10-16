@@ -1,13 +1,15 @@
 "use client";
 
 import React, { useId, useMemo, useState } from "react";
-import { ExternalLink, Search, SearchCheck } from "lucide-react";
+import { ChevronDown, ExternalLink, Search, SearchCheck } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 
+import MarkdownRenderer from "@/components/content/MarkdownRenderer";
+import type { Source } from "@/types";
+import ResearchDisclosure from "../ResearchDisclosure";
 import { CustomSelect } from "@/components/ui/controls";
 import { Button, Input } from "@/components/ui/primitives";
 import { getSafeExternalHref } from "@/lib/security/clientUrl";
-import { cn } from "@/lib/utils/cn";
 
 import type { ResearchEvidenceView, ResearchTaskViewModel } from "../types";
 import { formatResearchDateTime } from "../formatters";
@@ -120,7 +122,7 @@ function EvidenceListItem({
                 <summary className="w-fit cursor-pointer rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                   {t("evidence.technicalDetails")}
                 </summary>
-                <p className="mt-1 wrap-break-word font-mono text-[11px]">
+                <p className="mt-1 wrap-break-word text-[11px]">
                   {evidence.locator}
                 </p>
               </details>
@@ -146,9 +148,20 @@ function EvidenceListItem({
   );
 }
 
-export function EvidencePanel({ task }: { task: ResearchTaskViewModel }) {
+export function EvidencePanel({
+  task,
+  sourcesMarkdown,
+  reportSources,
+  onInspectEvidence,
+}: {
+  task: ResearchTaskViewModel;
+  sourcesMarkdown: string;
+  reportSources: Source[];
+  onInspectEvidence: (id: string) => void;
+}) {
   const t = useTranslations("Research");
   const controlId = useId();
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [questionFilter, setQuestionFilter] = useState<number | "all">("all");
   const [stanceFilter, setStanceFilter] = useState<EvidenceStance | "all">(
@@ -225,11 +238,11 @@ export function EvidencePanel({ task }: { task: ResearchTaskViewModel }) {
   ]);
 
   return (
-    <div className="mx-auto w-full max-w-5xl p-4 sm:p-6">
+    <div className="mx-auto w-full max-w-3xl p-4 sm:p-6">
       <h2 className="text-lg font-semibold">{t("evidence.title")}</h2>
       <div className="mt-4 space-y-3 border-b border-border pb-4">
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <label className="min-w-0 text-xs font-medium text-foreground lg:col-span-2">
+        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_12rem]">
+          <label className="min-w-0 text-xs font-medium text-foreground">
             <span>{t("evidence.searchLabel")}</span>
             <span className="relative mt-1 block">
               <Search
@@ -247,22 +260,6 @@ export function EvidencePanel({ task }: { task: ResearchTaskViewModel }) {
             </span>
           </label>
           <div className="min-w-0 text-xs font-medium text-foreground">
-            <label htmlFor={`${controlId}-domain`}>
-              {t("evidence.domain")}
-            </label>
-            <CustomSelect
-              id={`${controlId}-domain`}
-              value={domainFilter}
-              onChange={setDomainFilter}
-              ariaLabel={t("evidence.domain")}
-              options={[
-                { value: "all", label: t("evidence.allDomains") },
-                ...domains.map((domain) => ({ value: domain, label: domain })),
-              ]}
-              selectButtonClassName="mt-1 flex h-11 w-full items-center justify-between gap-2 rounded-md border border-border bg-background px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:h-9"
-            />
-          </div>
-          <div className="min-w-0 text-xs font-medium text-foreground">
             <label htmlFor={`${controlId}-sort`}>{t("evidence.sort")}</label>
             <CustomSelect
               id={`${controlId}-sort`}
@@ -279,118 +276,141 @@ export function EvidencePanel({ task }: { task: ResearchTaskViewModel }) {
               selectButtonClassName="mt-1 flex h-11 w-full items-center justify-between gap-2 rounded-md border border-border bg-background px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:h-9"
             />
           </div>
-          <div className="min-w-0 text-xs font-medium text-foreground">
-            <label htmlFor={`${controlId}-authority`}>
-              {t("evidence.authorityFilter")}
-            </label>
-            <CustomSelect
-              id={`${controlId}-authority`}
-              value={authorityFilter}
-              onChange={setAuthorityFilter}
-              ariaLabel={t("evidence.authorityFilter")}
-              options={[
-                { value: "all", label: t("evidence.allAuthorities") },
-                ...(["primary", "secondary", "unknown"] as const).map(
-                  (authority) => ({
-                    value: authority,
-                    label: t(`authority.${authority}`),
-                  }),
-                ),
-              ]}
-              selectButtonClassName="mt-1 flex h-11 w-full items-center justify-between gap-2 rounded-md border border-border bg-background px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:h-9"
-            />
-          </div>
-          <div className="min-w-0 text-xs font-medium text-foreground">
-            <label htmlFor={`${controlId}-freshness`}>
-              {t("evidence.freshnessFilter")}
-            </label>
-            <CustomSelect
-              id={`${controlId}-freshness`}
-              value={freshnessFilter}
-              onChange={setFreshnessFilter}
-              ariaLabel={t("evidence.freshnessFilter")}
-              options={[
-                { value: "all", label: t("evidence.allFreshness") },
-                ...(["current", "stale", "unknown"] as const).map(
-                  (freshness) => ({
-                    value: freshness,
-                    label: t(`freshness.${freshness}`),
-                  }),
-                ),
-              ]}
-              selectButtonClassName="mt-1 flex h-11 w-full items-center justify-between gap-2 rounded-md border border-border bg-background px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:h-9"
-            />
-          </div>
         </div>
-        {questionTitles.length > 0 ? (
-          <div
-            className="flex gap-1 overflow-x-auto pb-1 [&_button]:h-9 sm:[&_button]:h-8"
-            role="group"
-            aria-label={t("metrics.questions")}
-          >
-            <Button
-              size="sm"
-              variant={questionFilter === "all" ? "primary" : "ghost"}
-              onClick={() => setQuestionFilter("all")}
-              className={cn(
-                "shrink-0",
-                questionFilter === "all" &&
-                  "bg-research-solid text-research-accent-foreground hover:bg-research-accent-hover",
-              )}
-            >
-              {t("evidence.allQuestions")}
-            </Button>
-            {questionTitles.map((question, index) => (
-              <Button
-                key={question}
-                size="sm"
-                variant={questionFilter === index ? "primary" : "ghost"}
-                onClick={() => setQuestionFilter(index)}
-                className={cn(
-                  "shrink-0",
-                  questionFilter === index &&
-                    "bg-research-solid text-research-accent-foreground hover:bg-research-accent-hover",
-                )}
-                aria-label={`${t("evidence.questionShort", { number: index + 1 })}: ${question}`}
-              >
-                {t("evidence.questionShort", { number: index + 1 })}
-              </Button>
-            ))}
-          </div>
-        ) : null}
-        <div
-          className="flex gap-1 overflow-x-auto pb-1 [&_button]:h-9 sm:[&_button]:h-8"
-          role="group"
-          aria-label={t("evidence.stance")}
+        <ResearchDisclosure
+          open={filtersOpen}
+          onOpenChange={setFiltersOpen}
+          triggerClassName="flex min-h-11 items-center gap-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          summary={(open) => (
+            <>
+              <ChevronDown
+                size={16}
+                aria-hidden="true"
+                className={open ? "rotate-180" : ""}
+              />
+              {t("evidence.moreFilters")}
+            </>
+          )}
         >
-          <Button
-            size="sm"
-            variant={stanceFilter === "all" ? "primary" : "ghost"}
-            onClick={() => setStanceFilter("all")}
-            className={cn(
-              "shrink-0",
-              stanceFilter === "all" &&
-                "bg-research-solid text-research-accent-foreground hover:bg-research-accent-hover",
-            )}
-          >
-            {t("evidence.allRelationships")}
-          </Button>
-          {EVIDENCE_STANCES.map((stance) => (
-            <Button
-              key={stance}
-              size="sm"
-              variant={stanceFilter === stance ? "primary" : "ghost"}
-              onClick={() => setStanceFilter(stance)}
-              className={cn(
-                "shrink-0",
-                stanceFilter === stance &&
-                  "bg-research-solid text-research-accent-foreground hover:bg-research-accent-hover",
-              )}
+          <div className="space-y-3">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="min-w-0 text-xs font-medium text-foreground">
+                <label htmlFor={`${controlId}-domain`}>
+                  {t("evidence.domain")}
+                </label>
+                <CustomSelect
+                  id={`${controlId}-domain`}
+                  value={domainFilter}
+                  onChange={setDomainFilter}
+                  ariaLabel={t("evidence.domain")}
+                  options={[
+                    { value: "all", label: t("evidence.allDomains") },
+                    ...domains.map((domain) => ({
+                      value: domain,
+                      label: domain,
+                    })),
+                  ]}
+                  selectButtonClassName="mt-1 flex h-11 w-full items-center justify-between gap-2 rounded-md border border-border bg-background px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:h-9"
+                />
+              </div>
+              <div className="min-w-0 text-xs font-medium text-foreground">
+                <label htmlFor={`${controlId}-authority`}>
+                  {t("evidence.authorityFilter")}
+                </label>
+                <CustomSelect
+                  id={`${controlId}-authority`}
+                  value={authorityFilter}
+                  onChange={setAuthorityFilter}
+                  ariaLabel={t("evidence.authorityFilter")}
+                  options={[
+                    { value: "all", label: t("evidence.allAuthorities") },
+                    ...(["primary", "secondary", "unknown"] as const).map(
+                      (authority) => ({
+                        value: authority,
+                        label: t(`authority.${authority}`),
+                      }),
+                    ),
+                  ]}
+                  selectButtonClassName="mt-1 flex h-11 w-full items-center justify-between gap-2 rounded-md border border-border bg-background px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:h-9"
+                />
+              </div>
+              <div className="min-w-0 text-xs font-medium text-foreground">
+                <label htmlFor={`${controlId}-freshness`}>
+                  {t("evidence.freshnessFilter")}
+                </label>
+                <CustomSelect
+                  id={`${controlId}-freshness`}
+                  value={freshnessFilter}
+                  onChange={setFreshnessFilter}
+                  ariaLabel={t("evidence.freshnessFilter")}
+                  options={[
+                    { value: "all", label: t("evidence.allFreshness") },
+                    ...(["current", "stale", "unknown"] as const).map(
+                      (freshness) => ({
+                        value: freshness,
+                        label: t(`freshness.${freshness}`),
+                      }),
+                    ),
+                  ]}
+                  selectButtonClassName="mt-1 flex h-11 w-full items-center justify-between gap-2 rounded-md border border-border bg-background px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:h-9"
+                />
+              </div>
+            </div>
+            {questionTitles.length > 0 ? (
+              <div
+                className="flex gap-1 overflow-x-auto pb-1 [&_button]:h-9 sm:[&_button]:h-8"
+                role="group"
+                aria-label={t("metrics.questions")}
+              >
+                <Button
+                  size="sm"
+                  variant={questionFilter === "all" ? "research" : "ghost"}
+                  onClick={() => setQuestionFilter("all")}
+                  className="shrink-0"
+                >
+                  {t("evidence.allQuestions")}
+                </Button>
+                {questionTitles.map((question, index) => (
+                  <Button
+                    key={question}
+                    size="sm"
+                    variant={questionFilter === index ? "research" : "ghost"}
+                    onClick={() => setQuestionFilter(index)}
+                    className="shrink-0"
+                    aria-label={`${t("evidence.questionShort", { number: index + 1 })}: ${question}`}
+                  >
+                    {t("evidence.questionShort", { number: index + 1 })}
+                  </Button>
+                ))}
+              </div>
+            ) : null}
+            <div
+              className="flex gap-1 overflow-x-auto pb-1 [&_button]:h-9 sm:[&_button]:h-8"
+              role="group"
+              aria-label={t("evidence.stance")}
             >
-              {t(`stance.${stance}`)}
-            </Button>
-          ))}
-        </div>
+              <Button
+                size="sm"
+                variant={stanceFilter === "all" ? "research" : "ghost"}
+                onClick={() => setStanceFilter("all")}
+                className="shrink-0"
+              >
+                {t("evidence.allRelationships")}
+              </Button>
+              {EVIDENCE_STANCES.map((stance) => (
+                <Button
+                  key={stance}
+                  size="sm"
+                  variant={stanceFilter === stance ? "research" : "ghost"}
+                  onClick={() => setStanceFilter(stance)}
+                  className="shrink-0"
+                >
+                  {t(`stance.${stance}`)}
+                </Button>
+              ))}
+            </div>
+          </div>
+        </ResearchDisclosure>
         <p className="text-xs text-muted-foreground" aria-live="polite">
           {t("evidence.results", { count: filteredEvidence.length })}
         </p>
@@ -423,6 +443,21 @@ export function EvidencePanel({ task }: { task: ResearchTaskViewModel }) {
           </p>
         </div>
       )}
+      {sourcesMarkdown ? (
+        <section className="mt-6 border-t border-border pt-5">
+          <h2 className="mb-3 text-base font-semibold">
+            {t("evidence.citedInReport")}
+          </h2>
+          <MarkdownRenderer
+            content={sourcesMarkdown}
+            searchSources={reportSources}
+            onCitationClick={(source) => {
+              const id = source.metadata?.researchEvidenceId;
+              if (typeof id === "string") onInspectEvidence(id);
+            }}
+          />
+        </section>
+      ) : null}
     </div>
   );
 }

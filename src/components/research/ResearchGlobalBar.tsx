@@ -56,7 +56,7 @@ export default function ResearchGlobalBar({
           : t("global.label")
       }
     >
-      <div className="mx-auto flex min-h-10 max-w-5xl items-center gap-3">
+      <div className="mx-auto flex min-h-10 max-w-3xl items-center gap-3">
         <div className="min-w-0 flex-1">
           <div
             className="flex flex-wrap items-center gap-x-2"
@@ -65,14 +65,14 @@ export default function ResearchGlobalBar({
           >
             <StatusLabel status={task.status} />
             {task.run ? (
-              <span className="font-mono text-xs tabular-nums text-muted-foreground">
+              <span className="text-xs tabular-nums text-muted-foreground">
                 {formatDuration(elapsedMs || task.usage.elapsedMs)}
               </span>
             ) : null}
           </div>
-          <p className="truncate text-xs text-foreground/80">{task.title}</p>
+
           <p className="truncate text-[11px] text-muted-foreground">
-            {runningActivity?.title ?? phaseLabel}
+            {task.title} · {runningActivity?.title ?? phaseLabel}
           </p>
         </div>
         {onPause ? (
@@ -89,10 +89,10 @@ export default function ResearchGlobalBar({
         {onResume ? (
           <Button
             size="sm"
-            variant="primary"
+            variant="research"
             onClick={onResume}
             aria-label={t("actions.resume")}
-            className="h-9 bg-research-solid text-research-accent-foreground hover:bg-research-accent-hover sm:h-8"
+            className="h-9 sm:h-8"
           >
             <Play size={14} aria-hidden="true" />
             <span>{t("actions.resume")}</span>
@@ -101,13 +101,11 @@ export default function ResearchGlobalBar({
         <Button
           size="sm"
           onClick={onOpenWorkbench}
-          aria-label={t("actions.returnWorkbench")}
+          aria-label={t("actions.viewProgress")}
           className="h-9 sm:h-8"
         >
           <ArrowUpRight size={14} aria-hidden="true" />
-          <span className="hidden sm:inline">
-            {t("actions.returnWorkbench")}
-          </span>
+          <span className="hidden sm:inline">{t("actions.viewProgress")}</span>
           <span className="sm:hidden">{t("actions.open")}</span>
         </Button>
       </div>

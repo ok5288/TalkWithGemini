@@ -1,7 +1,13 @@
 // @vitest-environment jsdom
 
 import React from "react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -33,7 +39,6 @@ function renderDialog(
     open: true,
     sessionId: "session-1",
     budgetPreset: "standard",
-    strategy: { ...RESEARCH_STRATEGY_PRESETS.standard },
     onChange: vi.fn(),
     onClose: vi.fn(),
     ...overrides,
@@ -54,7 +59,7 @@ describe("ResearchSettingsDialog", () => {
     const onChange = vi.fn();
     renderDialog({ onChange });
 
-    await userEvent.click(screen.getByRole("radio", { name: /Deep budget/ }));
+    await userEvent.click(screen.getByRole("radio", { name: /Thorough/ }));
 
     expect(onChange).toHaveBeenCalledWith(
       "deep",
@@ -62,27 +67,38 @@ describe("ResearchSettingsDialog", () => {
     );
   });
 
-  it("clamps manual strategy values and resets to the active preset", async () => {
+  it("offers thoroughness without raw strategy number inputs", async () => {
     const onChange = vi.fn();
-    renderDialog({
-      strategy: { ...RESEARCH_STRATEGY_PRESETS.standard, initialBreadth: 5 },
-      onChange,
-    });
-
-    expect(screen.getByRole("button", { name: "Reset preset" })).toBeTruthy();
-    const breadth = screen.getByRole("spinbutton", { name: "Breadth" });
-    fireEvent.change(breadth, { target: { value: "99" } });
-    fireEvent.blur(breadth);
-    expect(onChange).toHaveBeenCalledWith("standard", {
-      ...RESEARCH_STRATEGY_PRESETS.standard,
-      initialBreadth: 8,
-    });
-
-    await userEvent.click(screen.getByRole("button", { name: "Reset preset" }));
-    expect(onChange).toHaveBeenLastCalledWith(
-      "standard",
-      RESEARCH_STRATEGY_PRESETS.standard,
+    renderDialog({ onChange });
+    expect(screen.queryByRole("spinbutton")).toBeNull();
+    expect(screen.getByText("About 15 minutes")).toBeTruthy();
+    await userEvent.click(screen.getByRole("radio", { name: "Quick" }));
+    expect(onChange).toHaveBeenCalledWith(
+      "quick",
+      RESEARCH_STRATEGY_PRESETS.quick,
     );
+  });
+
+  it("reflects a pending choice immediately and restores it if saving fails", async () => {
+    let reject!: (reason: Error) => void;
+    const pending = new Promise<void>((_resolve, fail) => {
+      reject = fail;
+    });
+    renderDialog({ onChange: () => pending });
+    const quick = screen.getByRole("radio", {
+      name: "Quick",
+    }) as HTMLInputElement;
+    await userEvent.click(quick);
+    expect(quick.checked).toBe(true);
+    await act(async () => {
+      reject(new Error("Storage unavailable"));
+    });
+    expect(quick.checked).toBe(false);
+    expect(
+      (screen.getByRole("radio", { name: "Standard" }) as HTMLInputElement)
+        .checked,
+    ).toBe(true);
+    expect(screen.getByText(researchMessages.adjust.error)).toBeTruthy();
   });
 
   it("reuses the Artifact workspace and supports keyboard tab navigation", () => {

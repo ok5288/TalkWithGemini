@@ -27,7 +27,6 @@
   "deliverable": "Deliverable",
   "sections": "Required sections",
   "sources": "Source priorities",
-  "strategy": "Starting strategy",
   "editor": {
     "title": "Template details",
     "name": "Name",
@@ -43,7 +42,6 @@
     "rationale": "Rationale",
     "rationalePlaceholder": "Why this source is useful",
     "addSource": "Add source priority",
-    "strategy": "Starting strategy",
     "cancel": "Cancel",
     "save": "Save template",
     "required": "Complete the required fields before saving.",

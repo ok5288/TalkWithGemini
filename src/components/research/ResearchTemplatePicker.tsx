@@ -40,7 +40,6 @@ export interface ResearchTemplatePickerLabels {
   deliverable?: string;
   sections?: string;
   sources?: string;
-  strategy?: string;
   templateEditor?: Partial<
     ComponentProps<typeof ResearchTemplateEditor>["labels"]
   >;
@@ -168,11 +167,11 @@ export default function ResearchTemplatePicker({
         </div>
         {selectedTemplate ? (
           <div className="flex shrink-0 items-center gap-1">
-            <span className="rounded-md bg-muted/60 px-1.5 py-1 text-[10px] text-muted-foreground">
+            <span className="rounded-md bg-muted/60 px-1.5 py-1 text-xs text-muted-foreground">
               {selectedTemplate.builtIn ? labels.builtIn : labels.custom}
             </span>
             {isSnapshotSelection ? (
-              <span className="rounded-md border border-research-border px-1.5 py-1 text-[10px] text-research-accent">
+              <span className="rounded-md border border-research-border px-1.5 py-1 text-xs text-research-accent">
                 {labels.snapshot || "Saved snapshot"}
               </span>
             ) : null}
@@ -263,7 +262,7 @@ export default function ResearchTemplatePicker({
           type="button"
           disabled={disabled || api.isLoading}
           onClick={() => setEditor({ mode: "create" })}
-          className="inline-flex h-8 shrink-0 items-center justify-center gap-1 rounded-md px-2 text-[10px] font-medium text-research-accent hover:bg-research-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-research-accent/50 disabled:opacity-50"
+          className="inline-flex h-8 shrink-0 items-center justify-center gap-1 rounded-md px-2 text-xs font-medium text-research-accent hover:bg-research-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-research-accent/50 disabled:opacity-50"
         >
           <Plus size={13} aria-hidden="true" />
           {labels.newTemplate || "New template"}
@@ -271,12 +270,12 @@ export default function ResearchTemplatePicker({
       </div>
 
       {api.isLoading ? (
-        <p className="mt-2 text-[10px] text-muted-foreground" role="status">
+        <p className="mt-2 text-xs text-muted-foreground" role="status">
           {labels.loading}
         </p>
       ) : api.error ? (
         <p
-          className="mt-2 text-[10px] text-amber-700 dark:text-amber-300"
+          className="mt-2 text-xs text-amber-700 dark:text-amber-300"
           role="status"
         >
           {labels.unavailable}
@@ -285,14 +284,14 @@ export default function ResearchTemplatePicker({
 
       {selectedTemplate ? (
         <div className="mt-3 rounded-md bg-muted/25 p-2.5">
-          <p className="text-[10px] font-medium text-foreground">
+          <p className="text-xs font-medium text-foreground">
             {labels.preview || "Template preview"}
           </p>
-          <p className="mt-1 text-[10px] leading-4 text-muted-foreground">
+          <p className="mt-1 text-xs leading-4 text-muted-foreground">
             {labels.templateDescription?.(selectedTemplate) ||
               selectedTemplate.description}
           </p>
-          <dl className="mt-2 grid gap-x-3 gap-y-1 text-[10px] leading-4 text-muted-foreground sm:grid-cols-[auto_1fr]">
+          <dl className="mt-2 grid gap-x-3 gap-y-1 text-xs leading-4 text-muted-foreground sm:grid-cols-[auto_1fr]">
             <dt className="font-medium text-foreground">
               {labels.deliverable || "Deliverable"}
             </dt>
@@ -308,15 +307,6 @@ export default function ResearchTemplatePicker({
               {selectedTemplate.sourcePriorities
                 .map((source) => `${source.sourceType}:${source.priority}`)
                 .join(", ")}
-            </dd>
-            <dt className="font-medium text-foreground">
-              {labels.strategy || "Starting strategy"}
-            </dt>
-            <dd className="font-mono">
-              {selectedTemplate.strategy.initialBreadth}/
-              {selectedTemplate.strategy.maxDepth}/
-              {selectedTemplate.strategy.maxQueries}/
-              {selectedTemplate.strategy.resultsPerQuery}
             </dd>
           </dl>
         </div>

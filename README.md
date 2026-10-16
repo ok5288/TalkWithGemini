@@ -86,7 +86,7 @@ Before production deployment, follow the [deployment guide](docs/deployment-hard
 
 Conversations and workspace files stay in browser storage by default. Requests send the necessary content to the model providers and services you use, usually through the app's API routes. Local-first storage does not mean inference runs offline.
 
-Encrypted sync is optional. Backups exclude credentials and external service data; Research extensions such as custom templates, steering, and report Q&A are currently browser-local and excluded from both ZIP backups and encrypted sync.
+Encrypted sync is optional. Backups exclude credentials and external service data; Research extensions such as custom templates and report Q&A are currently browser-local and excluded from both ZIP backups and encrypted sync.
 
 Agent and Research runs are orchestrated in the foreground. Closing the page interrupts execution; saved runs require explicit resume. The deployment password is an access gate, not a multi-user account system.
 
@@ -101,7 +101,7 @@ Browse the [documentation hub](docs/README.md), or jump to a guide below.
 | [Configuration](docs/environment-variables.md)           | Model providers, search, RAG, voice, and server defaults |
 | [Deployment](docs/deployment-hardening.md)               | Docker, Vercel, Cloudflare Workers, and production setup |
 | [Agent runtime](docs/agent-runtime.md)                   | Tools, permissions, workspaces, and execution recovery   |
-| [Deep Research](docs/research-workflows.md)              | Templates, sources, steering, and report Q&A             |
+| [Deep Research](docs/research-workflows.md)              | Plan approval, recovery, reports, and report Q&A         |
 | [Plugin development](docs/plugin-development.md)         | Build and integrate tools                                |
 | [Local MCP bridge](docs/mcp-stdio-bridge.md)             | Connect allowlisted stdio servers through Docker         |
 | [Conversation sharing](docs/conversation-sharing.md)     | Publish, update, expire, and revoke read-only snapshots  |

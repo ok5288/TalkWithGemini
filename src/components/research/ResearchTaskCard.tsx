@@ -12,6 +12,7 @@ import {
 
 import ResearchPlanCard from "./ResearchPlanCard";
 import ResearchProgressCard from "./ResearchProgressCard";
+import ResearchSummaryRow from "./ResearchSummaryRow";
 import type { ResearchTaskActions, ResearchTaskViewModel } from "./types";
 
 export interface ResearchTaskCardProps extends ResearchTaskActions {
@@ -44,7 +45,11 @@ export default function ResearchTaskCard(props: ResearchTaskCardProps) {
 
   return (
     <div className="grid gap-3 [&>section]:m-0!">
-      <ResearchProgressCard {...props} />
+      {task.status === "completed" || task.status === "partial_completed" ? (
+        <ResearchSummaryRow {...props} />
+      ) : (
+        <ResearchProgressCard {...props} />
+      )}
       {activeReport ? (
         <LongTextBlock
           content={

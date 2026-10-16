@@ -150,7 +150,6 @@ import {
   getNextSupportedChatMode,
   normalizeChatMode,
 } from "@/lib/chat/mode";
-import { resolveResearchStrategy } from "@/lib/research/orchestration/strategy";
 import {
   type ResearchBudgetPreset,
   type ResearchStrategy,
@@ -477,14 +476,6 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
     );
     const researchBudgetPreset =
       currentSession?.config?.researchBudgetPreset || "standard";
-    const researchStrategy = useMemo(
-      () =>
-        resolveResearchStrategy(
-          researchBudgetPreset,
-          currentSession?.config?.researchStrategy,
-        ),
-      [currentSession?.config?.researchStrategy, researchBudgetPreset],
-    );
     const activeSkillIds = useMemo(
       () =>
         normalizeSkillIdRefs(
@@ -620,7 +611,7 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
           label: t("chatModeResearch"),
           description: modelCapabilities.toolCall
             ? t("chatModeResearchDescription")
-            : t("agentModeUnavailable"),
+            : t("researchModeUnavailable"),
           supported: modelCapabilities.toolCall,
         },
         {
@@ -782,7 +773,13 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
           (mode === "agent" || mode === "research") &&
           !modelCapabilities.toolCall
         ) {
-          setErrorMsg(t("agentModeUnavailable"));
+          setErrorMsg(
+            t(
+              mode === "research"
+                ? "researchModeUnavailable"
+                : "agentModeUnavailable",
+            ),
+          );
           return;
         }
 
@@ -2305,7 +2302,6 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
             open={showResearchSettings}
             sessionId={currentSessionId}
             budgetPreset={researchBudgetPreset}
-            strategy={researchStrategy}
             template={currentSession?.config?.researchTemplate}
             onChange={handleResearchSettingsChange}
             onTemplateChange={handleResearchTemplateChange}

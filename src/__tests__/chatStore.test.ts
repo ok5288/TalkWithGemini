@@ -475,6 +475,56 @@ describe("chat store persistence", () => {
     expect(useChatStore.getState().chatConfig.useDeepResearch).toBe(false);
   });
 
+  it("updates a session mode and synchronizes only the current composer", () => {
+    useChatStore.setState({
+      sessions: [makeSession("active"), makeSession("other")],
+      currentSessionId: "active",
+    });
+    useChatStore.getState().setSessionChatMode("active", "research");
+    expect(useChatStore.getState().chatConfig).toMatchObject({
+      chatMode: "research",
+      useDeepResearch: true,
+      useAgentMode: false,
+    });
+    useChatStore.getState().setSessionChatMode("other", "auto");
+    expect(useChatStore.getState().chatConfig.chatMode).toBe("research");
+    expect(useChatStore.getState().sessions[1].config?.chatMode).toBe("auto");
+    useChatStore.getState().setSessionChatMode("active", "auto");
+    expect(useChatStore.getState().chatConfig.useDeepResearch).toBe(false);
+  });
+
+  it("keeps mode selection revisions local, isolated and bounded by session lifetime", async () => {
+    useChatStore.setState({
+      sessions: [makeSession("active"), makeSession("other")],
+      currentSessionId: "active",
+      sessionModeRevisions: {},
+    });
+    const state = () => useChatStore.getState();
+    state().setSessionChatMode("active", "research");
+    const applied = state().sessionModeRevisions.active;
+    state().setChatConfig({ useSearch: true });
+    state().updateSessionConfig("active", { approvalMode: "strict" });
+    expect(state().sessionModeRevisions.active).toBe(applied);
+    state().setSessionChatMode("other", "agent");
+    expect(state().sessionModeRevisions.active).toBe(applied);
+    state().setChatConfig({ chatMode: "agent" });
+    expect(state().sessionModeRevisions.active).toBeGreaterThan(applied);
+    const selected = state().sessionModeRevisions.active;
+    state().updateSessionConfig("active", { chatMode: "research" });
+    expect(state().sessionModeRevisions.active).toBeGreaterThan(selected);
+    expect(
+      useChatStore.persist.getOptions().partialize!(state()),
+    ).not.toHaveProperty("sessionModeRevisions");
+    await state().deleteSession("active");
+    expect(state().sessionModeRevisions).not.toHaveProperty("active");
+    expect(state().sessionModeRevisions.other).toBeDefined();
+    const temporary = state().createTemporarySession();
+    state().setChatConfig({ chatMode: "chat" });
+    expect(state().sessionModeRevisions[temporary]).toBeDefined();
+    state().discardTemporarySession();
+    expect(state().sessionModeRevisions).not.toHaveProperty(temporary);
+  });
+
   it("does not reuse titled or non-empty chats when creating a default chat", () => {
     useChatStore.setState({
       sessions: [

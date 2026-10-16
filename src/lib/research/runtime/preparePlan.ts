@@ -1,3 +1,9 @@
+import { ResearchPersistenceError } from "@/services/research/taskRepository/errors";
+import { restoreResearchTaskAfterPlanning } from "../task";
+import type { ResearchTask } from "../types";
+import { createStarterResearchPlan } from "../prompts/starterPlan";
+import { runResearchModelWithRetry } from "./modelRetry";
+import { getResearchModelErrorCode } from "@/lib/chat/providerErrors";
 import { v7 as uuidv7 } from "uuid";
 
 import type { ToolCall, ToolConfirmationController } from "@/types";
@@ -63,6 +69,7 @@ const PLAN_REPAIR_ATTEMPTS = 2;
  */
 export async function prepareResearchPlan({
   taskId,
+  previousTask,
   adjustment,
   requestModel,
   controller,
@@ -74,6 +81,7 @@ export async function prepareResearchPlan({
   onNotice,
 }: {
   taskId: string;
+  previousTask?: ResearchTask;
   adjustment?: string;
   requestModel?: string;
   controller: AbortController;
@@ -87,6 +95,7 @@ export async function prepareResearchPlan({
   const store = useResearchStore.getState();
   const initial = store.tasksById[taskId];
   if (!initial) throw new Error("Research task was not found.");
+  const beforePlanning = previousTask || initial;
   try {
     const provisionalSnapshot = await createSourceSnapshot(
       initial,
@@ -182,83 +191,92 @@ export async function prepareResearchPlan({
       let roundToolCalls: ToolCall[] = [];
       const priorToolCalls = planningToolCalls;
       try {
-        content = await streamChatResponse(
-          initial.sessionId,
-          model,
-          [],
-          buildResearchPlanPrompt({
-            task: initial,
-            adjustment: reconAdjustment,
-            stage,
-            contextRequest,
-            planningContext,
-            allowedSourceTypes,
-            strategy,
-            template,
-            preserveInitialContract: preserveInitialTemplateContract,
-          }),
-          [],
-          {
-            ...chatConfig,
-            chatMode: "research",
-            useAgentMode: false,
-            useDeepResearch: true,
-            useSearch: stage === "web",
-            useReasoning: false,
-          },
-          (text) => {
-            content = text;
-          },
-          [effective.systemInstruction, RESEARCH_PLANNING_SYSTEM_INSTRUCTION]
-            .filter(Boolean)
-            .join("\n\n"),
-          undefined,
-          (toolCalls) => {
-            roundToolCalls = toolCalls;
-            planningToolCalls = [...priorToolCalls, ...toolCalls];
-          },
-          undefined,
-          undefined,
-          lookupSignal.signal,
-          [],
-          undefined,
-          undefined,
-          toolConfirmationController,
-          {
-            executionWorkflow: { kind: "research", phase: "plan" },
-            disableTools: !lookup,
-            disableImageGeneration: true,
-            allowedToolIds:
-              stage === "knowledge"
-                ? ["search_knowledge"]
-                : stage === "web"
-                  ? ["web_search"]
-                  : [],
-            enforceAllowedToolIds: true,
-            allowedToolEffects:
-              stage === "web" ? ["network_read"] : ["local_read"],
-            approvalMode: effective.approvalMode,
-            researchQueryBudget: queryBudget,
-            ...(stage === "knowledge" ? { knowledgeScope } : {}),
-            agentBudget: {
-              maxToolRounds: Math.min(3, initial.budget.maxToolRounds),
-              maxToolCalls: Math.min(2, initial.budget.maxToolCalls),
-              maxDurationMs: Math.min(
-                10 * 60 * 1_000,
-                initial.budget.maxDurationMs,
-              ),
-              ...(initial.budget.maxTotalTokens
-                ? { maxTotalTokens: initial.budget.maxTotalTokens }
-                : {}),
+        const run = () =>
+          streamChatResponse(
+            initial.sessionId,
+            model,
+            [],
+            buildResearchPlanPrompt({
+              task: initial,
+              adjustment: reconAdjustment,
+              stage,
+              contextRequest,
+              planningContext,
+              allowedSourceTypes,
+              strategy,
+              template,
+              preserveInitialContract: preserveInitialTemplateContract,
+            }),
+            [],
+            {
+              ...chatConfig,
+              chatMode: "research",
+              useAgentMode: false,
+              useDeepResearch: true,
+              useSearch: stage === "web",
+              useReasoning: false,
             },
-            agentRun: {
-              id: runId,
-              userMessageId: initial.userMessageId,
-              modelMessageId: initial.cardMessageId,
+            (text) => {
+              content = text;
             },
-            abortAgentRunAsInterrupted: true,
-          },
-        );
+            [effective.systemInstruction, RESEARCH_PLANNING_SYSTEM_INSTRUCTION]
+              .filter(Boolean)
+              .join("\n\n"),
+            undefined,
+            (toolCalls) => {
+              roundToolCalls = toolCalls;
+              planningToolCalls = [...priorToolCalls, ...toolCalls];
+            },
+            undefined,
+            undefined,
+            lookupSignal.signal,
+            [],
+            undefined,
+            undefined,
+            toolConfirmationController,
+            {
+              executionWorkflow: { kind: "research", phase: "plan" },
+              disableTools: !lookup,
+              disableImageGeneration: true,
+              allowedToolIds:
+                stage === "knowledge"
+                  ? ["search_knowledge"]
+                  : stage === "web"
+                    ? ["web_search"]
+                    : [],
+              enforceAllowedToolIds: true,
+              allowedToolEffects:
+                stage === "web" ? ["network_read"] : ["local_read"],
+              approvalMode: effective.approvalMode,
+              researchQueryBudget: queryBudget,
+              ...(stage === "knowledge" ? { knowledgeScope } : {}),
+              agentBudget: {
+                maxToolRounds: Math.min(3, initial.budget.maxToolRounds),
+                maxToolCalls: Math.min(2, initial.budget.maxToolCalls),
+                maxDurationMs: Math.min(
+                  10 * 60 * 1_000,
+                  initial.budget.maxDurationMs,
+                ),
+                ...(initial.budget.maxTotalTokens
+                  ? { maxTotalTokens: initial.budget.maxTotalTokens }
+                  : {}),
+              },
+              agentRun: {
+                id: runId,
+                userMessageId: initial.userMessageId,
+                modelMessageId: initial.cardMessageId,
+              },
+              abortAgentRunAsInterrupted: true,
+            },
+          );
+        content = lookup
+          ? await run()
+          : await runResearchModelWithRetry({
+              run,
+              signal: controller.signal,
+              hasVisibleOutput: () => content.length > 0,
+              hasToolActivity: () => roundToolCalls.length > 0,
+            });
         controller.signal.throwIfAborted();
         lookupSignal.signal?.throwIfAborted();
         return content;
@@ -398,71 +416,77 @@ export async function prepareResearchPlan({
       attempt += 1
     ) {
       let repairedContent = "";
-      repairedContent = await streamChatResponse(
-        initial.sessionId,
-        model,
-        [],
-        buildResearchPlanRepairPrompt({
-          task: initial,
-          invalidOutput: attemptContent,
-          planningContext,
-          issues: evaluated.issues,
-          allowedSourceTypes,
-          strategy,
-          template,
-          preserveInitialContract: preserveInitialTemplateContract,
-        }),
-        [],
-        {
-          ...chatConfig,
-          chatMode: "chat",
-          useAgentMode: false,
-          useDeepResearch: false,
-          useSearch: false,
-          useReasoning: false,
-        },
-        (text) => {
-          repairedContent = text;
-        },
-        `${effective.systemInstruction}\n\nThis is a closed-book plan repair. All tools and source access are disabled.`,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        controller.signal,
-        [],
-        undefined,
-        undefined,
-        undefined,
-        {
-          disableTools: true,
-          disableImageGeneration: true,
-          agentRun: {
-            id: attempt === 0 ? criticRunId : uuidv7(),
-            userMessageId: initial.userMessageId,
-            modelMessageId: initial.cardMessageId,
-          },
-        },
-      );
+      repairedContent = await runResearchModelWithRetry({
+        signal: controller.signal,
+        hasVisibleOutput: () => repairedContent.length > 0,
+        run: () =>
+          streamChatResponse(
+            initial.sessionId,
+            model,
+            [],
+            buildResearchPlanRepairPrompt({
+              task: initial,
+              invalidOutput: attemptContent,
+              planningContext,
+              issues: evaluated.issues,
+              allowedSourceTypes,
+              strategy,
+              template,
+              preserveInitialContract: preserveInitialTemplateContract,
+            }),
+            [],
+            {
+              ...chatConfig,
+              chatMode: "chat",
+              useAgentMode: false,
+              useDeepResearch: false,
+              useSearch: false,
+              useReasoning: false,
+            },
+            (text) => {
+              repairedContent = text;
+            },
+            `${effective.systemInstruction}\n\nThis is a closed-book plan repair. All tools and source access are disabled.`,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            controller.signal,
+            [],
+            undefined,
+            undefined,
+            undefined,
+            {
+              disableTools: true,
+              disableImageGeneration: true,
+              agentRun: {
+                id: attempt === 0 ? criticRunId : uuidv7(),
+                userMessageId: initial.userMessageId,
+                modelMessageId: initial.cardMessageId,
+              },
+            },
+          ),
+      });
       controller.signal.throwIfAborted();
       attemptContent = repairedContent;
       evaluated = evaluatePlanDraft(repairedContent);
     }
-    if (!evaluated.plan) {
-      await store.updateTask(taskId, (current) =>
-        current.status === "cancelled"
-          ? current
-          : {
-              ...transitionResearchTask(current, "failed"),
-              error: {
-                code: "RESEARCH_PLAN_INVALID",
-                message: t("runtime.error.planInvalid"),
-                recoverable: true,
-              },
-            },
+    if (!evaluated.plan && beforePlanning.planVersions.length === 0) {
+      evaluated = evaluatePlanDraft(
+        JSON.stringify(
+          createStarterResearchPlan({
+            goal: initial.goal,
+            strategy,
+            allowedSourceTypes,
+            t,
+          }),
+        ),
       );
-      onError?.(t("runtime.error.plan"));
-      return;
+    }
+    if (!evaluated.plan) {
+      throw Object.assign(new Error(t("runtime.error.planInvalid")), {
+        code: "RESEARCH_PLAN_INVALID",
+      });
     }
     const planDraft = evaluated.plan;
 
@@ -512,6 +536,54 @@ export async function prepareResearchPlan({
     }
     onNotice?.(t("runtime.notice.planReady"));
   } catch (error) {
+    if (error instanceof ResearchPersistenceError) {
+      // A failed save, especially a conflict, must not trigger a second write
+      // of our snapshot over the durable task owned by another tab.
+      const message = t("runtime.error.persistence");
+      useResearchStore.setState((state) => {
+        const current = state.tasksById[taskId];
+        if (!current || current.status === "cancelled") return {};
+        const failure = {
+          code: `RESEARCH_STORAGE_${error.reason}`,
+          message,
+          recoverable: true,
+        };
+        const recovered =
+          beforePlanning.planVersions.length > 0
+            ? restoreResearchTaskAfterPlanning(current, beforePlanning, failure)
+            : { ...transitionResearchTask(current, "paused"), error: failure };
+        return {
+          ...(state.activeTaskId === taskId ? { activeTaskId: null } : {}),
+          tasksById: { ...state.tasksById, [taskId]: recovered },
+        };
+      });
+      onError?.(message);
+      throw error;
+    }
+    if (beforePlanning.planVersions.length > 0) {
+      const message = t("runtime.error.adjustFailed");
+      await store.updateTask(
+        taskId,
+        (current) =>
+          restoreResearchTaskAfterPlanning(current, beforePlanning, {
+            code:
+              isAbortError(error) ||
+              controller.signal.aborted ||
+              (error instanceof Error &&
+                "code" in error &&
+                error.code === "RESEARCH_PLAN_INVALID")
+                ? "RESEARCH_PLAN_ADJUST_FAILED"
+                : error instanceof ResearchModelUnavailableError
+                  ? error.code
+                  : getResearchModelErrorCode(error),
+            message,
+            recoverable: true,
+          }),
+        { persistence: "best-effort" },
+      );
+      onError?.(message);
+      throw new Error(message, { cause: error });
+    }
     if (isAbortError(error) || controller.signal.aborted) {
       await store.updateTask(
         taskId,
@@ -571,7 +643,7 @@ export async function prepareResearchPlan({
           : {
               ...transitionResearchTask(current, "failed"),
               error: {
-                code: "RESEARCH_PLAN_FAILED",
+                code: getResearchModelErrorCode(error),
                 message: localizedRuntimeError(error, "planFallback"),
                 recoverable: true,
               },

@@ -12,6 +12,8 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { NextIntlClientProvider } from "next-intl";
 import EvidenceQuestionsPanel from "@/components/research/workbench/EvidenceQuestionsPanel";
 import messages from "@/i18n/locales/en/EvidenceQuestions.json";
+import { ResearchFollowupDialog } from "@/components/research/workbench/ResearchFollowupDialog";
+import researchMessages from "@/i18n/locales/en/Research.json";
 import contentMessages from "@/i18n/locales/en/Content.json";
 
 const state = vi.hoisted(() => ({
@@ -58,15 +60,19 @@ vi.mock("@/hooks/research/useEvidenceConversation", () => ({
     };
   },
 }));
-const renderPanel = () => (
+const renderPanel = (
+  embedded = false,
+  versions = [{ id: "report", version: 1 }],
+) => (
   <NextIntlClientProvider
     locale="en"
     messages={{ EvidenceQuestions: messages, Content: contentMessages }}
   >
     <EvidenceQuestionsPanel
+      embedded={embedded}
       taskId="task"
       reportId="report"
-      reportVersions={[{ id: "report", version: 1 }]}
+      reportVersions={versions}
       onSelectVersion={vi.fn()}
     />
   </NextIntlClientProvider>
@@ -141,4 +147,55 @@ it("renders completed answers through the restricted shared Markdown entry", () 
       "[data-markdown-diagram], [data-readonly-code]",
     ),
   ).toBeNull();
+});
+
+it("embeds without duplicating the dialog heading or a single-version picker", () => {
+  const view = render(renderPanel(true));
+  expect(screen.queryByRole("heading", { name: messages.title })).toBeNull();
+  expect(screen.queryByRole("combobox", { name: messages.version })).toBeNull();
+  view.rerender(
+    renderPanel(true, [
+      { id: "report", version: 1 },
+      { id: "report-2", version: 2 },
+    ]),
+  );
+  expect(screen.getByRole("combobox", { name: messages.version })).toBeTruthy();
+});
+
+it("keeps a failed continuation editable and refreshes without requiring new instructions", async () => {
+  const user = userEvent.setup();
+  const submit = vi.fn().mockRejectedValueOnce(new Error("offline"));
+  const refresh = vi.fn().mockResolvedValue(undefined);
+  const close = vi.fn();
+  render(
+    <NextIntlClientProvider
+      locale="en"
+      messages={{ Research: researchMessages }}
+    >
+      <ResearchFollowupDialog
+        open
+        onClose={close}
+        onSubmit={submit}
+        onUpdateLatest={refresh}
+      />
+    </NextIntlClientProvider>,
+  );
+  const input = screen.getByRole("textbox");
+  fireEvent.change(input, { target: { value: "Compare recent findings" } });
+  await user.click(
+    screen.getByRole("button", {
+      name: researchMessages.followup.continue.submit,
+    }),
+  );
+  expect(screen.getByRole("alert").textContent).toBe(
+    researchMessages.followup.error,
+  );
+  expect((input as HTMLTextAreaElement).value).toBe("Compare recent findings");
+  expect(close).not.toHaveBeenCalled();
+  await user.clear(input);
+  await user.click(
+    screen.getByRole("button", { name: researchMessages.actions.updateLatest }),
+  );
+  expect(refresh).toHaveBeenCalledOnce();
+  expect(close).toHaveBeenCalledOnce();
 });

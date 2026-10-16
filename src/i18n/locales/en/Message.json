@@ -96,5 +96,8 @@
   "archiveDownloadAria": "Download archive {title}",
   "archiveEntryCount": "{count, plural, one {# file} other {# files}}",
   "archiveMissing": "This archive is no longer available.",
-  "knowledgePrepareFailed": "Could not prepare this message. Check that its sources are still available and try again."
+  "knowledgePrepareFailed": "Could not prepare this message. Check that its sources are still available and try again.",
+  "generationErrors": {
+    "RESEARCH_TOOL_CALLING_REQUIRED": "Deep Research needs a model with tool calling. Choose a compatible model in settings."
+  }
 }

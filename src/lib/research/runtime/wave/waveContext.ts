@@ -46,6 +46,7 @@ export interface ResearchWaveContext extends ResearchWaveInput {
   readonly queryBudget: BuiltinResearchQueryBudget;
   readonly sourceBudget: BuiltinResearchSourceBudget;
   readonly resumeHistory: Message[];
+  streamCompleted?: boolean;
   activeRun: ResearchReportRun;
   latestContent: string;
   latestToolCalls: ToolCall[];

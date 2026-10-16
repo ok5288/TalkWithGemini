@@ -15,3 +15,11 @@ export class ResearchWorkspaceUnavailableError extends Error {
     this.name = "ResearchWorkspaceUnavailableError";
   }
 }
+
+export class ResearchCheckpointUnavailableError extends Error {
+  readonly code = "RESEARCH_CHECKPOINT_UNAVAILABLE";
+  constructor(message: string) {
+    super(message);
+    this.name = "ResearchCheckpointUnavailableError";
+  }
+}

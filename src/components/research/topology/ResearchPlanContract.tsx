@@ -83,7 +83,7 @@ export function ResearchPlanContract({
         >
           {plan.deliverable ? (
             <div className="bg-background px-3 py-2.5">
-              <dt className="text-[10px] font-semibold tracking-[0.12em] text-muted-foreground uppercase">
+              <dt className="text-xs font-semibold text-muted-foreground">
                 {t("plan.deliverable")}
               </dt>
               <dd className="mt-1 text-xs font-medium text-foreground">
@@ -99,26 +99,26 @@ export function ResearchPlanContract({
           {plan.strategy ? (
             <>
               <div className="bg-background px-3 py-2.5">
-                <dt className="text-[10px] font-semibold tracking-[0.12em] text-muted-foreground uppercase">
+                <dt className="text-xs font-semibold text-muted-foreground">
                   {t("plan.initialBreadth")}
                 </dt>
-                <dd className="mt-1 font-mono text-xs font-medium tabular-nums text-foreground">
+                <dd className="mt-1 text-xs font-medium tabular-nums text-foreground">
                   {plan.strategy.initialBreadth}
                 </dd>
               </div>
               <div className="bg-background px-3 py-2.5">
-                <dt className="text-[10px] font-semibold tracking-[0.12em] text-muted-foreground uppercase">
+                <dt className="text-xs font-semibold text-muted-foreground">
                   {t("plan.maxDepth")}
                 </dt>
-                <dd className="mt-1 font-mono text-xs font-medium tabular-nums text-foreground">
+                <dd className="mt-1 text-xs font-medium tabular-nums text-foreground">
                   {plan.strategy.maxDepth}
                 </dd>
               </div>
               <div className="bg-background px-3 py-2.5">
-                <dt className="text-[10px] font-semibold tracking-[0.12em] text-muted-foreground uppercase">
+                <dt className="text-xs font-semibold text-muted-foreground">
                   {t("plan.queryLimit")}
                 </dt>
-                <dd className="mt-1 font-mono text-xs font-medium tabular-nums text-foreground">
+                <dd className="mt-1 text-xs font-medium tabular-nums text-foreground">
                   {plan.strategy.queryLimit}
                 </dd>
               </div>
@@ -129,7 +129,7 @@ export function ResearchPlanContract({
 
       {!compact && !advancedOnly && plan.objective ? (
         <section>
-          <h4 className="text-[11px] font-semibold tracking-[0.12em] text-muted-foreground uppercase">
+          <h4 className="text-[11px] font-semibold text-muted-foreground">
             {t("plan.objective")}
           </h4>
           <p className="mt-1.5 text-sm leading-6 text-foreground/90">
@@ -140,7 +140,7 @@ export function ResearchPlanContract({
 
       {!compact && !advancedOnly && hasScope && plan.scope ? (
         <section>
-          <h4 className="text-[11px] font-semibold tracking-[0.12em] text-muted-foreground uppercase">
+          <h4 className="text-[11px] font-semibold text-muted-foreground">
             {t("plan.scope")}
           </h4>
           <dl className="mt-2 grid gap-3 text-xs sm:grid-cols-2">
@@ -214,7 +214,7 @@ export function ResearchPlanContract({
 
       {!compact && plan.strategy ? (
         <section>
-          <h4 className="text-[11px] font-semibold tracking-[0.12em] text-muted-foreground uppercase">
+          <h4 className="text-[11px] font-semibold text-muted-foreground">
             {t("plan.strategy")}
           </h4>
           <dl className="mt-2 grid grid-cols-2 gap-x-5 gap-y-2 text-xs sm:grid-cols-4">
@@ -222,7 +222,7 @@ export function ResearchPlanContract({
               <dt className="text-muted-foreground">
                 {t("plan.resultsPerQuery")}
               </dt>
-              <dd className="mt-0.5 font-mono tabular-nums text-foreground">
+              <dd className="mt-0.5 tabular-nums text-foreground">
                 {plan.strategy.resultsPerQuery}
               </dd>
             </div>
@@ -231,7 +231,7 @@ export function ResearchPlanContract({
                 <dt className="text-muted-foreground">
                   {t("plan.validationReserve")}
                 </dt>
-                <dd className="mt-0.5 font-mono tabular-nums text-foreground">
+                <dd className="mt-0.5 tabular-nums text-foreground">
                   {plan.strategy.reservedValidationQueries}
                 </dd>
               </div>
@@ -241,7 +241,7 @@ export function ResearchPlanContract({
                 <dt className="text-muted-foreground">
                   {t("plan.sourceLimit")}
                 </dt>
-                <dd className="mt-0.5 font-mono tabular-nums text-foreground">
+                <dd className="mt-0.5 tabular-nums text-foreground">
                   {plan.strategy.sourceContentLimit}
                 </dd>
               </div>
@@ -252,7 +252,7 @@ export function ResearchPlanContract({
 
       {!compact && plan.assumptions?.length ? (
         <section>
-          <h4 className="text-[11px] font-semibold tracking-[0.12em] text-muted-foreground uppercase">
+          <h4 className="text-[11px] font-semibold text-muted-foreground">
             {t("plan.assumptions")}
           </h4>
           <PlanList items={plan.assumptions} />
@@ -261,7 +261,7 @@ export function ResearchPlanContract({
 
       {!compact && plan.completionCriteria?.length ? (
         <section>
-          <h4 className="text-[11px] font-semibold tracking-[0.12em] text-muted-foreground uppercase">
+          <h4 className="text-[11px] font-semibold text-muted-foreground">
             {t("plan.completionCriteria")}
           </h4>
           <PlanList items={plan.completionCriteria} />
@@ -316,7 +316,7 @@ export function ResearchPlanContract({
                     key={item.id}
                     className="grid grid-cols-[1.5rem_minmax(0,1fr)] gap-2 text-xs"
                   >
-                    <span className="font-mono tabular-nums text-muted-foreground">
+                    <span className="tabular-nums text-muted-foreground">
                       {String(index + 1).padStart(2, "0")}
                     </span>
                     <div className="min-w-0">
@@ -349,7 +349,7 @@ export function ResearchPlanContract({
                       key={item.id}
                       className="grid grid-cols-[1.5rem_minmax(0,1fr)] gap-2 text-xs"
                     >
-                      <span className="font-mono tabular-nums text-muted-foreground">
+                      <span className="tabular-nums text-muted-foreground">
                         {String(index + 1).padStart(2, "0")}
                       </span>
                       <div className="min-w-0">

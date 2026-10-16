@@ -38,7 +38,6 @@ const task: ResearchTaskViewModel = {
 describe("interactive report explanation entry", () => {
   it("stages the selected version only after an explicit click and leaves evidence actions independent", () => {
     const explain = vi.fn();
-    const evidence = vi.fn();
     const download = vi.fn();
     render(
       <NextIntlClientProvider
@@ -49,12 +48,12 @@ describe("interactive report explanation entry", () => {
           task={task}
           report={report}
           reportMarkdown={report.markdown}
+          notesMarkdown=""
           reportSources={[]}
           imageSources={[]}
           onSelectVersion={vi.fn()}
           onInspectEvidence={vi.fn()}
           onInteractiveExplanation={explain}
-          onAskEvidence={evidence}
           onDownloadMarkdown={download}
         />
       </NextIntlClientProvider>,
@@ -64,7 +63,6 @@ describe("interactive report explanation entry", () => {
       screen.getByRole("button", { name: "Explain interactively in chat" }),
     );
     expect(explain).toHaveBeenCalledExactlyOnceWith("report-v2");
-    expect(evidence).not.toHaveBeenCalled();
     expect(download).not.toHaveBeenCalled();
     expect(screen.getByText("Unchanged evidence")).toBeTruthy();
   });
@@ -78,6 +76,7 @@ describe("interactive report explanation entry", () => {
           task={task}
           report={report}
           reportMarkdown={report.markdown}
+          notesMarkdown=""
           reportSources={[]}
           imageSources={[]}
           onSelectVersion={vi.fn()}

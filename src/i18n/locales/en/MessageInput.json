@@ -189,5 +189,6 @@
   "compressContextDone": "Context compressed.",
   "compressContextNothingToDo": "There is nothing new to compress yet.",
   "compressContextChanged": "The conversation changed before compression completed, so the stale result was discarded.",
-  "compressContextFailed": "Couldn't compress the context. Please try again."
+  "compressContextFailed": "Couldn't compress the context. Please try again.",
+  "researchModeUnavailable": "Deep Research needs a model with tool calling. Choose a compatible model in settings."
 }

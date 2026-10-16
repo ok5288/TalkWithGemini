@@ -37,6 +37,7 @@ export function ConnectedResearchTaskCard({
   const hydrated = useResearchStore((state) => state.hydrated);
   const currentSessionId = useChatStore((state) => state.currentSessionId);
   const actions = useTaskActions(taskId);
+  const runtime = useResearchRuntime();
   if (!task && hydrated) {
     const removeReference = () => {
       if (!currentSessionId || !messageId || !blockId) return;
@@ -78,7 +79,10 @@ export function ConnectedResearchTaskCard({
     <ResearchTaskCard
       task={viewModel}
       onOpenWorkbench={() => openResearchTask(taskId)}
-      onNewFollowUp={() => openResearchTask(taskId)}
+      onContinueResearch={(instruction) =>
+        runtime.continueResearch(taskId, instruction)
+      }
+      onUpdateLatest={() => runtime.updateLatest(taskId)}
       {...actions}
     />
   );
@@ -281,6 +285,7 @@ export function ConnectedResearchWorkbench({
   return (
     <>
       <ResearchWorkbench
+        key={taskId}
         task={viewModel}
         onClose={onClose}
         {...actions}
@@ -299,11 +304,7 @@ export function ConnectedResearchWorkbench({
                   const store = useChatStore.getState();
                   if (store.currentSessionId !== task.sessionId)
                     await store.selectSession(task.sessionId);
-                  store.updateSessionConfig(task.sessionId, {
-                    chatMode: "chat",
-                    useAgentMode: false,
-                    useDeepResearch: false,
-                  });
+                  store.setSessionChatMode(task.sessionId, "auto");
                   onClose();
                   window.requestAnimationFrame(() =>
                     requestComposerDraft({

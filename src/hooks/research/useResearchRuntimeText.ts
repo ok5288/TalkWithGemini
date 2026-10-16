@@ -1,3 +1,4 @@
+import { classifyModelError } from "@/lib/chat/providerErrors";
 import { ResearchPersistenceError } from "@/services/research/taskRepository/errors";
 import { useCallback, useMemo } from "react";
 import { useTranslations } from "next-intl";
@@ -20,7 +21,7 @@ export function useResearchRuntimeText(): {
 } {
   const t = useTranslations("Research");
   const localizedRuntimeError = useCallback<ResearchRuntimeErrorText>(
-    (error, fallbackKey) => {
+    (error) => {
       if (
         error instanceof Error &&
         error.cause instanceof ResearchPersistenceError
@@ -31,7 +32,7 @@ export function useResearchRuntimeText(): {
         : error instanceof Error &&
             error.message === t("runtime.error.persistence")
           ? error.message
-          : t(`runtime.error.${fallbackKey}`);
+          : t(`runtime.error.${classifyModelError(error)}`);
     },
     [t],
   );

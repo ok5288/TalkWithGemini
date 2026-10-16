@@ -12,7 +12,14 @@ const task = {
   sessionId: "session",
   checkpoint: { historyPath: "research/checkpoints/wave.json" },
 } as ResearchTask;
-const checkpoint = { version: 1, taskId: task.id, savedAt: 1, toolCalls: [] };
+const checkpoint = {
+  version: 1,
+  taskId: task.id,
+  savedAt: 1,
+  prompt: "Research",
+  partialContent: "",
+  toolCalls: [],
+};
 
 beforeEach(() => vi.clearAllMocks());
 

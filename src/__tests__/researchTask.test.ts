@@ -1,3 +1,4 @@
+import { restoreResearchTaskAfterPlanning } from "@/lib/research/task";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -221,7 +222,7 @@ describe("ResearchTask domain", () => {
     ).toBe("cancelled");
   });
 
-  it("recovers every non-terminal task as a manual pause", () => {
+  it("recovers interrupted work as a manual pause and preserves plan approval", () => {
     const researching = transitionResearchTask(
       transitionResearchTask(
         createResearchTask({
@@ -237,6 +238,8 @@ describe("ResearchTask domain", () => {
       { now: 120 },
     );
 
+    const ready = { ...researching, status: "plan_ready" as const };
+    expect(recoverResearchTask(ready, 130)).toBe(ready);
     const recovered = recoverResearchTask(researching, 130);
     expect(recovered.status).toBe("paused");
     expect(recovered.checkpoint).toEqual({
@@ -431,4 +434,29 @@ describe("ResearchTask domain", () => {
     expect(resumed.usage.wallTimeMs).toBe(interrupted.usage.wallTimeMs);
     expect(resumed.startedAt).toBe(10_000 - interrupted.usage.wallTimeMs);
   });
+});
+
+it("planning rollback preserves run history and persistence diagnostics", () => {
+  const previous = createResearchTask({ sessionId: "session", goal: "Goal" });
+  const storageError = {
+    code: "RESEARCH_STORAGE_quota",
+    message: "Cannot save",
+    recoverable: true,
+  };
+  const current = {
+    ...previous,
+    status: "clarifying" as const,
+    agentRunIds: ["new-run"],
+    error: storageError,
+  };
+  const restored = restoreResearchTaskAfterPlanning(current, previous, {
+    code: "RESEARCH_PLAN_FAILED",
+    message: "Failed",
+    recoverable: true,
+  });
+  expect(restored.status).toBe(previous.status);
+  expect(restored.agentRunIds).toEqual(["new-run"]);
+  expect(restored.error).toEqual(storageError);
+  const cancelled = { ...current, status: "cancelled" as const };
+  expect(restoreResearchTaskAfterPlanning(cancelled, previous)).toBe(cancelled);
 });

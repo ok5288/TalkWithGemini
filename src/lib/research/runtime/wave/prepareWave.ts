@@ -20,6 +20,7 @@ import type {
   BuiltinResearchSourceBudget,
 } from "@/services/api/chat/builtinTools";
 
+import { ResearchCheckpointUnavailableError } from "../dependencyErrors";
 import { readCheckpoint } from "../checkpointStorage";
 import { persistRun, type ResearchExecutionContext } from "../executionContext";
 import { getInvalidFrozenWorkspaceSource } from "../sourceSnapshot";
@@ -51,8 +52,44 @@ export async function prepareWave(
     );
   }
   const currentTask = ctx.store.tasksById[ctx.taskId];
-  const availableBudget = remainingBudget(currentTask);
-  if (!availableBudget) return null;
+  const checkpointPath = `research/checkpoints/${ctx.task.id}-${run.id}-wave-${run.waves.find((wave) => wave.id === waveId)?.index || 0}.json`;
+  const resumeDecision = getResearchRunResumeDecision(
+    currentTask,
+    useAgentRunStore.getState().runsById,
+  );
+  const resumeThisWave =
+    currentTask.checkpoint?.researchRunId === run.id &&
+    (resumeDecision.action === "resume" || resumeDecision.action === "archive");
+  if (
+    currentTask.checkpoint?.historyPath &&
+    (!resumeThisWave || currentTask.checkpoint.historyPath !== checkpointPath)
+  ) {
+    throw new ResearchCheckpointUnavailableError(
+      ctx.dependencyText.checkpointUnavailable,
+    );
+  }
+  const savedCheckpoint = resumeThisWave
+    ? await readCheckpoint(currentTask)
+    : null;
+  if (
+    resumeThisWave &&
+    (!savedCheckpoint ||
+      (savedCheckpoint.waveId !== undefined &&
+        savedCheckpoint.waveId !== waveId))
+  ) {
+    throw new ResearchCheckpointUnavailableError(
+      ctx.dependencyText.checkpointUnavailable,
+    );
+  }
+  // A pending checkpoint must settle its receipts even when no further tool
+  // work fits. The reserved closed-book archive can still integrate that work.
+  const remaining = remainingBudget(currentTask);
+  if (!remaining && !savedCheckpoint) return null;
+  const availableBudget = remaining ?? {
+    maxToolRounds: 0,
+    maxToolCalls: 0,
+    maxDurationMs: 0,
+  };
   const searchDeadlineAt = Date.now() + availableBudget.maxDurationMs;
   const currentExecutionUsage = aggregateExecutionUsage(
     getCurrentResearchReportRunIds(currentTask),
@@ -70,26 +107,18 @@ export async function prepareWave(
   // Every wave needs one tool-free archive pass and may need one
   // targeted repair pass. Neither pass may consume search budget.
   const reservedModelRounds = 2;
-  if (
+  const toolBudgetExhausted =
+    !remaining ||
     phaseToolCallAllowance <= 0 ||
-    availableBudget.maxToolRounds <= reservedModelRounds
-  ) {
-    return null;
-  }
-
-  const resumeDecision = getResearchRunResumeDecision(
-    currentTask,
-    useAgentRunStore.getState().runsById,
+    availableBudget.maxToolRounds <= reservedModelRounds ||
+    queryAllowance <= 0;
+  const streamCompleted = Boolean(
+    savedCheckpoint &&
+    (savedCheckpoint.streamCompleted ||
+      resumeDecision.action === "archive" ||
+      toolBudgetExhausted),
   );
-  const resumeThisWave =
-    currentTask.checkpoint?.researchRunId === run.id &&
-    resumeDecision.action === "resume";
-  if (
-    currentTask.checkpoint?.researchRunId === run.id &&
-    resumeDecision.action === "unavailable"
-  ) {
-    throw new Error(ctx.dependencyText.checkpointUnavailable);
-  }
+  if (toolBudgetExhausted && !savedCheckpoint) return null;
   const agentRunId = resumeThisWave ? resumeDecision.runId : uuidv7();
   ctx.lastAgentRunId = agentRunId;
   if (!resumeThisWave) {
@@ -100,10 +129,6 @@ export async function prepareWave(
     }));
   }
 
-  const checkpointPath = `research/checkpoints/${ctx.task.id}-${run.id}-wave-${run.waves.find((wave) => wave.id === waveId)?.index || 0}.json`;
-  const savedCheckpoint = resumeThisWave
-    ? await readCheckpoint(currentTask)
-    : null;
   ctx.imageSources = mergeResearchImageSources(
     ctx.imageSources ?? [],
     run.imageSources ?? [],
@@ -146,16 +171,18 @@ export async function prepareWave(
     ctx.evidence,
     resumeThisWave ? currentTask.checkpoint : undefined,
   );
-  const executedQueries: string[] = getResearchQueriesFromToolCalls(
-    savedCheckpoint?.toolCalls || [],
-  );
+  const executedQueries: string[] =
+    savedCheckpoint?.executedQueries !== undefined
+      ? [...savedCheckpoint.executedQueries]
+      : getResearchQueriesFromToolCalls(savedCheckpoint?.toolCalls || []);
   const readLocators: string[] = getResearchSourceLocatorsFromToolCalls(
     savedCheckpoint?.toolCalls || [],
   );
   const specializedUsage = getSpecializedCheckpointUsage(
     savedCheckpoint?.toolCalls || [],
   );
-  executedQueries.push(...specializedUsage.queries);
+  if (savedCheckpoint?.executedQueries === undefined)
+    executedQueries.push(...specializedUsage.queries);
   readLocators.push(...specializedUsage.locators);
   const queryBudget: BuiltinResearchQueryBudget = {
     deadlineAt: searchDeadlineAt,
@@ -166,6 +193,15 @@ export async function prepareWave(
     ),
     searchPolicy: createResearchSearchPolicy(ctx.plan.scope),
     onQueriesExecuted: (queries) => executedQueries.push(...queries),
+    onQueriesRefunded: (queries) => {
+      for (const query of queries) {
+        const index = executedQueries.findIndex(
+          (value) =>
+            normalizeResearchQuery(value) === normalizeResearchQuery(query),
+        );
+        if (index >= 0) executedQueries.splice(index, 1);
+      }
+    },
   };
   const sourceBudget: BuiltinResearchSourceBudget = {
     remainingSourceBodies: Math.max(
@@ -215,6 +251,7 @@ export async function prepareWave(
     agentRunId,
     resumeThisWave,
     savedCheckpoint,
+    streamCompleted,
     checkpointPath,
     availableBudget,
     phaseToolCallAllowance,

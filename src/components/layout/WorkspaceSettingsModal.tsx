@@ -781,10 +781,6 @@ const WorkspaceSettingsModal: React.FC<WorkspaceSettingsModalProps> = ({
                     "Required sections",
                   ),
                   sources: researchTemplateText("sources", "Source priorities"),
-                  strategy: researchTemplateText(
-                    "strategy",
-                    "Starting strategy",
-                  ),
                   templateEditor: {
                     title: researchTemplateText(
                       "editor.title",
@@ -838,10 +834,6 @@ const WorkspaceSettingsModal: React.FC<WorkspaceSettingsModalProps> = ({
                     addSource: researchTemplateText(
                       "editor.addSource",
                       "Add source priority",
-                    ),
-                    strategy: researchTemplateText(
-                      "editor.strategy",
-                      "Starting strategy",
                     ),
                     cancel: researchTemplateText("editor.cancel", "Cancel"),
                     save: researchTemplateText("editor.save", "Save template"),

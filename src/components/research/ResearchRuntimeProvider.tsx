@@ -11,7 +11,7 @@ import {
   isTerminalResearchStatus,
   transitionResearchTask,
 } from "@/lib/research/task";
-import { type ResearchStrategy } from "@/lib/research/types";
+import { type ResearchBudgetPreset } from "@/lib/research/types";
 import { useResearchStore } from "@/store/core/researchStore";
 
 import { usePlanActions } from "@/hooks/research/usePlanActions";
@@ -35,9 +35,9 @@ interface ResearchRuntimeProviderProps {
 export interface ResearchRuntimeActions {
   confirmPlan: (taskId: string) => Promise<void>;
   adjustPlan: (taskId: string, instruction: string) => Promise<void>;
-  updatePlanStrategy: (
+  updatePlanPreset: (
     taskId: string,
-    overrides: Partial<ResearchStrategy>,
+    preset: ResearchBudgetPreset,
   ) => Promise<void>;
   pauseTask: (taskId: string) => Promise<void>;
   resumeTask: (taskId: string) => Promise<void>;
@@ -111,7 +111,7 @@ export function ResearchRuntimeProvider({
     onError,
     onNotice,
   });
-  const { confirmPlan, adjustPlan, updatePlanStrategy } = usePlanActions({
+  const { confirmPlan, adjustPlan, updatePlanPreset } = usePlanActions({
     claimActiveSlot,
     dependencyText,
     launchResearch,
@@ -124,6 +124,7 @@ export function ResearchRuntimeProvider({
     useResearchTaskActions({
       claimActiveSlot,
       checkpointUnavailableText: dependencyText.checkpointUnavailable,
+      planningFailureText: t("runtime.error.adjustFailed"),
       launchResearch,
       preparePlan,
       onNotice,
@@ -167,7 +168,7 @@ export function ResearchRuntimeProvider({
     () => ({
       confirmPlan,
       adjustPlan,
-      updatePlanStrategy,
+      updatePlanPreset,
       pauseTask,
       resumeTask,
       retryTask,
@@ -184,7 +185,7 @@ export function ResearchRuntimeProvider({
       retryTask,
       resumeTask,
       updateLatest,
-      updatePlanStrategy,
+      updatePlanPreset,
     ],
   );
 

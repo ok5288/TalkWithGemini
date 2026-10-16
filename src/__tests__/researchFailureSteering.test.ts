@@ -106,3 +106,65 @@ it("treats a checkpoint-triggered stream abort as a storage failure without salv
   expect(onError).toHaveBeenCalledOnce();
   expect(publish).toHaveBeenCalledTimes(publishedBefore);
 });
+
+it.each(["failed", "completed", "interrupted"])(
+  "pauses connection loss and keeps stream history for validation on recovery (%s)",
+  async (status) => {
+    const { createResearchTask } = await import("@/lib/research");
+    const { useAgentRunStore } = await import("@/store/core/agentRunStore");
+    const original = createResearchTask({
+      id: "task",
+      sessionId: "session",
+      goal: "Research",
+      now: 100,
+    });
+    const run = {
+      id: "run",
+      nodes: [],
+      waves: [],
+      phase: "exploring",
+    } as unknown as import("@/lib/research").ResearchReportRun;
+    let task = {
+      ...original,
+      status: "researching",
+      checkpoint: {
+        createdAt: 100,
+        resumeStatus: "researching",
+        committedEvidenceIds: [],
+        committedToolExecutionIds: [],
+        historyPath: "checkpoint.json",
+        researchRunId: run.id,
+      },
+    } as import("@/lib/research").ResearchTask;
+    useAgentRunStore.setState({
+      runsById: {
+        agent: { id: "agent", status } as import("@/lib/agent").AgentRun,
+      },
+    });
+    const ctx = {
+      taskId: "task",
+      lastAgentRunId: "agent",
+      controller: new AbortController(),
+      run,
+      evidence: [],
+      store: {
+        tasksById: { task },
+        updateTask: async (
+          _id: string,
+          update: (current: typeof task) => typeof task,
+        ) => {
+          task = update(task);
+          return task;
+        },
+        setActiveTask: vi.fn(),
+      },
+      t: (key: string) => key,
+    } as unknown as ResearchExecutionContext;
+    const publishedBefore = publish.mock.calls.length;
+    await handleExecutionFailure(ctx, new TypeError("Failed to fetch"));
+    expect(task.status).toBe("paused");
+    expect(task.error?.code).toBe("RESEARCH_CONNECTION_LOST");
+    expect(task.checkpoint?.historyPath).toBe("checkpoint.json");
+    expect(publish).toHaveBeenCalledTimes(publishedBefore);
+  },
+);

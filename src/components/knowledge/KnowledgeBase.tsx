@@ -80,6 +80,16 @@ import {
   type KnowledgeFileStatusFilter,
 } from "@/lib/knowledge/fileProductivity";
 import { CustomSelect } from "@/components/ui/controls";
+import {
+  PanelCard,
+  PanelCardAction,
+  PanelCardActions,
+  PanelEmpty,
+  PanelHeader,
+  PanelLoading,
+  PanelRoot,
+  PanelSearch,
+} from "@/components/ui/panel";
 import { Button } from "@/components/ui/primitives";
 
 const formatBytes = (bytes: number, decimals = 2) => {
@@ -308,6 +318,7 @@ const CollectionModalContent = ({
 
   return (
     <div
+      data-panel-accent="knowledge"
       className="fixed inset-0 z-9999 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200"
       onClick={(event) => {
         if (event.target === event.currentTarget) handleClose();
@@ -320,14 +331,11 @@ const CollectionModalContent = ({
         aria-labelledby={titleId}
         tabIndex={-1}
         onKeyDown={handleModalKeyDown}
-        className="bg-white dark:bg-card w-full max-w-lg rounded-2xl shadow-2xl border border-gray-200 dark:border-border flex flex-col overflow-hidden max-h-[90vh]"
+        className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl"
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-border">
-          <h2
-            id={titleId}
-            className="text-lg font-bold text-gray-800 dark:text-foreground"
-          >
+        <div className="flex items-center justify-between border-b border-border px-5 py-4">
+          <h2 id={titleId} className="text-lg font-bold text-foreground">
             {title}
           </h2>
           <Button
@@ -335,7 +343,7 @@ const CollectionModalContent = ({
             type="button"
             aria-label={t("closeEditor")}
             onClick={handleClose}
-            className="rounded-full p-1 text-gray-500 transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:hover:bg-muted"
+            className="rounded-full p-1 text-muted-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-panel-accent/60"
           >
             <X size={20} aria-hidden="true" />
           </Button>
@@ -348,7 +356,7 @@ const CollectionModalContent = ({
             <div className="space-y-1.5">
               <label
                 htmlFor={nameInputId}
-                className="text-xs font-semibold text-gray-500 dark:text-muted-foreground"
+                className="text-xs font-semibold text-muted-foreground"
               >
                 {t("name")}
               </label>
@@ -358,7 +366,7 @@ const CollectionModalContent = ({
                 name="knowledge-collection-name"
                 type="text"
                 autoComplete="off"
-                className="w-full px-3 py-2 bg-gray-50 dark:bg-muted border border-gray-200 dark:border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm font-medium text-gray-800 dark:text-foreground transition-[border-color,box-shadow,background-color]"
+                className="w-full rounded-xl border border-border bg-muted px-3 py-2 text-sm font-medium text-foreground outline-none transition-[border-color,box-shadow,background-color] focus:border-panel-accent focus:ring-2 focus:ring-panel-accent/20"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder={t("namePlaceholder")}
@@ -368,7 +376,7 @@ const CollectionModalContent = ({
             <div className="space-y-1.5">
               <label
                 htmlFor={descriptionInputId}
-                className="text-xs font-semibold text-gray-500 dark:text-muted-foreground"
+                className="text-xs font-semibold text-muted-foreground"
               >
                 {t("description")}
               </label>
@@ -376,7 +384,7 @@ const CollectionModalContent = ({
                 id={descriptionInputId}
                 name="knowledge-collection-description"
                 autoComplete="off"
-                className="w-full px-3 py-2 bg-gray-50 dark:bg-muted border border-gray-200 dark:border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm resize-none h-20 text-gray-700 dark:text-foreground/85 transition-[border-color,box-shadow,background-color]"
+                className="h-20 w-full resize-none rounded-xl border border-border bg-muted px-3 py-2 text-sm text-foreground/85 outline-none transition-[border-color,box-shadow,background-color] focus:border-panel-accent focus:ring-2 focus:ring-panel-accent/20"
                 value={desc}
                 onChange={(e) => setDesc(e.target.value)}
                 placeholder={t("descriptionPlaceholder")}
@@ -385,18 +393,18 @@ const CollectionModalContent = ({
             </div>
           </div>
 
-          <section className="space-y-3 rounded-xl border border-gray-200 bg-gray-50/70 p-4 dark:border-border dark:bg-muted/40">
+          <section className="space-y-3 rounded-xl border border-border bg-muted/40 p-4">
             <div>
-              <h3 className="text-xs font-semibold text-gray-700 dark:text-foreground">
+              <h3 className="text-xs font-semibold text-foreground">
                 {t("chunking.title")}
               </h3>
-              <p className="mt-1 text-[11px] leading-relaxed text-gray-500 dark:text-muted-foreground">
+              <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
                 {t("chunking.description")}
               </p>
             </div>
             <label
               htmlFor={chunkingStrategyInputId}
-              className="block space-y-1.5 text-xs font-semibold text-gray-500 dark:text-muted-foreground"
+              className="block space-y-1.5 text-xs font-semibold text-muted-foreground"
             >
               <span>{t("chunking.strategy")}</span>
               <CustomSelect
@@ -414,11 +422,11 @@ const CollectionModalContent = ({
                   { value: "markdown", label: t("chunking.markdown") },
                 ]}
                 ariaLabel={t("chunking.strategy")}
-                selectButtonClassName="flex w-full items-center justify-between rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-800 outline-none transition-[border-color,box-shadow] focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-border dark:bg-card dark:text-foreground"
+                selectButtonClassName="flex w-full items-center justify-between rounded-xl border border-border bg-card px-3 py-2 text-sm font-medium text-foreground outline-none transition-[border-color,box-shadow] focus:border-panel-accent focus:ring-2 focus:ring-panel-accent/20"
               />
             </label>
             <div className="grid grid-cols-2 gap-3">
-              <label className="space-y-1.5 text-xs font-semibold text-gray-500 dark:text-muted-foreground">
+              <label className="space-y-1.5 text-xs font-semibold text-muted-foreground">
                 <span>{t("chunking.chunkSize")}</span>
                 <input
                   type="number"
@@ -432,10 +440,10 @@ const CollectionModalContent = ({
                       chunkSize: Number(event.target.value),
                     }))
                   }
-                  className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm tabular-nums text-gray-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-border dark:bg-card dark:text-foreground"
+                  className="w-full rounded-xl border border-border bg-card px-3 py-2 text-sm tabular-nums text-foreground outline-none focus:border-panel-accent focus:ring-2 focus:ring-panel-accent/20"
                 />
               </label>
-              <label className="space-y-1.5 text-xs font-semibold text-gray-500 dark:text-muted-foreground">
+              <label className="space-y-1.5 text-xs font-semibold text-muted-foreground">
                 <span>{t("chunking.overlap")}</span>
                 <input
                   type="number"
@@ -448,7 +456,7 @@ const CollectionModalContent = ({
                       overlapPercent: Number(event.target.value),
                     }))
                   }
-                  className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm tabular-nums text-gray-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-border dark:bg-card dark:text-foreground"
+                  className="w-full rounded-xl border border-border bg-card px-3 py-2 text-sm tabular-nums text-foreground outline-none focus:border-panel-accent focus:ring-2 focus:ring-panel-accent/20"
                 />
               </label>
             </div>
@@ -458,7 +466,7 @@ const CollectionModalContent = ({
                 type="button"
                 onClick={() => void handlePreview()}
                 disabled={isPreviewing}
-                className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:opacity-50 dark:border-blue-900/60 dark:bg-card dark:text-blue-300 dark:hover:bg-blue-950/30"
+                className="inline-flex items-center gap-2 rounded-lg border border-panel-accent/30 bg-card px-3 py-2 text-xs font-medium text-panel-accent-text transition-colors hover:bg-panel-accent-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-panel-accent/60 disabled:opacity-50"
               >
                 <RefreshCw
                   size={13}
@@ -468,7 +476,7 @@ const CollectionModalContent = ({
                 {t("chunking.preview")}
               </Button>
             ) : (
-              <p className="text-[11px] text-gray-500 dark:text-muted-foreground">
+              <p className="text-[11px] text-muted-foreground">
                 {t("chunking.previewEmpty")}
               </p>
             )}
@@ -481,14 +489,14 @@ const CollectionModalContent = ({
               </p>
             ) : null}
             {chunkPreview ? (
-              <div className="space-y-2 rounded-lg border border-blue-100 bg-white p-3 dark:border-blue-900/40 dark:bg-card">
-                <div className="text-[11px] font-semibold text-blue-700 dark:text-blue-300">
+              <div className="space-y-2 rounded-lg border border-panel-accent/20 bg-card p-3">
+                <div className="text-[11px] font-semibold text-panel-accent-text">
                   {t("chunking.previewCount", { count: chunkPreview.total })}
                 </div>
                 {chunkPreview.chunks.map((chunk, index) => (
                   <p
                     key={index}
-                    className="line-clamp-3 rounded-md bg-gray-50 px-2 py-1.5 font-mono text-[10px] leading-relaxed text-gray-600 dark:bg-muted dark:text-foreground/75"
+                    className="line-clamp-3 rounded-md bg-muted px-2 py-1.5 font-mono text-[10px] leading-relaxed text-foreground/75"
                   >
                     {chunk}
                   </p>
@@ -507,7 +515,7 @@ const CollectionModalContent = ({
             <div className="space-y-2">
               <div
                 id={colorGroupId}
-                className="text-xs font-semibold text-gray-500 dark:text-muted-foreground"
+                className="text-xs font-semibold text-muted-foreground"
               >
                 {t("themeColor")}
               </div>
@@ -524,7 +532,7 @@ const CollectionModalContent = ({
                     aria-label={t("useThemeColorAria", { color: c.name })}
                     aria-pressed={selectedColor === c.name}
                     onClick={() => setSelectedColor(c.name)}
-                    className={`w-8 h-8 rounded-full ${c.class} flex items-center justify-center transition-[opacity,transform,box-shadow] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-background ${selectedColor === c.name ? "scale-110 shadow-md" : "opacity-40 hover:opacity-100 hover:scale-105"}`}
+                    className={`flex h-8 w-8 items-center justify-center rounded-full ${c.class} transition-[opacity,transform,box-shadow] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-panel-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${selectedColor === c.name ? "scale-110 shadow-md" : "opacity-40 hover:scale-105 hover:opacity-100"}`}
                   >
                     {selectedColor === c.name && (
                       <Check
@@ -542,7 +550,7 @@ const CollectionModalContent = ({
             <div className="space-y-2">
               <div
                 id={iconGroupId}
-                className="text-xs font-semibold text-gray-500 dark:text-muted-foreground"
+                className="text-xs font-semibold text-muted-foreground"
               >
                 {t("icon")}
               </div>
@@ -559,7 +567,7 @@ const CollectionModalContent = ({
                     aria-label={t("useIconAria", { icon: IconData.name })}
                     aria-pressed={selectedIcon === IconData.name}
                     onClick={() => setSelectedIcon(IconData.name)}
-                    className={`w-10 h-10 p-2 rounded-xl flex items-center justify-center transition-[color,background-color,border-color,box-shadow] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 ${selectedIcon === IconData.name ? "bg-blue-50 dark:bg-blue-900/20 text-blue-500 border border-blue-200 dark:border-blue-800" : "text-gray-400 hover:text-gray-600 dark:hover:text-foreground/85 hover:bg-gray-100 dark:hover:bg-muted border border-transparent"}`}
+                    className={`flex h-10 w-10 items-center justify-center rounded-xl border border-transparent p-2 transition-[color,background-color,border-color,box-shadow] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-panel-accent/60 ${selectedIcon === IconData.name ? "border-panel-accent/30 bg-panel-accent-soft text-panel-accent-text" : "text-muted-foreground hover:bg-muted hover:text-foreground/85"}`}
                   >
                     <IconData.icon size={20} aria-hidden="true" />
                   </Button>
@@ -570,7 +578,7 @@ const CollectionModalContent = ({
         </div>
 
         {/* Footer */}
-        <div className="p-5 border-t border-gray-100 dark:border-border bg-gray-50/50 dark:bg-card/50 flex justify-between gap-3">
+        <div className="flex justify-between gap-3 border-t border-border bg-muted/40 p-5">
           {/* Delete Button */}
           <div>
             {onDelete && (
@@ -624,7 +632,7 @@ const CollectionModalContent = ({
               variant="bare"
               type="button"
               onClick={handleClose}
-              className="px-4 py-2 text-sm text-gray-600 dark:text-muted-foreground hover:bg-gray-100 dark:hover:bg-muted rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
+              className="rounded-xl px-4 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-panel-accent/60"
             >
               {t("cancel")}
             </Button>
@@ -633,7 +641,7 @@ const CollectionModalContent = ({
               type="button"
               onClick={handleSubmit}
               disabled={!trimmedName}
-              className="px-6 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-lg shadow-blue-500/20 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-background"
+              className="flex items-center gap-2 rounded-xl bg-panel-accent px-6 py-2 text-sm font-medium text-white shadow-lg shadow-panel-accent/20 transition-colors hover:bg-panel-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-panel-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Save size={16} aria-hidden="true" /> {t("save")}
             </Button>
@@ -743,24 +751,26 @@ const CreateCollectionCard = ({
 }) => {
   const t = useTranslations("Knowledge");
   return (
-    <Button
-      variant="bare"
-      type="button"
-      aria-label={t("createNewCollectionAria")}
-      onClick={onClick}
-      disabled={disabled}
-      className="group flex flex-col items-center justify-center p-6 h-full min-h-45 rounded-3xl border-2 border-dashed border-gray-300 dark:border-border hover:border-blue-500 dark:hover:border-blue-400 hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-[border-color,background-color,box-shadow] duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-background"
-    >
-      <div className="w-14 h-14 rounded-full bg-gray-100 dark:bg-muted group-hover:bg-blue-500 group-hover:text-white dark:group-hover:bg-blue-500 text-gray-400 dark:text-muted-foreground/70 flex items-center justify-center mb-4 transition-[background-color,color,transform,box-shadow] duration-300 shadow-sm group-hover:shadow-blue-500/30">
-        <Plus size={28} aria-hidden="true" />
-      </div>
-      <h3 className="font-bold text-gray-700 dark:text-foreground mb-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-        {t("newCollection")}
-      </h3>
-      <p className="text-xs text-gray-400 text-center max-w-37.5">
-        {t("createFolderHint")}
-      </p>
-    </Button>
+    <PanelCard className="min-h-45 border-2 border-dashed border-border bg-card/40 p-0 transition-[border-color,background-color,box-shadow] duration-300 hover:border-panel-accent/60 hover:bg-panel-accent-soft">
+      <Button
+        variant="bare"
+        type="button"
+        aria-label={t("createNewCollectionAria")}
+        onClick={onClick}
+        disabled={disabled}
+        className="group flex h-full w-full flex-col items-center justify-center rounded-2xl p-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-panel-accent/60 focus-visible:ring-offset-0"
+      >
+        <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-muted text-muted-foreground/70 shadow-sm transition-[background-color,color,transform,box-shadow] duration-300 group-hover:bg-panel-accent group-hover:text-white group-hover:shadow-panel-accent/30">
+          <Plus size={28} aria-hidden="true" />
+        </div>
+        <h3 className="mb-1 font-bold text-foreground transition-colors group-hover:text-panel-accent-text">
+          {t("newCollection")}
+        </h3>
+        <p className="max-w-37.5 text-center text-xs text-muted-foreground">
+          {t("createFolderHint")}
+        </p>
+      </Button>
+    </PanelCard>
   );
 };
 
@@ -781,13 +791,13 @@ const CollectionCard: React.FC<{
     COLLECTION_COLORS[0];
 
   return (
-    <div className="group relative bg-white dark:bg-muted/40 p-5 rounded-3xl border border-gray-200 dark:border-border hover:border-gray-300 dark:hover:border-border transition-[border-color,background-color,box-shadow] duration-300 flex flex-col h-full min-h-45 shadow-sm hover:shadow-xl dark:shadow-none overflow-hidden">
+    <PanelCard className="min-h-45 p-5">
       <Button
         variant="bare"
         type="button"
         aria-label={t("openCollectionAria", { name: collection.name })}
         onClick={onClick}
-        className="absolute inset-0 rounded-3xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-background"
+        className="absolute inset-0 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-panel-accent focus-visible:ring-offset-0"
       >
         <span className="sr-only">
           {t("openCollectionAria", { name: collection.name })}
@@ -798,11 +808,11 @@ const CollectionCard: React.FC<{
       <div className="relative pointer-events-none mb-3 flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3 overflow-hidden">
           <div
-            className={`w-10 h-10 rounded-xl ${colorObj.class} flex items-center justify-center text-white shadow-md shadow-black/5 dark:shadow-black/20 shrink-0`}
+            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${colorObj.class} text-white shadow-md shadow-black/5 dark:shadow-black/20`}
           >
             <IconComponent size={20} aria-hidden="true" />
           </div>
-          <h3 className="min-w-0 truncate text-base font-bold text-gray-800 transition-colors group-hover:text-blue-600 dark:text-foreground dark:group-hover:text-blue-400">
+          <h3 className="min-w-0 truncate text-base font-bold text-foreground transition-colors group-hover:text-panel-accent-text">
             {collection.name}
           </h3>
         </div>
@@ -811,12 +821,12 @@ const CollectionCard: React.FC<{
       </div>
 
       {/* Description */}
-      <p className="relative pointer-events-none text-xs text-gray-500 dark:text-muted-foreground line-clamp-3 leading-relaxed mb-4 flex-1">
+      <p className="relative pointer-events-none mb-4 flex-1 text-xs leading-relaxed text-muted-foreground line-clamp-3">
         {collection.description || t("noDescriptionProvided")}
       </p>
 
       {/* Footer Stats */}
-      <div className="relative pointer-events-none mt-auto flex items-center justify-between gap-3 border-t border-gray-100 pt-3 text-xs font-medium text-gray-400 dark:border-border dark:text-muted-foreground/70">
+      <div className="relative pointer-events-none mt-auto flex items-center justify-between gap-3 border-t border-border pt-3 text-xs font-medium text-muted-foreground/70">
         <div className="flex min-w-0 items-center gap-1.5">
           <FileText size={14} aria-hidden="true" />
           <span className="truncate">
@@ -826,17 +836,17 @@ const CollectionCard: React.FC<{
         {/* Updated At Removed as per request */}
       </div>
 
-      <Button
-        variant="bare"
-        type="button"
-        aria-label={t("editCollectionAria", { name: collection.name })}
-        onClick={onEdit}
-        disabled={readOnly}
-        className="absolute right-5 top-5 z-10 p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-foreground hover:bg-gray-100 dark:hover:bg-accent rounded-lg transition-colors opacity-0 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-      >
-        <Settings size={16} aria-hidden="true" />
-      </Button>
-    </div>
+      <PanelCardActions className="right-4 top-4">
+        <PanelCardAction
+          type="button"
+          aria-label={t("editCollectionAria", { name: collection.name })}
+          onClick={onEdit}
+          disabled={readOnly}
+        >
+          <Settings size={16} aria-hidden="true" />
+        </PanelCardAction>
+      </PanelCardActions>
+    </PanelCard>
   );
 };
 
@@ -1032,10 +1042,10 @@ const FileRow: React.FC<{
       data-knowledge-file-id={file.id}
       className={`group flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3 transition-[background-color,border-color,box-shadow] ${
         isHighlighted
-          ? "border-purple-400 bg-purple-50 ring-2 ring-purple-500/30 dark:border-purple-700 dark:bg-purple-950/30"
+          ? "border-panel-accent/60 bg-panel-accent-soft ring-2 ring-panel-accent/30"
           : isSelected
-            ? "border-blue-200 bg-blue-50/60 dark:border-blue-900/60 dark:bg-blue-950/20"
-            : "border-transparent hover:border-gray-100 hover:bg-gray-50 dark:hover:border-border dark:hover:bg-muted/50"
+            ? "border-panel-accent/20 bg-panel-accent-soft"
+            : "border-transparent hover:border-border hover:bg-muted/50"
       }`}
     >
       {onSelectedChange ? (
@@ -1045,7 +1055,7 @@ const FileRow: React.FC<{
           disabled={selectionDisabled}
           aria-label={t("selectFileAria", { name: file.name })}
           onChange={(event) => onSelectedChange(event.target.checked)}
-          className="h-4 w-4 shrink-0 rounded border-gray-300 text-blue-600 focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:cursor-not-allowed disabled:opacity-50 dark:border-border dark:bg-muted"
+          className="h-4 w-4 shrink-0 rounded border-border text-panel-accent-text focus-visible:ring-2 focus-visible:ring-panel-accent/60 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-muted"
         />
       ) : null}
       <Button
@@ -1053,16 +1063,16 @@ const FileRow: React.FC<{
         type="button"
         onClick={onClick}
         aria-label={t("openFileAria", { name: file.name })}
-        className="flex min-w-0 basis-64 flex-1 items-center gap-3 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-background"
+        className="flex min-w-0 flex-1 basis-48 items-center gap-3 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-panel-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       >
-        <div className="w-9 h-9 rounded-lg bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 flex items-center justify-center shrink-0 text-blue-500 dark:text-blue-400">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-panel-accent/20 bg-panel-accent-soft text-panel-accent-text">
           <FileIcon size={18} aria-hidden="true" />
         </div>
         <div className="flex min-w-0 flex-col">
-          <div className="text-sm font-medium text-gray-700 dark:text-foreground truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+          <div className="truncate text-sm font-medium text-foreground/85 transition-colors group-hover:text-panel-accent-text">
             {file.name}
           </div>
-          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-gray-400">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-muted-foreground">
             <span className="max-w-24 truncate uppercase">
               {file.type.split("/").pop() || t("fileTypeFallback")}
             </span>
@@ -1079,7 +1089,7 @@ const FileRow: React.FC<{
       </Button>
 
       <div className="ml-auto flex max-w-full flex-wrap items-center justify-end gap-1.5 sm:gap-2">
-        <div className="flex max-w-44 items-center gap-1.5 rounded-md border border-gray-100 bg-gray-50 px-2 py-1 dark:border-border dark:bg-muted">
+        <div className="flex max-w-44 items-center gap-1.5 rounded-md border border-border bg-muted px-2 py-1">
           <span
             className={`w-2 h-2 rounded-full ${storageStatusConfig.color} ${["uploading", "parsing"].includes(storageStatus) ? "animate-pulse" : ""}`}
             aria-hidden="true"
@@ -1104,7 +1114,7 @@ const FileRow: React.FC<{
         </div>
 
         {indexStatusConfig && indexStatus && (
-          <div className="flex max-w-44 items-center gap-1.5 rounded-md border border-gray-100 bg-gray-50 px-2 py-1 dark:border-border dark:bg-muted">
+          <div className="flex max-w-44 items-center gap-1.5 rounded-md border border-border bg-muted px-2 py-1">
             <span
               className={`h-2 w-2 rounded-full ${indexStatusConfig.color} ${indexStatus === "indexing" ? "animate-pulse" : ""}`}
               aria-hidden="true"
@@ -1127,7 +1137,7 @@ const FileRow: React.FC<{
               </Tooltip>
             )}
             {indexStatus === "indexed" && file.ragChunkCount ? (
-              <span className="shrink-0 text-[10px] text-gray-400">
+              <span className="shrink-0 text-[10px] text-muted-foreground">
                 {t("chunkCount", { count: file.ragChunkCount })}
               </span>
             ) : null}
@@ -1155,7 +1165,7 @@ const FileRow: React.FC<{
                 event.stopPropagation();
                 void onDownloadOriginal();
               }}
-              className="shrink-0 rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-blue-50 hover:text-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-blue-900/20"
+              className="shrink-0 rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-panel-accent-soft hover:text-panel-accent-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-panel-accent/60 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Download size={16} aria-hidden="true" />
             </Button>
@@ -1173,7 +1183,7 @@ const FileRow: React.FC<{
                 event.stopPropagation();
                 void onReparse();
               }}
-              className="shrink-0 rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-amber-50 hover:text-amber-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60 disabled:opacity-50 dark:hover:bg-amber-900/20"
+              className="shrink-0 rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-amber-50 hover:text-amber-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60 disabled:opacity-50 dark:hover:bg-amber-900/20"
             >
               <RotateCcw
                 size={16}
@@ -1250,7 +1260,7 @@ const FileRow: React.FC<{
                 event.stopPropagation();
                 void onCancel();
               }}
-              className="shrink-0 rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60 dark:hover:bg-red-900/20"
+              className="shrink-0 rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-red-50 hover:text-red-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60 dark:hover:bg-red-900/20"
             >
               <Ban size={16} aria-hidden="true" />
             </Button>
@@ -1272,7 +1282,7 @@ const FileRow: React.FC<{
                 e.stopPropagation();
                 void onReindex();
               }}
-              className="shrink-0 rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-blue-50 hover:text-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-blue-900/20 dark:hover:text-blue-300"
+              className="shrink-0 rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-panel-accent-soft hover:text-panel-accent-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-panel-accent/60 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <RefreshCw
                 size={16}
@@ -1299,7 +1309,7 @@ const FileRow: React.FC<{
           className={`shrink-0 rounded-lg p-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60 ${
             isDeleteConfirming
               ? "bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-200"
-              : "text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
+              : "text-muted-foreground hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20"
           }`}
         >
           {isDeleteConfirming ? (
@@ -1983,22 +1993,14 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
   // Show loading state while hydrating
   if (!_hasHydrated) {
     return (
-      <div className="flex flex-col h-full w-full relative overflow-hidden animate-in fade-in duration-300 bg-gray-50/50 dark:bg-background">
-        <div className="flex h-full items-center justify-center">
-          <div
-            role="status"
-            aria-live="polite"
-            className="text-sm text-gray-500 dark:text-muted-foreground"
-          >
-            {t("loadingKnowledgeBase")}
-          </div>
-        </div>
-      </div>
+      <PanelRoot accent="knowledge" className="bg-background">
+        <PanelLoading label={t("loadingKnowledgeBase")} />
+      </PanelRoot>
     );
   }
 
   return (
-    <div className="flex flex-col h-full w-full relative overflow-hidden animate-in fade-in duration-300 bg-gray-50/50 dark:bg-background">
+    <PanelRoot accent="knowledge" className="bg-background">
       {showNewModal && (
         <NewCollectionModal onClose={() => setShowNewModal(false)} />
       )}
@@ -2014,27 +2016,28 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
         createPortal(
           <div
             ref={fileViewerDialogRef}
+            data-panel-accent="knowledge"
             role="dialog"
             aria-modal="true"
             aria-labelledby={fileViewerTitleId}
             tabIndex={-1}
             onKeyDown={handleFileViewerKeyDown}
-            className="fixed inset-0 z-9999 overflow-y-auto bg-white animate-in fade-in duration-300 dark:bg-background"
+            className="fixed inset-0 z-9999 overflow-y-auto bg-background animate-in fade-in duration-300"
           >
             <div className="max-w-5xl mx-auto p-4 min-h-screen relative flex flex-col">
-              <div className="mb-4 pb-2 border-b border-gray-100 dark:border-border flex items-center justify-between shrink-0">
+              <div className="mb-4 flex shrink-0 items-center justify-between border-b border-border pb-2">
                 <h2
                   id={fileViewerTitleId}
-                  className="flex items-center gap-2 overflow-hidden text-base font-semibold text-gray-700 dark:text-foreground"
+                  className="flex items-center gap-2 overflow-hidden text-base font-semibold text-foreground"
                 >
                   <FileText
                     size={20}
-                    className="shrink-0 text-blue-500"
+                    className="shrink-0 text-panel-accent-text"
                     aria-hidden="true"
                   />
                   <span className="truncate">{viewingFile.name}</span>
                   {isDirty && isOnline && (
-                    <span className="text-xs text-gray-400 font-normal ml-1 shrink-0">
+                    <span className="ml-1 shrink-0 text-xs font-normal text-muted-foreground">
                       ({t("edited")})
                     </span>
                   )}
@@ -2048,7 +2051,7 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
                         name: viewingFile.name,
                       })}
                       onClick={handleSaveFile}
-                      className="flex items-center gap-1.5 rounded-lg bg-blue-50/50 px-3 py-1.5 text-blue-600 transition-colors hover:bg-blue-50 hover:text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:bg-blue-900/10 dark:text-blue-400 dark:hover:bg-blue-900/20 dark:hover:text-blue-300"
+                      className="flex items-center gap-1.5 rounded-lg bg-panel-accent-soft px-3 py-1.5 text-panel-accent-text transition-colors hover:bg-panel-accent/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-panel-accent/60"
                     >
                       <Save size={16} aria-hidden="true" />
                       <span className="text-xs font-medium">{t("save")}</span>
@@ -2066,7 +2069,7 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
                           : t("copyContentAria", { name: viewingFile.name })
                     }
                     onClick={handleCopyContent}
-                    className="rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:text-muted-foreground dark:hover:bg-muted dark:hover:text-foreground"
+                    className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-panel-accent/60"
                   >
                     {isCopied ? (
                       <Check
@@ -2097,14 +2100,14 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
                     type="button"
                     aria-label={t("closeFileViewer")}
                     onClick={() => setViewingFile(null)}
-                    className="rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:text-muted-foreground dark:hover:bg-muted dark:hover:text-foreground"
+                    className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-panel-accent/60"
                   >
                     <X size={20} aria-hidden="true" />
                   </Button>
                 </div>
               </div>
 
-              <div className="flex-1 grid overflow-hidden custom-scrollbar bg-gray-50 dark:bg-card rounded-lg border border-gray-200 dark:border-border">
+              <div className="grid flex-1 overflow-hidden rounded-lg border border-border bg-card custom-scrollbar">
                 <label htmlFor={fileContentInputId} className="sr-only">
                   {t("fileContentLabel")}
                 </label>
@@ -2112,7 +2115,7 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
                   ref={fileContentInputRef}
                   id={fileContentInputId}
                   name="knowledge-file-content"
-                  className="h-full w-full resize-none rounded-lg border-none bg-transparent p-4 font-mono text-sm leading-relaxed text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:text-foreground custom-scrollbar"
+                  className="h-full w-full resize-none rounded-lg border-none bg-transparent p-4 font-mono text-sm leading-relaxed text-foreground outline-none focus:ring-2 focus:ring-panel-accent/30 custom-scrollbar"
                   value={editContent}
                   readOnly={!isOnline}
                   onChange={(e) => setEditContent(e.target.value)}
@@ -2138,59 +2141,39 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
         )}
 
       {/* Header */}
-      <div className="sticky top-0 z-10 flex shrink-0 items-center justify-between gap-3 border-b border-gray-200/50 bg-white/40 px-6 py-4 backdrop-blur-md dark:border-border dark:bg-card/40">
-        <div className="flex min-w-0 items-center gap-3">
-          <div
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-linear-to-tr from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-500/20"
-            aria-hidden="true"
-          >
-            <LibraryBig size={20} />
-          </div>
-          <div className="min-w-0">
-            <h1 className="flex min-w-0 items-center gap-2 text-lg font-bold text-gray-800 dark:text-foreground">
-              {activeCollection ? (
-                <>
-                  <Button
-                    variant="bare"
-                    type="button"
-                    aria-label={t("backToCollectionsAria")}
-                    className="shrink-0 rounded opacity-50 transition-opacity hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-                    onClick={() => setActiveCollectionId(null)}
-                  >
-                    {t("title")}
-                  </Button>
-                  <ChevronRight
-                    size={16}
-                    className="shrink-0 text-gray-400"
-                    aria-hidden="true"
-                  />
-                  <span className="min-w-0 truncate">
-                    {activeCollection.name}
-                  </span>
-                </>
-              ) : (
-                <span className="truncate">{t("title")}</span>
-              )}
-            </h1>
-            <p className="mt-0.5 truncate text-xs text-gray-500 dark:text-muted-foreground">
-              {activeCollection
-                ? activeCollection.description || t("manageDocsSubtitle")
-                : t("manageCollectionsSubtitle")}
-            </p>
-          </div>
-        </div>
-        {onClose && (
-          <Button
-            variant="bare"
-            type="button"
-            aria-label={t("closeKnowledgeBase")}
-            onClick={onClose}
-            className="shrink-0 rounded-full p-2 text-gray-500 transition-colors hover:bg-gray-200/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/60 dark:text-muted-foreground dark:hover:bg-accent/50"
-          >
-            <X size={20} aria-hidden="true" />
-          </Button>
-        )}
-      </div>
+      <PanelHeader
+        icon={<LibraryBig size={20} />}
+        title={
+          activeCollection ? (
+            <>
+              <Button
+                variant="bare"
+                type="button"
+                aria-label={t("backToCollectionsAria")}
+                className="shrink-0 rounded opacity-50 transition-opacity hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-panel-accent/60"
+                onClick={() => setActiveCollectionId(null)}
+              >
+                {t("title")}
+              </Button>
+              <ChevronRight
+                size={16}
+                className="shrink-0 text-muted-foreground"
+                aria-hidden="true"
+              />
+              <span className="min-w-0 truncate">{activeCollection.name}</span>
+            </>
+          ) : (
+            <span className="truncate">{t("title")}</span>
+          )
+        }
+        subtitle={
+          activeCollection
+            ? activeCollection.description || t("manageDocsSubtitle")
+            : t("manageCollectionsSubtitle")
+        }
+        onClose={onClose}
+        closeLabel={t("closeKnowledgeBase")}
+      />
 
       {!isOnline ? (
         <div
@@ -2203,32 +2186,14 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
 
       {/* Search Bar & Filter - Only on Index View */}
       {!activeCollection && (
-        <div className="mx-auto flex w-full max-w-7xl shrink-0 gap-3 px-6 pb-6 pt-6">
-          <div className="group relative min-w-0 flex-1">
-            <div className="absolute inset-0 bg-purple-500/20 dark:bg-purple-500/10 rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-            <div className="relative flex items-center rounded-2xl border border-gray-200 bg-white/60 px-4 py-3 shadow-sm backdrop-blur-xl transition-[border-color,box-shadow] focus-within:border-purple-500/50 focus-within:ring-2 focus-within:ring-purple-500/30 dark:border-border dark:bg-muted/60">
-              <label htmlFor={collectionSearchInputId} className="sr-only">
-                {t("searchCollectionsLabel")}
-              </label>
-              <Search
-                size={20}
-                className="mr-3 text-gray-400"
-                aria-hidden="true"
-              />
-              <input
-                id={collectionSearchInputId}
-                type="text"
-                name="knowledge-collection-search"
-                autoComplete="off"
-                spellCheck={false}
-                placeholder={t("searchCollectionsPlaceholder")}
-                className="min-w-0 flex-1 border-none bg-transparent text-base text-gray-800 outline-none placeholder-gray-400 dark:text-foreground"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-          </div>
-        </div>
+        <PanelSearch
+          id={collectionSearchInputId}
+          name="knowledge-collection-search"
+          label={t("searchCollectionsLabel")}
+          placeholder={t("searchCollectionsPlaceholder")}
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
       )}
 
       {/* Main Content */}
@@ -2262,9 +2227,9 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
               </div>
 
               {filteredCollections.length === 0 && searchTerm && (
-                <div className="text-center py-20 text-gray-400">
+                <PanelEmpty className="py-20">
                   <p>{t("noCollectionsMatch", { term: searchTerm })}</p>
-                </div>
+                </PanelEmpty>
               )}
             </>
           ) : (
@@ -2276,12 +2241,12 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
                     (file.contentPath || file.path) &&
                     (file.indexStatus || file.status) !== "indexed",
                 ) ? (
-                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-blue-200 bg-blue-50/70 px-4 py-3 dark:border-blue-900/60 dark:bg-blue-950/20">
+                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-panel-accent/20 bg-panel-accent-soft px-4 py-3">
                     <div className="min-w-0">
-                      <div className="text-sm font-semibold text-blue-800 dark:text-blue-200">
+                      <div className="text-sm font-semibold text-panel-accent-text">
                         {t("chunking.pendingTitle")}
                       </div>
-                      <p className="mt-0.5 text-xs text-blue-700/80 dark:text-blue-300/80">
+                      <p className="mt-0.5 text-xs text-panel-accent-text/80">
                         {t("chunking.pendingDescription")}
                       </p>
                     </div>
@@ -2292,7 +2257,7 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
                       disabled={
                         !isOnline || !rag.enabled || isReindexingCollection
                       }
-                      className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-panel-accent px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-panel-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-panel-accent/60 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <RefreshCw
                         size={14}
@@ -2318,8 +2283,8 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
                                         border-2 border-dashed rounded-xl p-10 flex flex-col items-center justify-center text-center transition-[border-color,background-color,transform] duration-300 group relative overflow-hidden
                                         ${
                                           isDragging
-                                            ? "border-purple-500 bg-purple-50 dark:bg-purple-900/10 scale-[1.01]"
-                                            : "border-gray-300 dark:border-border hover:border-purple-400 dark:hover:border-purple-600 bg-white/50 dark:bg-muted/20"
+                                            ? "border-panel-accent bg-panel-accent-soft scale-[1.01]"
+                                            : "border-border bg-card/40 hover:border-panel-accent/70 dark:bg-muted/20"
                                         }
                                     `}
                 >
@@ -2342,24 +2307,24 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
                     disabled={!isOnline}
                     onClick={() => fileInputRef.current?.click()}
                     aria-describedby={`${uploadDescriptionId} ${uploadLimitsId}`}
-                    className="group/upload flex max-w-full flex-col items-center rounded-xl px-4 py-3 text-center transition-[background-color,box-shadow] hover:bg-white/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:hover:bg-muted/50 dark:focus-visible:ring-offset-background"
+                    className="group/upload flex max-w-full flex-col items-center rounded-xl px-4 py-3 text-center transition-[background-color,box-shadow] hover:bg-card/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-panel-accent/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:hover:bg-muted/50"
                   >
-                    <span className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-gray-100 bg-white text-purple-500 shadow-sm transition-[transform,box-shadow] duration-300 group-hover/upload:scale-110 group-hover/upload:shadow-md dark:border-border dark:bg-muted">
+                    <span className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-border bg-card text-panel-accent-text shadow-sm transition-[transform,box-shadow] duration-300 group-hover/upload:scale-110 group-hover/upload:shadow-md dark:bg-muted">
                       <UploadCloud size={32} aria-hidden="true" />
                     </span>
                     <span
                       id={uploadTitleId}
-                      className="mb-1 text-base font-bold text-gray-800 dark:text-foreground"
+                      className="mb-1 text-base font-bold text-foreground"
                     >
                       {t("chooseFiles")}
                     </span>
-                    <span className="text-xs text-gray-500 dark:text-muted-foreground">
+                    <span className="text-xs text-muted-foreground">
                       {t("chooseFilesHint")}
                     </span>
                   </Button>
                   <p
                     id={uploadDescriptionId}
-                    className="mt-3 max-w-sm text-xs leading-relaxed text-gray-500 dark:text-muted-foreground"
+                    className="mt-3 max-w-sm text-xs leading-relaxed text-muted-foreground"
                   >
                     {rag.enabled
                       ? t("uploadSupportedRag")
@@ -2367,7 +2332,7 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
                   </p>
                   <p
                     id={uploadLimitsId}
-                    className="mt-2 text-[11px] text-gray-400 dark:text-muted-foreground/70"
+                    className="mt-2 text-[11px] text-muted-foreground/70"
                   >
                     {t("uploadLimits", {
                       max: KNOWLEDGE_LIMITS.maxFilesPerCollection,
@@ -2393,19 +2358,19 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
                 )}
 
                 {/* File List */}
-                <div className="bg-white dark:bg-card/50 border border-gray-200 dark:border-border rounded-xl overflow-hidden">
+                <div className="overflow-hidden rounded-2xl border border-border bg-card/40 dark:bg-muted/40">
                   <div
                     aria-busy={isBatchRunning || undefined}
-                    className="border-b border-gray-100 bg-gray-50/80 p-4 backdrop-blur-sm dark:border-border dark:bg-muted/80"
+                    className="border-b border-border bg-muted/80 p-4 backdrop-blur-sm"
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <h3 className="min-w-0 truncate text-sm font-bold text-gray-700 dark:text-foreground">
+                      <h3 className="min-w-0 truncate text-sm font-bold text-foreground">
                         {t("documentsHeading", {
                           count: activeCollection.files.length,
                         })}
                       </h3>
                       {(fileSearchTerm || fileStatusFilter !== "all") && (
-                        <span className="text-xs text-gray-500 dark:text-muted-foreground">
+                        <span className="text-xs text-muted-foreground">
                           {t("filteredDocumentsCount", {
                             count: filteredFiles.length,
                           })}
@@ -2421,7 +2386,7 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
                         <Search
                           size={15}
                           aria-hidden="true"
-                          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
                         />
                         <input
                           id={fileSearchInputId}
@@ -2434,7 +2399,7 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
                             setFileSearchTerm(event.target.value)
                           }
                           placeholder={t("searchFilesPlaceholder")}
-                          className="h-9 w-full rounded-lg border border-gray-200 bg-white pl-9 pr-3 text-sm text-gray-800 outline-none transition-[border-color,box-shadow] placeholder:text-gray-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20 dark:border-border dark:bg-background dark:text-foreground"
+                          className="h-9 w-full rounded-lg border border-border bg-card pl-9 pr-3 text-sm text-foreground outline-none transition-[border-color,box-shadow] placeholder:text-muted-foreground focus:border-panel-accent focus:ring-2 focus:ring-panel-accent/20 dark:bg-background"
                         />
                       </div>
                       <div>
@@ -2459,14 +2424,14 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
                             { value: "error", label: t("fileStatusError") },
                           ]}
                           ariaLabel={t("fileStatusFilterLabel")}
-                          selectButtonClassName="flex h-9 w-full items-center justify-between rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none transition-[border-color,box-shadow] focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20 dark:border-border dark:bg-background dark:text-foreground"
+                          selectButtonClassName="flex h-9 w-full items-center justify-between rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none transition-[border-color,box-shadow] focus:border-panel-accent focus:ring-2 focus:ring-panel-accent/20 dark:bg-background"
                         />
                       </div>
                     </div>
 
                     {activeCollection.files.length > 0 && (
-                      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-gray-200/70 pt-3 dark:border-border">
-                        <label className="mr-auto inline-flex min-h-8 cursor-pointer items-center gap-2 rounded-lg px-2 text-xs font-medium text-gray-600 hover:bg-white focus-within:ring-2 focus-within:ring-blue-500/50 dark:text-muted-foreground dark:hover:bg-background">
+                      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
+                        <label className="mr-auto inline-flex min-h-8 cursor-pointer items-center gap-2 rounded-lg px-2 text-xs font-medium text-muted-foreground hover:bg-card focus-within:ring-2 focus-within:ring-panel-accent/50 dark:hover:bg-background">
                           <input
                             ref={selectVisibleFilesRef}
                             type="checkbox"
@@ -2477,7 +2442,7 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
                             onChange={(event) =>
                               handleSelectVisibleFiles(event.target.checked)
                             }
-                            className="h-4 w-4 rounded border-gray-300 text-blue-600 disabled:cursor-not-allowed disabled:opacity-50 dark:border-border dark:bg-muted"
+                            className="h-4 w-4 rounded border-border text-panel-accent-text disabled:cursor-not-allowed disabled:opacity-50 dark:bg-muted"
                           />
                           <span>
                             {t("selectVisibleFiles", {
@@ -2490,7 +2455,7 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
                           <>
                             <span
                               role="status"
-                              className="w-full text-xs font-medium text-blue-700 dark:text-blue-300 sm:w-auto"
+                              className="w-full text-xs font-medium text-panel-accent-text sm:w-auto"
                             >
                               {t("selectedFilesCount", {
                                 count: selectedFiles.length,
@@ -2500,7 +2465,7 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
                               <span
                                 role="status"
                                 aria-live="polite"
-                                className="text-xs text-gray-500 dark:text-muted-foreground"
+                                className="text-xs text-muted-foreground"
                               >
                                 {t("batchRunning")}
                               </span>
@@ -2510,7 +2475,7 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
                               type="button"
                               disabled={isBatchRunning}
                               onClick={() => setSelectedFileIds(new Set())}
-                              className="inline-flex min-h-8 items-center gap-1 rounded-lg px-2 text-xs font-medium text-gray-500 transition-colors hover:bg-white hover:text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 disabled:cursor-not-allowed disabled:opacity-50 dark:text-muted-foreground dark:hover:bg-background dark:hover:text-foreground"
+                              className="inline-flex min-h-8 items-center gap-1 rounded-lg px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-card hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-panel-accent/50 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-background"
                             >
                               <X size={13} aria-hidden="true" />
                               {t("clearSelection")}
@@ -2522,7 +2487,7 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
                                 !isOnline || isBatchRunning || !canRetrySelected
                               }
                               onClick={() => void handleBatchAction("retry")}
-                              className="inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 text-xs font-medium text-gray-700 transition-colors hover:border-blue-200 hover:text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-border dark:bg-background dark:text-foreground"
+                              className="inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-xs font-medium text-foreground transition-colors hover:border-panel-accent/30 hover:text-panel-accent-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-panel-accent/50 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-background"
                             >
                               <RotateCcw size={14} aria-hidden="true" />
                               {t("batchRetry")}
@@ -2536,7 +2501,7 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
                                 !canReindexSelected
                               }
                               onClick={() => void handleBatchAction("reindex")}
-                              className="inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 text-xs font-medium text-gray-700 transition-colors hover:border-blue-200 hover:text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-border dark:bg-background dark:text-foreground"
+                              className="inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-xs font-medium text-foreground transition-colors hover:border-panel-accent/30 hover:text-panel-accent-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-panel-accent/50 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-background"
                             >
                               <RefreshCw size={14} aria-hidden="true" />
                               {t("batchReindex")}
@@ -2546,7 +2511,7 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
                               type="button"
                               disabled={isBatchRunning || !canDownloadSelected}
                               onClick={() => void handleBatchAction("download")}
-                              className="inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 text-xs font-medium text-gray-700 transition-colors hover:border-blue-200 hover:text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-border dark:bg-background dark:text-foreground"
+                              className="inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-xs font-medium text-foreground transition-colors hover:border-panel-accent/30 hover:text-panel-accent-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-panel-accent/50 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-background"
                             >
                               <Download size={14} aria-hidden="true" />
                               {t("batchDownload")}
@@ -2556,7 +2521,7 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
                               type="button"
                               disabled={!isOnline || isBatchRunning}
                               onClick={() => setIsBatchDeleteConfirming(true)}
-                              className="inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-red-200 bg-white px-2.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-900/60 dark:bg-background dark:text-red-300 dark:hover:bg-red-950/30"
+                              className="inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-red-200 bg-card px-2.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-900/60 dark:bg-background dark:text-red-300 dark:hover:bg-red-950/30"
                             >
                               <Trash2 size={14} aria-hidden="true" />
                               {t("batchDelete")}
@@ -2607,10 +2572,10 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
                       <div
                         role="status"
                         aria-live="polite"
-                        className="mt-3 rounded-lg border border-gray-200 bg-white p-3 text-xs dark:border-border dark:bg-background"
+                        className="mt-3 rounded-lg border border-border bg-card p-3 text-xs dark:bg-background"
                       >
                         <div className="flex items-center justify-between gap-3">
-                          <p className="font-semibold text-gray-700 dark:text-foreground">
+                          <p className="font-semibold text-foreground">
                             {t("batchResultSummary", {
                               success: batchResults.filter(
                                 (result) => result.status === "succeeded",
@@ -2625,7 +2590,7 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
                             type="button"
                             aria-label={t("dismissBatchResults")}
                             onClick={() => setBatchResults([])}
-                            className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 dark:hover:bg-muted dark:hover:text-foreground"
+                            className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-panel-accent/50"
                           >
                             <X size={14} aria-hidden="true" />
                           </Button>
@@ -2634,7 +2599,7 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
                           {batchResults.map((result) => (
                             <li
                               key={result.fileId}
-                              className="flex items-start gap-2 rounded-md px-2 py-1.5 text-gray-600 dark:text-muted-foreground"
+                              className="flex items-start gap-2 rounded-md px-2 py-1.5 text-muted-foreground"
                             >
                               {result.status === "succeeded" ? (
                                 <Check
@@ -2650,7 +2615,7 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
                                 />
                               )}
                               <span className="min-w-0">
-                                <span className="font-medium text-gray-700 dark:text-foreground">
+                                <span className="font-medium text-foreground">
                                   {result.fileName}
                                 </span>
                                 <span className="ml-2">
@@ -2761,22 +2726,29 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
                           ))}
                         </div>
                       ) : (
-                        <div className="flex h-36 flex-col items-center justify-center gap-2 px-4 text-center text-gray-400">
-                          <Search size={22} aria-hidden="true" />
+                        <PanelEmpty className="flex h-36 flex-col items-center justify-center gap-2 rounded-none border-0 px-4 py-0">
+                          <Search
+                            size={22}
+                            className="text-panel-accent-text"
+                            aria-hidden="true"
+                          />
                           <p className="text-sm font-medium">
                             {t("noFilesMatch")}
                           </p>
-                        </div>
+                        </PanelEmpty>
                       )
                     ) : (
-                      <div className="flex flex-col items-center justify-center h-48 text-gray-400 gap-2">
-                        <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-muted flex items-center justify-center">
-                          <FileText size={24} className="opacity-50" />
+                      <PanelEmpty className="flex h-48 flex-col items-center justify-center gap-2 rounded-none border-0 px-4 py-0">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+                          <FileText
+                            size={24}
+                            className="text-muted-foreground opacity-50"
+                          />
                         </div>
                         <p className="text-sm font-medium">
                           {t("noDocuments")}
                         </p>
-                      </div>
+                      </PanelEmpty>
                     )}
                   </div>
                 </div>
@@ -2785,7 +2757,7 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({
           )}
         </div>
       </div>
-    </div>
+    </PanelRoot>
   );
 };
 

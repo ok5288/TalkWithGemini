@@ -26,6 +26,23 @@ function markFocusableElementsAsVisible() {
 }
 
 describe("modal focus containment", () => {
+  it("closes only the nested dialog on Escape", () => {
+    const outerClose = vi.fn();
+    const innerClose = vi.fn();
+    render(
+      <Dialog open onClose={outerClose} title="Outer">
+        <Dialog open onClose={innerClose} title="Confirm">
+          <button type="button">Keep working</button>
+        </Dialog>
+      </Dialog>,
+    );
+    fireEvent.keyDown(screen.getByRole("dialog", { name: "Confirm" }), {
+      key: "Escape",
+    });
+    expect(innerClose).toHaveBeenCalledOnce();
+    expect(outerClose).not.toHaveBeenCalled();
+  });
+
   it("moves Shift+Tab from the shared lifecycle dialog container to the last control", () => {
     markFocusableElementsAsVisible();
     const dialog = document.createElement("div");

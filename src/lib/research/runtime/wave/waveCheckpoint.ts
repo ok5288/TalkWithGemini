@@ -21,6 +21,11 @@ export function persistWaveCheckpoint(wave: ResearchWaveContext) {
   const payload: SavedResearchCheckpoint = {
     version: 1,
     taskId: ctx.task.id,
+    researchRunId: wave.activeRun.id,
+    agentRunId: wave.agentRunId,
+    waveId: wave.waveId,
+    streamCompleted: wave.streamCompleted ?? false,
+    executedQueries: [...(wave.executedQueries ?? [])],
     savedAt: Date.now(),
     prompt: redactCheckpointText(wave.wavePrompt),
     partialContent: redactCheckpointText(wave.latestContent),

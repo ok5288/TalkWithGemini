@@ -651,3 +651,25 @@ describe("Research evidence collection and wave archive", () => {
     expect(collected.evidence).toEqual([evidence]);
   });
 });
+
+it("retries the first closed-book archive request and preserves its exhausted error", async () => {
+  vi.useFakeTimers();
+  try {
+    const { wave, evidence } = fixture();
+    const error = new TypeError("Failed to fetch");
+    mocks.stream.mockRejectedValue(error);
+    const result = expect(
+      archiveWave(wave, {
+        evidence: [evidence],
+        newEvidenceIds: [],
+        touchedEvidenceIds: [],
+        searchOnlyCount: 0,
+      }),
+    ).rejects.toBe(error);
+    await vi.runAllTimersAsync();
+    await result;
+    expect(mocks.stream).toHaveBeenCalledTimes(3);
+  } finally {
+    vi.useRealTimers();
+  }
+});

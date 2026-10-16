@@ -78,6 +78,7 @@ export interface ResearchReconView {
 export interface ResearchPlanView {
   id: string;
   version: number;
+  isStarter?: boolean;
   summary: string;
   objective?: string;
   scope?: ResearchPlanScopeView;
@@ -295,12 +296,9 @@ export interface ResearchTaskViewModel {
 export interface ResearchTaskActions {
   onConfirmPlan?: () => void;
   onAdjustPlan?: (instruction: string) => void | Promise<void>;
-  onUpdatePlanStrategy?: (strategy: {
-    initialBreadth: number;
-    maxDepth: number;
-    maxQueries: number;
-    resultsPerQuery: number;
-  }) => void | Promise<void>;
+  onUpdatePlanPreset?: (preset: ResearchBudgetPreset) => void | Promise<void>;
+  onContinueResearch?: (instruction: string) => void | Promise<void>;
+  onUpdateLatest?: () => void | Promise<void>;
   onPause?: () => void;
   onResume?: () => void;
   onCancel?: () => void;

@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -8,7 +8,7 @@ import {
   FileDown,
   FileText,
   MessageSquareText,
-  RefreshCw,
+  ChevronDown,
 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 
@@ -23,30 +23,31 @@ import {
 import { Button, InlineStatus } from "@/components/ui/primitives";
 import type { Source } from "@/types";
 
+import ResearchDisclosure from "../ResearchDisclosure";
 import { ResearchRunRail } from "../topology";
 import { ActivityList, formatDuration } from "../ui";
 import type { ResearchTaskViewModel } from "../types";
 import { formatResearchDateTime } from "../formatters";
 import { formatTokens } from "./workbenchUtils";
 
-export function ActivityPanel({ task }: { task: ResearchTaskViewModel }) {
+export function RunDetails({ task }: { task: ResearchTaskViewModel }) {
   const locale = useLocale();
   const t = useTranslations("Research");
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-5 p-4 sm:p-6">
+    <div className="mx-auto w-full max-w-3xl space-y-5 p-4 sm:p-6">
       {task.run ? <ResearchRunRail run={task.run} /> : null}
       <div>
         <h2 className="text-lg font-semibold">{t("activity.title")}</h2>
         <dl className="mt-4 grid grid-cols-2 gap-3 border-y border-border py-4 text-xs sm:grid-cols-3 lg:grid-cols-6">
           <div>
             <dt className="text-muted-foreground">{t("metrics.toolCalls")}</dt>
-            <dd className="mt-0.5 font-mono tabular-nums text-foreground">
+            <dd className="mt-0.5 tabular-nums text-foreground">
               {task.usage.toolCalls}/{task.usage.maxToolCalls}
             </dd>
           </div>
           <div>
             <dt className="text-muted-foreground">{t("metrics.elapsed")}</dt>
-            <dd className="mt-0.5 font-mono tabular-nums text-foreground">
+            <dd className="mt-0.5 tabular-nums text-foreground">
               {formatDuration(task.usage.elapsedMs)}/
               {formatDuration(task.usage.maxWallTimeMs)}
             </dd>
@@ -54,7 +55,7 @@ export function ActivityPanel({ task }: { task: ResearchTaskViewModel }) {
           {task.usage.totalTokens !== undefined ? (
             <div>
               <dt className="text-muted-foreground">{t("metrics.tokens")}</dt>
-              <dd className="mt-0.5 font-mono tabular-nums text-foreground">
+              <dd className="mt-0.5 tabular-nums text-foreground">
                 {formatTokens(task.usage.totalTokens, locale)}
                 {task.usage.maxTotalTokens
                   ? `/${formatTokens(task.usage.maxTotalTokens, locale)}`
@@ -64,7 +65,7 @@ export function ActivityPanel({ task }: { task: ResearchTaskViewModel }) {
           ) : null}
           <div>
             <dt className="text-muted-foreground">{t("metrics.questions")}</dt>
-            <dd className="mt-0.5 font-mono tabular-nums text-foreground">
+            <dd className="mt-0.5 tabular-nums text-foreground">
               {task.completedQuestions}/{task.totalQuestions}
             </dd>
           </div>
@@ -74,7 +75,7 @@ export function ActivityPanel({ task }: { task: ResearchTaskViewModel }) {
                 <dt className="text-muted-foreground">
                   {t("metrics.evidence")}
                 </dt>
-                <dd className="mt-0.5 font-mono tabular-nums text-foreground">
+                <dd className="mt-0.5 tabular-nums text-foreground">
                   {task.evidence.length}
                 </dd>
               </div>
@@ -82,7 +83,7 @@ export function ActivityPanel({ task }: { task: ResearchTaskViewModel }) {
                 <dt className="text-muted-foreground">
                   {t("metrics.verifiedClaims")}
                 </dt>
-                <dd className="mt-0.5 font-mono tabular-nums text-foreground">
+                <dd className="mt-0.5 tabular-nums text-foreground">
                   {task.run.claimCounts.verified}/{task.run.claimCounts.total}
                 </dd>
               </div>
@@ -90,6 +91,15 @@ export function ActivityPanel({ task }: { task: ResearchTaskViewModel }) {
           ) : null}
         </dl>
       </div>
+    </div>
+  );
+}
+
+export function ActivityLog({ task }: { task: ResearchTaskViewModel }) {
+  const t = useTranslations("Research");
+  return (
+    <section className="space-y-3">
+      <h2 className="text-base font-semibold">{t("activity.title")}</h2>
       {task.activities.length ? (
         <div>
           <ActivityList activities={task.activities} />
@@ -97,7 +107,7 @@ export function ActivityPanel({ task }: { task: ResearchTaskViewModel }) {
       ) : (
         <p className="text-sm text-muted-foreground">{t("activity.empty")}</p>
       )}
-    </div>
+    </section>
   );
 }
 
@@ -226,92 +236,6 @@ function ReportTrustSummary({
   );
 }
 
-export function SupplementPanel({
-  task,
-  report,
-  supplementsMarkdown,
-  reportSources,
-  imageSources,
-  onSelectVersion,
-  onInspectEvidence,
-}: {
-  task: ResearchTaskViewModel;
-  report: ResearchTaskViewModel["reportVersions"][number] | undefined;
-  supplementsMarkdown: string;
-  reportSources: Source[];
-  imageSources: NonNullable<
-    ResearchTaskViewModel["reportVersions"][number]["imageSources"]
-  >;
-  onSelectVersion: (versionId: string) => void;
-  onInspectEvidence: (evidenceId: string) => void;
-}) {
-  const locale = useLocale();
-  const t = useTranslations("Research");
-  if (!report) {
-    return (
-      <div className="mx-auto flex min-h-72 w-full max-w-5xl flex-col items-center justify-center p-5 text-center">
-        <FileText
-          size={26}
-          className="text-muted-foreground"
-          aria-hidden="true"
-        />
-        <h2 className="mt-3 text-sm font-semibold">{t("tabs.supplements")}</h2>
-        <p className="mt-1 max-w-sm text-sm leading-6 text-muted-foreground">
-          {t("report.supplementsEmpty")}
-        </p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="mx-auto w-full max-w-5xl space-y-5 p-4 sm:p-6">
-      <header className="flex flex-wrap items-start gap-3 border-b border-border pb-4">
-        <div className="min-w-0 flex-1">
-          <h2 className="text-lg font-semibold">{t("tabs.supplements")}</h2>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {t("report.versionDate", {
-              version: report.version,
-              date: formatResearchDateTime(report.createdAt, locale),
-            })}
-          </p>
-        </div>
-        <div>
-          <label className="sr-only" htmlFor={`supplements-version-${task.id}`}>
-            {t("report.selectVersion")}
-          </label>
-          <CustomSelect
-            id={`supplements-version-${task.id}`}
-            value={report.id}
-            onChange={onSelectVersion}
-            options={task.reportVersions.map((version) => ({
-              value: version.id,
-              label: t("plan.version", { version: version.version }),
-            }))}
-            ariaLabel={t("report.selectVersion")}
-            selectButtonClassName="flex h-9 min-h-0 min-w-28 items-center justify-between gap-2 rounded-md border border-border bg-background px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          />
-        </div>
-      </header>
-      <ReportTrustSummary report={report} />
-      {supplementsMarkdown.trim() ? (
-        <MarkdownRenderer
-          content={supplementsMarkdown}
-          searchSources={reportSources}
-          imageSources={imageSources}
-          onCitationClick={(source) => {
-            const evidenceId = source.metadata?.researchEvidenceId;
-            if (typeof evidenceId === "string") onInspectEvidence(evidenceId);
-          }}
-        />
-      ) : (
-        <p className="text-sm leading-6 text-muted-foreground">
-          {t("report.supplementsEmpty")}
-        </p>
-      )}
-    </div>
-  );
-}
-
 export function ReportPanel({
   task,
   report,
@@ -323,8 +247,7 @@ export function ReportPanel({
   onDownloadMarkdown,
   onPrintPdf,
   onInteractiveExplanation,
-  onAskEvidence,
-  onUpdateLatest,
+  notesMarkdown,
 }: {
   task: ResearchTaskViewModel;
   report: ResearchTaskViewModel["reportVersions"][number] | undefined;
@@ -338,14 +261,14 @@ export function ReportPanel({
   onDownloadMarkdown?: (versionId: string) => void;
   onPrintPdf?: (versionId: string) => void;
   onInteractiveExplanation?: (versionId: string) => void;
-  onAskEvidence?: () => void;
-  onUpdateLatest?: () => void;
+  notesMarkdown: string;
 }) {
   const locale = useLocale();
   const t = useTranslations("Research");
+  const [notesOpen, setNotesOpen] = useState(false);
   if (!report) {
     return (
-      <div className="mx-auto flex min-h-72 w-full max-w-5xl flex-col items-center justify-center p-5 text-center">
+      <div className="mx-auto flex min-h-72 w-full max-w-3xl flex-col items-center justify-center p-5 text-center">
         <FileText
           size={26}
           className="text-muted-foreground"
@@ -360,7 +283,7 @@ export function ReportPanel({
   }
 
   return (
-    <div className="mx-auto w-full max-w-5xl p-4 sm:p-6">
+    <div className="mx-auto w-full max-w-3xl p-4 sm:p-6">
       <div className="border-b border-border pb-4 sm:flex sm:flex-wrap sm:items-start sm:gap-3">
         <div className="min-w-0 flex-1">
           <h2 className="wrap-break-word text-lg font-semibold">
@@ -374,20 +297,24 @@ export function ReportPanel({
           </p>
         </div>
         <div className="mt-3 flex flex-wrap gap-2 [&_button]:h-9 [&_button]:min-h-0 sm:mt-0 sm:[&_button]:h-8">
-          <label className="sr-only" htmlFor={`report-version-${task.id}`}>
-            {t("report.selectVersion")}
-          </label>
-          <CustomSelect
-            id={`report-version-${task.id}`}
-            value={report.id}
-            onChange={onSelectVersion}
-            options={task.reportVersions.map((version) => ({
-              value: version.id,
-              label: t("plan.version", { version: version.version }),
-            }))}
-            ariaLabel={t("report.selectVersion")}
-            selectButtonClassName="flex h-9 min-h-0 min-w-28 items-center justify-between gap-2 rounded-md border border-border bg-background px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          />
+          {task.reportVersions.length > 1 ? (
+            <>
+              <label className="sr-only" htmlFor={`report-version-${task.id}`}>
+                {t("report.selectVersion")}
+              </label>
+              <CustomSelect
+                id={`report-version-${task.id}`}
+                value={report.id}
+                onChange={onSelectVersion}
+                options={task.reportVersions.map((version) => ({
+                  value: version.id,
+                  label: t("plan.version", { version: version.version }),
+                }))}
+                ariaLabel={t("report.selectVersion")}
+                selectButtonClassName="flex h-9 min-h-0 min-w-28 items-center justify-between gap-2 rounded-md border border-border bg-background px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              />
+            </>
+          ) : null}
           {onInteractiveExplanation ? (
             <Button
               size="sm"
@@ -435,22 +362,36 @@ export function ReportPanel({
         }}
         className="mt-6"
       />
-      {onAskEvidence || onUpdateLatest ? (
-        <div className="mt-8 flex flex-wrap gap-2 border-t border-border pt-4 [&_button]:h-9 [&_button]:min-h-0 sm:[&_button]:h-8">
-          {onAskEvidence ? (
-            <Button onClick={onAskEvidence}>
-              <MessageSquareText size={15} aria-hidden="true" />
-              {t("actions.askEvidence")}
-            </Button>
-          ) : null}
-          {onUpdateLatest ? (
-            <Button onClick={onUpdateLatest}>
-              <RefreshCw size={15} aria-hidden="true" />
-              {t("actions.updateLatest")}
-            </Button>
-          ) : null}
-        </div>
-      ) : null}
+      <ResearchDisclosure
+        open={notesOpen}
+        onOpenChange={setNotesOpen}
+        className="mt-8 border-t border-border"
+        triggerClassName="flex min-h-11 w-full items-center gap-2 py-3 text-left text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        summary={(open) => (
+          <>
+            <ChevronDown
+              size={16}
+              aria-hidden="true"
+              className={open ? "rotate-180" : ""}
+            />
+            {t("report.notesAndLimits")}
+          </>
+        )}
+      >
+        <ReportTrustSummary report={report} />
+        {notesMarkdown ? (
+          <MarkdownRenderer
+            content={notesMarkdown}
+            searchSources={reportSources}
+            imageSources={imageSources}
+            onCitationClick={(source) => {
+              const id = source.metadata?.researchEvidenceId;
+              if (typeof id === "string") onInspectEvidence(id);
+            }}
+            className="mt-5"
+          />
+        ) : null}
+      </ResearchDisclosure>
     </div>
   );
 }

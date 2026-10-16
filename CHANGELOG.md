@@ -7,6 +7,27 @@ group changes under a level-2 heading that matches the release tag, such as
 `## v2.0.0`; the release workflow uses that section as the GitHub release notes
 when the matching tag is pushed.
 
+## Unreleased
+
+- **Deep Research flow:** Simplified plan approval with Quick/Standard/Thorough
+  choices, compact progress and completion cards, and a report-first reader with
+  Report, Sources, and How it was researched tabs. Report questions open in a
+  dialog; raw strategy controls, the research map, and steering UI were removed.
+- **Research recovery:** Added safe pre-output retries, provider-specific error
+  actions, reviewed starter plans, failed-edit rollback, connection-loss pause,
+  and query refunds for temporary search failures, including checkpoint recovery.
+  Repeated interruption retains receipts; interrupted archive resumes from saved
+  results, and invalid checkpoints stop recovery before dispatch.
+  Query reservations are saved before search dispatch, preventing a hard
+  refresh during an in-flight request from restoring spent allowance.
+- **Research follow-ups:** Verified report delivery conditionally returns to Auto;
+  ordinary follow-ups receive bounded report context. Research more and refresh
+  explicitly prepare a new plan, preserving the previous report on failure.
+  Compression preserves report references, and mode rollback protects explicit
+  user selections while retaining unrelated settings changes.
+- **Shared controls:** Kept research primary actions blue in both themes, fixed
+  nested-dialog Escape and select layering, and synchronized session chat modes.
+
 ## v2.6.0
 
 - **Intelligent UI:** Added model-generated interactive answers in ordinary chat

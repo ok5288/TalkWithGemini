@@ -4,6 +4,8 @@
 
 - **Research plan / 研究计划:** The user-reviewable objective, scope, steps,
   sources, and deliverable that must be approved before research begins.
+- **Starter plan / 基础计划:** A fallback research plan offered when the generated
+  plan remains invalid. It requires review and approval before research begins.
 - **Model knowledge / 模型已有知识:** Information available to the model without
   retrieval. It can help plan or supplement a report, but is not evidence verified
   by the current research.

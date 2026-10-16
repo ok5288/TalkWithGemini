@@ -45,18 +45,35 @@ export function getResearchQueriesFromToolCalls(
 ): string[] {
   const queries = toolCalls.flatMap((toolCall) => {
     if (!isRecord(toolCall.args)) return [];
+    const result = getToolResultData(toolCall);
+    const marker =
+      isRecord(toolCall.result) &&
+      Array.isArray(toolCall.result.refundedQueries)
+        ? toolCall.result.refundedQueries
+        : result?.refundedQueries;
+    const refunded = new Set(
+      Array.isArray(marker)
+        ? marker
+            .filter((query): query is string => typeof query === "string")
+            .map(normalizeResearchQuery)
+        : [],
+    );
     if (
       toolCall.name === "web_search" &&
       typeof toolCall.args.query === "string"
     ) {
-      return [toolCall.args.query];
+      return refunded.has(normalizeResearchQuery(toolCall.args.query))
+        ? []
+        : [toolCall.args.query];
     }
     if (
       toolCall.name === "search_web" &&
       Array.isArray(toolCall.args.queries)
     ) {
       return toolCall.args.queries.filter(
-        (query): query is string => typeof query === "string",
+        (query): query is string =>
+          typeof query === "string" &&
+          !refunded.has(normalizeResearchQuery(query)),
       );
     }
     return [];

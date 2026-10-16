@@ -1,3 +1,5 @@
+import { runResearchModelWithRetry } from "../modelRetry";
+import { isResearchConnectionError } from "../connectionErrors";
 import { v7 as uuidv7 } from "uuid";
 
 import type { Message } from "@/types";
@@ -151,40 +153,45 @@ export async function archiveWave(
   }) => {
     const request = async (useNativeSchema: boolean) => {
       let content = "";
-      content = await streamChatResponse(
-        ctx.task.sessionId,
-        ctx.researchModel,
-        history,
-        prompt,
-        [],
-        {
-          ...chatConfig,
-          chatMode: "chat",
-          useAgentMode: false,
-          useDeepResearch: false,
-          useSearch: false,
-          useReasoning: false,
-        },
-        (text) => {
-          content = text;
-        },
-        systemInstruction,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        controller.signal,
-        [],
-        undefined,
-        undefined,
-        undefined,
-        {
-          disableTools: true,
-          ...(useNativeSchema && nativeResponseFormat
-            ? { responseFormat: nativeResponseFormat }
-            : {}),
-        },
-      );
+      content = await runResearchModelWithRetry({
+        signal: controller.signal,
+        hasVisibleOutput: () => Boolean(content),
+        run: () =>
+          streamChatResponse(
+            ctx.task.sessionId,
+            ctx.researchModel,
+            history,
+            prompt,
+            [],
+            {
+              ...chatConfig,
+              chatMode: "chat",
+              useAgentMode: false,
+              useDeepResearch: false,
+              useSearch: false,
+              useReasoning: false,
+            },
+            (text) => {
+              content = text;
+            },
+            systemInstruction,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            controller.signal,
+            [],
+            undefined,
+            undefined,
+            undefined,
+            {
+              disableTools: true,
+              ...(useNativeSchema && nativeResponseFormat
+                ? { responseFormat: nativeResponseFormat }
+                : {}),
+            },
+          ),
+      });
       return content;
     };
     if (!nativeResponseFormatAvailable) return request(false);
@@ -282,7 +289,7 @@ export async function archiveWave(
         repairIssues = parsedRepair.error.issues;
       }
     } catch (error) {
-      if (isAbortError(error)) throw error;
+      if (isAbortError(error) || isResearchConnectionError(error)) throw error;
       logDevError("Deep Research wave packet repair failed", error);
       repairIssues = [
         ...repairIssues,

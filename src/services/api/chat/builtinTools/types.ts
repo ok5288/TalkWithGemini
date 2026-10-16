@@ -49,6 +49,9 @@ export interface BuiltinResearchQueryBudget {
   /** Approved absolute web filters applied by the host before network access. */
   searchPolicy?: ResearchSearchPolicy;
   onQueriesExecuted?: (queries: string[]) => void;
+  onQueriesRefunded?: (queries: string[]) => void;
+  /** Persist the host net ledger before dispatch and after a refund. */
+  persistQueries?: () => Promise<void>;
 }
 
 export interface BuiltinResearchSourceBudget {

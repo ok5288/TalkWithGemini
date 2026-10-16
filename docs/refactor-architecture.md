@@ -83,12 +83,38 @@ recovers another tab's active task. Global OPFS orphan sweeping remains
 suspended until it can share a maintenance lock with publishers; explicit task
 deletion still checks Artifact references.
 
-`runtime/steering.ts` consumes durable commands only at a safe wave boundary
+The steering UI and topology have been removed; existing records remain readable.
+`runtime/steering.ts` consumes legacy durable commands only at a safe wave boundary
 under the task Web Lock. `runtime/evidenceConversation.ts` owns
 one-request-per-topic streaming, cancellation, retry, and exact report-version
 routing. Import
 `ResearchRuntimeProvider.tsx` and `ConnectedResearchViews.tsx` by path when a
 component needs them so a research card does not pull in the runtime.
+
+Research recovery concentrates shared model-error classification and safe retry
+in `lib/chat/providerErrors.ts` and `runtime/modelRetry.ts`. Stage implementations
+own persistence and decide whether to restore a plan, pause, or deliver received
+text. Planning rollback is explicit and retains cancellation and storage errors.
+The starter-plan projection uses existing step identity, preserving the strict
+persisted plan schema.
+
+Wave checkpoints retain execution identity, completed-stream state, and merged
+tool receipts. Pending recovery crosses stage budget checks before new work
+is considered; a completed tool turn resumes only its closed-book archive.
+Invalid declared history fails closed, preserving the query and cache seam.
+An optional net query ledger extends checkpoint v1 without changing the strict
+task schema. Search bindings and specialized search dispatch await its commit
+before network access and after refunds; persistence errors propagate through
+the batch and tool handlers rather than becoming ordinary search failures.
+
+Report content projection remains pure in `lib/research/reportContext.ts`;
+`runtime/reportContext.ts` performs guarded store and Artifact reads. Publication
+is the seam for the conditional session-mode change. Card/footer task actions
+share one interface, while the report reader exposes report/sources/process.
+This keeps recovery and content knowledge local without duplicating it in callers.
+Compression retains branch-local task references for the same guarded resolver.
+Runtime-only session-mode revisions distinguish user selection from unrelated
+config changes, keeping failed-planning rollback local to the mode it changed.
 
 ## Client, server, and source boundaries
 

@@ -2,24 +2,26 @@
 
 import dynamic from "next/dynamic";
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft } from "lucide-react";
+import { FileText, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 
-import { Button, InlineStatus } from "@/components/ui/primitives";
+import {
+  Button,
+  Dialog,
+  IconButton,
+  InlineStatus,
+} from "@/components/ui/primitives";
 import { cn } from "@/lib/utils/cn";
 import { createReportSectionLabels } from "@/lib/research/reportSectionLabels";
 
-import { StatusLabel, TaskActions } from "../ui";
+import { StatusLabel, TaskActions, formatDuration } from "../ui";
 import type { ResearchTaskActions, ResearchTaskViewModel } from "../types";
 
 import { EvidencePanel } from "./EvidencePanel";
-import { ClaimPanel } from "./ClaimPanel";
-import { PlanPanel } from "./PlanPanel";
-import { ActivityPanel, ReportPanel, SupplementPanel } from "./ReportPanel";
-import { ResearchFollowupDialog } from "./ResearchFollowupDialog";
+import { ProcessPanel } from "./ProcessPanel";
+import { ReportPanel } from "./ReportPanel";
 import {
   WORKBENCH_TABS,
-  type FollowupMode,
   type WorkbenchTab,
   createReportPresentation,
   handleTabKeyDown,
@@ -27,7 +29,28 @@ import {
 
 const EvidenceQuestionsPanel = dynamic(
   () => import("./EvidenceQuestionsPanel"),
+  { ssr: false, loading: EvidenceQuestionsLoading },
 );
+const ResearchFollowupDialog = dynamic(
+  () =>
+    import("./ResearchFollowupDialog").then(
+      (module) => module.ResearchFollowupDialog,
+    ),
+  { ssr: false },
+);
+
+function EvidenceQuestionsLoading() {
+  const t = useTranslations("EvidenceQuestions");
+  return (
+    <div
+      role="status"
+      aria-label={t("loading")}
+      className="min-h-32 p-4 text-sm text-muted-foreground sm:p-6"
+    >
+      {t("loading")}
+    </div>
+  );
+}
 
 export interface ResearchWorkbenchProps extends ResearchTaskActions {
   task: ResearchTaskViewModel;
@@ -38,7 +61,7 @@ export interface ResearchWorkbenchProps extends ResearchTaskActions {
   onPrintPdf?: (versionId: string) => void;
   onInteractiveExplanation?: (versionId: string) => void;
   onContinueResearch?: (instruction: string) => void | Promise<void>;
-  onUpdateLatest?: () => void;
+  onUpdateLatest?: () => void | Promise<void>;
 }
 
 export default function ResearchWorkbench({
@@ -46,7 +69,7 @@ export default function ResearchWorkbench({
   onClose,
   onConfirmPlan,
   onAdjustPlan,
-  onUpdatePlanStrategy,
+  onUpdatePlanPreset,
   onPause,
   onResume,
   onCancel,
@@ -63,10 +86,11 @@ export default function ResearchWorkbench({
 }: ResearchWorkbenchProps) {
   const t = useTranslations("Research");
   const questionText = useTranslations("EvidenceQuestions");
-  const [tab, setTab] = useState<WorkbenchTab>(
-    task.reportVersions.length > 0 ? "report" : "plan",
-  );
-  const [followupMode, setFollowupMode] = useState<FollowupMode | null>(null);
+  const [selectedTab, setTab] = useState<WorkbenchTab | null>(null);
+  const tab =
+    selectedTab ?? (task.reportVersions.length > 0 ? "report" : "process");
+  const [followupOpen, setFollowupOpen] = useState(false);
+  const [questionsOpen, setQuestionsOpen] = useState(false);
   const [selectedVersionId, setSelectedVersionId] = useState(
     task.activeReportVersionId ?? task.reportVersions.at(-1)?.id,
   );
@@ -91,7 +115,8 @@ export default function ResearchWorkbench({
       return {
         markdown: "",
         bodyMarkdown: "",
-        supplementsMarkdown: "",
+        notesMarkdown: "",
+        sourcesMarkdown: "",
         sources: [],
       };
     }
@@ -105,52 +130,53 @@ export default function ResearchWorkbench({
   };
   const inspectEvidence = (evidenceId: string) => {
     onSelectEvidence?.(evidenceId);
-    setTab("evidence");
+    setTab("sources");
     window.requestAnimationFrame(() => {
       document.getElementById(`research-evidence-${evidenceId}`)?.focus();
     });
   };
-  const tabLabel = (item: WorkbenchTab) =>
-    item === "questions"
-      ? questionText("tab")
-      : item === "plan"
-        ? t("plan.title")
-        : t(`tabs.${item}`);
+  const tabLabel = (item: WorkbenchTab) => t(`tabs.${item}`);
 
   return (
     <section
       className="flex h-full min-h-0 flex-col bg-background text-foreground"
       aria-labelledby={`research-workbench-${task.id}`}
     >
-      <header className="flex min-h-14 shrink-0 items-center gap-3 border-b border-border px-3 sm:px-4">
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={onClose}
-          aria-label={t("actions.closeWorkbench")}
-          className="h-11 min-h-11 min-w-11 md:h-8 md:min-h-0 md:min-w-0"
-        >
-          <ArrowLeft size={16} aria-hidden="true" />
-          <span className="hidden sm:inline">{t("actions.backToChat")}</span>
-        </Button>
+      <header className="flex shrink-0 items-center gap-3 border-b border-border px-4 py-3 sm:px-6">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted ring-1 ring-border">
+          <FileText size={18} aria-hidden="true" />
+        </div>
         <div className="min-w-0 flex-1">
           <h1
             ref={headingRef}
             id={`research-workbench-${task.id}`}
             tabIndex={-1}
-            className="truncate text-sm font-semibold"
+            className="truncate text-base font-semibold"
           >
             {task.title}
           </h1>
-          <div aria-live="polite" aria-atomic="true">
+          <div
+            className="flex items-center gap-2 text-xs text-muted-foreground"
+            aria-live="polite"
+            aria-atomic="true"
+          >
             <StatusLabel status={task.status} />
+            <span aria-hidden="true">·</span>
+            <span className="tabular-nums">
+              {formatDuration(task.usage.elapsedMs)}
+            </span>
           </div>
         </div>
+        <IconButton
+          label={t("actions.closeWorkbench")}
+          icon={<X size={18} />}
+          onClick={onClose}
+        />
       </header>
 
       {task.error ? (
         <div className="shrink-0 border-b border-border px-4 py-3">
-          <div className="mx-auto max-w-5xl">
+          <div className="mx-auto max-w-3xl">
             <InlineStatus tone="danger" live>
               {task.error.message}
             </InlineStatus>
@@ -163,7 +189,7 @@ export default function ResearchWorkbench({
         aria-label={t("workbench.contentTabs")}
         role="tablist"
       >
-        <div className="mx-auto flex min-w-max max-w-5xl px-2 sm:px-4">
+        <div className="mx-auto flex min-w-max max-w-3xl px-2 sm:px-4">
           {WORKBENCH_TABS.map((item, index) => (
             <Button
               key={item}
@@ -185,6 +211,7 @@ export default function ResearchWorkbench({
               }
             >
               {tabLabel(item)}
+              {item === "sources" ? ` (${task.evidence.length})` : ""}
             </Button>
           ))}
         </div>
@@ -197,12 +224,19 @@ export default function ResearchWorkbench({
         aria-label={tabLabel(tab)}
         className="min-h-0 flex-1 overflow-y-auto"
       >
-        {tab === "plan" ? <PlanPanel task={task} /> : null}
-        {tab === "evidence" ? <EvidencePanel task={task} /> : null}
-        {tab === "claims" ? (
-          <ClaimPanel
+        {tab === "sources" ? (
+          <EvidencePanel
+            task={task}
+            sourcesMarkdown={reportPresentation.sourcesMarkdown}
+            reportSources={reportPresentation.sources}
+            onInspectEvidence={inspectEvidence}
+          />
+        ) : null}
+        {tab === "process" ? (
+          <ProcessPanel
             task={task}
             claims={report?.claims ?? task.claims ?? []}
+            onUpdatePlanPreset={onUpdatePlanPreset}
             onInspectEvidence={inspectEvidence}
           />
         ) : null}
@@ -218,49 +252,37 @@ export default function ResearchWorkbench({
             onDownloadMarkdown={onDownloadMarkdown}
             onPrintPdf={onPrintPdf}
             onInteractiveExplanation={onInteractiveExplanation}
-            onAskEvidence={() => setTab("questions")}
-            onUpdateLatest={
-              onUpdateLatest &&
-              (task.status === "completed" ||
-                task.status === "partial_completed")
-                ? onUpdateLatest
-                : undefined
-            }
+            notesMarkdown={reportPresentation.notesMarkdown}
           />
         ) : null}
-        {tab === "supplements" ? (
-          <SupplementPanel
-            task={task}
-            report={report}
-            supplementsMarkdown={reportPresentation.supplementsMarkdown}
-            reportSources={reportPresentation.sources}
-            imageSources={report?.imageSources ?? []}
-            onSelectVersion={selectVersion}
-            onInspectEvidence={inspectEvidence}
-          />
-        ) : null}
-        {tab === "questions" ? (
-          <EvidenceQuestionsPanel
-            key={effectiveVersionId}
-            taskId={task.id}
-            reportId={effectiveVersionId}
-            reportVersions={task.reportVersions}
-            onSelectVersion={selectVersion}
-          />
-        ) : null}
-        {tab === "activity" ? <ActivityPanel task={task} /> : null}
       </main>
 
       <footer className="shrink-0 border-t border-research-border bg-background/95 px-3 py-3 shadow-[0_-8px_24px_-20px_rgba(0,0,0,0.45)] backdrop-blur sm:px-4">
-        <div className="mx-auto flex max-w-5xl justify-end">
+        <div className="mx-auto flex max-w-3xl flex-wrap justify-end gap-2">
+          {report ? (
+            <Button onClick={() => setQuestionsOpen(true)}>
+              {t("actions.askEvidence")}
+            </Button>
+          ) : null}
+          {(task.status === "completed" ||
+            task.status === "partial_completed") &&
+          (onContinueResearch || onNewFollowUp) ? (
+            <Button
+              variant="research"
+              onClick={() =>
+                onContinueResearch ? setFollowupOpen(true) : onNewFollowUp?.()
+              }
+            >
+              {t("actions.newFollowUp")}
+            </Button>
+          ) : null}
           <TaskActions
-            compact
-            presentation="decision-bar"
+            layout="footer"
             task={task}
             actions={{
               onConfirmPlan,
               onAdjustPlan,
-              onUpdatePlanStrategy,
+              onUpdatePlanPreset,
               onPause,
               onResume,
               onCancel,
@@ -268,21 +290,45 @@ export default function ResearchWorkbench({
               onDismiss,
               onNewFollowUp:
                 onNewFollowUp ??
-                (onContinueResearch
-                  ? () => setFollowupMode("continue")
-                  : undefined),
+                (onContinueResearch ? () => setFollowupOpen(true) : undefined),
             }}
           />
         </div>
       </footer>
 
-      <ResearchFollowupDialog
-        mode={followupMode}
-        onClose={() => setFollowupMode(null)}
-        onSubmit={(value) => {
-          return onContinueResearch?.(value);
-        }}
-      />
+      <Dialog
+        open={questionsOpen}
+        onClose={() => setQuestionsOpen(false)}
+        title={questionText("title")}
+        placement="responsive-sheet"
+        className="sm:max-w-3xl"
+        headerAction={
+          <IconButton
+            label={t("actions.closeWorkbench")}
+            icon={<X size={18} />}
+            onClick={() => setQuestionsOpen(false)}
+          />
+        }
+      >
+        <div className="max-h-[calc(92dvh-3.25rem)] min-h-0 overflow-y-auto">
+          <EvidenceQuestionsPanel
+            key={effectiveVersionId}
+            embedded
+            taskId={task.id}
+            reportId={effectiveVersionId}
+            reportVersions={task.reportVersions}
+            onSelectVersion={selectVersion}
+          />
+        </div>
+      </Dialog>
+      {followupOpen ? (
+        <ResearchFollowupDialog
+          open
+          onClose={() => setFollowupOpen(false)}
+          onSubmit={(value) => onContinueResearch?.(value)}
+          onUpdateLatest={onUpdateLatest}
+        />
+      ) : null}
     </section>
   );
 }

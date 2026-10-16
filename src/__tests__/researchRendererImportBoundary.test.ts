@@ -24,3 +24,25 @@ it("keeps research views behind the research output block rather than ordinary M
   );
   expect(source).not.toContain('dynamic(() => import("./MarkdownRenderer")');
 });
+
+it.each([
+  ["ResearchSummaryRow.tsx", "ResearchFollowupDialog"],
+  ["ui/TaskActions.tsx", "ResearchAdjustmentDialog"],
+  ["workbench/ResearchWorkbench.tsx", "ResearchFollowupDialog"],
+  ["workbench/ResearchWorkbench.tsx", "EvidenceQuestionsPanel"],
+])(
+  "loads interactive research dialogs in their client owner: %s / %s",
+  (file, name) => {
+    const source = readFileSync(
+      resolve(process.cwd(), "src/components/research", file),
+      "utf8",
+    );
+
+    expect(source).not.toMatch(
+      new RegExp(`import\\s+(?:\\{[^}]*\\b${name}\\b[^}]*\\}|${name})\\s+from`),
+    );
+    expect(source).toMatch(
+      new RegExp(`const ${name} = dynamic\\([\\s\\S]*?ssr: false`),
+    );
+  },
+);

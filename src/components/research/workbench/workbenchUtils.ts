@@ -3,6 +3,7 @@ import type React from "react";
 import type { Source } from "@/types";
 import {
   projectResearchReport,
+  omitReportSections,
   transformReportProse,
   type ReportSectionLabels,
 } from "@/lib/research/reportSections";
@@ -10,26 +11,9 @@ import {
 import type { ResearchEvidenceView } from "../types";
 import { formatResearchTokens } from "../formatters";
 
-export type WorkbenchTab =
-  | "plan"
-  | "evidence"
-  | "claims"
-  | "report"
-  | "supplements"
-  | "questions"
-  | "activity";
+export type WorkbenchTab = "report" | "sources" | "process";
 export type EvidenceStance = NonNullable<ResearchEvidenceView["stance"]>;
-export type FollowupMode = "ask" | "continue";
-
-export const WORKBENCH_TABS: WorkbenchTab[] = [
-  "plan",
-  "evidence",
-  "claims",
-  "report",
-  "supplements",
-  "questions",
-  "activity",
-];
+export const WORKBENCH_TABS: WorkbenchTab[] = ["report", "sources", "process"];
 export const EVIDENCE_STANCES: EvidenceStance[] = [
   "supports",
   "contradicts",
@@ -117,10 +101,12 @@ export function createLocalEvidenceCitations(
 export interface ResearchReportPresentation {
   /** The complete, localized document used for downloads and printing. */
   markdown: string;
-  /** The report body shown above the supplementary material tab. */
+  /** The main reading surface without appendices. */
   bodyMarkdown: string;
-  /** Sources, gaps, and other appendices shown in the supplementary tab. */
+  /** All appendices, retained for callers projecting the complete document. */
   supplementsMarkdown: string;
+  notesMarkdown: string;
+  sourcesMarkdown: string;
   sources: Source[];
 }
 
@@ -142,6 +128,17 @@ export function createReportPresentation(
     markdown: localized.markdown,
     bodyMarkdown: stripLeadingMarkdownTitle(projected.bodyMarkdown),
     supplementsMarkdown: projected.supplementsMarkdown,
+    notesMarkdown: omitReportSections(projected.supplementsMarkdown, [
+      "sources",
+    ]),
+    sourcesMarkdown: omitReportSections(projected.supplementsMarkdown, [
+      "knowledgeSupplement",
+      "evidenceGaps",
+      "unverifiedMaterial",
+      "questionsToVerify",
+      "planCoverage",
+      "questionCoverage",
+    ]),
     sources: cited.sources,
   };
 }

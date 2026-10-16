@@ -283,3 +283,25 @@ it("checks host authorization after file upload before dispatching the model SDK
   expect(send).not.toHaveBeenCalled();
   expect(remove).toHaveBeenCalledWith("uploaded");
 });
+
+it.each([401, 403, 404, 408, 429, 503])(
+  "preserves provider HTTP %s across dispatch",
+  async (status) => {
+    mocks.streamOpenAIResponses.mockRejectedValueOnce(
+      Object.assign(new Error("Provider rejected request"), { status }),
+    );
+    await expect(
+      runChatStream({
+        ...baseOptions("OpenAI"),
+        runtime: makeRuntime().runtime,
+        send: vi.fn(),
+      }),
+    ).rejects.toMatchObject({
+      statusCode: status,
+      code:
+        status === 429
+          ? "PROVIDER_RATE_LIMITED"
+          : expect.stringMatching(/^PROVIDER_/),
+    });
+  },
+);

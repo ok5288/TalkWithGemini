@@ -27,7 +27,6 @@
   "deliverable": "成果物の種類",
   "sections": "必須セクション",
   "sources": "ソースの優先順位",
-  "strategy": "初期戦略",
   "editor": {
     "title": "テンプレートの詳細",
     "name": "名前",
@@ -43,7 +42,6 @@
     "rationale": "理由",
     "rationalePlaceholder": "このソースが役立つ理由",
     "addSource": "ソースの優先順位を追加",
-    "strategy": "初期戦略",
     "cancel": "キャンセル",
     "save": "テンプレートを保存",
     "required": "必須項目を入力してから保存してください。",

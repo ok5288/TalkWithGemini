@@ -376,9 +376,7 @@ describe("research steering persistence and concurrency", () => {
     };
     await initializeResearchSteering(optional);
     expect(optional.steeringRecord).toBeUndefined();
-    expect(optional.onNotice).toHaveBeenCalledWith(
-      "runtime.notice.steeringUnavailable",
-    );
+    expect(optional.onNotice).not.toHaveBeenCalled();
   });
 
   it("allows another tab to queue without mutating the active run, and serializes sequence numbers", async () => {

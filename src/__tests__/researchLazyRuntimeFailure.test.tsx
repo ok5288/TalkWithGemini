@@ -90,7 +90,7 @@ describe("Research chunk load failures", () => {
     await act(async () => result.current("task"));
     expect(state.task).toMatchObject({
       status: "failed",
-      error: { code: "RESEARCH_PLAN_FAILED", recoverable: true },
+      error: { code: "RESEARCH_MODEL_UNAVAILABLE", recoverable: true },
     });
     expect(state.writes).toEqual([true]);
     expect(state.activeTaskId).toBeNull();
@@ -108,7 +108,7 @@ describe("Research chunk load failures", () => {
     });
     expect(state.task).toMatchObject({
       status: "failed",
-      error: { code: "RESEARCH_EXECUTION_FAILED", recoverable: true },
+      error: { code: "RESEARCH_MODEL_UNAVAILABLE", recoverable: true },
     });
     expect(state.writes).toEqual([true]);
     expect(state.activeTaskId).toBeNull();
@@ -124,4 +124,35 @@ describe("Research chunk load failures", () => {
     expect(state.writes).toEqual([]);
     expect(onError).not.toHaveBeenCalled();
   });
+});
+
+it("restores a completed plan when the follow-up planning module fails to load", async () => {
+  const previous: ResearchTask = {
+    ...state.task!,
+    status: "completed",
+    endedAt: 42,
+    planVersions: [
+      { id: "old-plan", version: 1 } as ResearchTask["planVersions"][number],
+    ],
+    activePlanVersion: 1,
+  };
+  state.task = {
+    ...previous,
+    status: "clarifying",
+    pendingReportKind: "update",
+    endedAt: undefined,
+  };
+  const { result } = renderHook(() => usePreparePlan(dependencies));
+  await expect(
+    result.current("task", "refresh", undefined, undefined, previous),
+  ).rejects.toThrow("runtime.error.adjustFailed");
+  expect(state.task).toMatchObject({
+    status: "completed",
+    endedAt: 42,
+    pendingReportKind: "initial",
+    activePlanVersion: 1,
+  });
+  expect(state.task!.planVersions).toEqual(previous.planVersions);
+  expect(state.writes).toEqual([true]);
+  expect(isResearchTaskLocallyLocked("task")).toBe(false);
 });

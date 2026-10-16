@@ -37,8 +37,6 @@ import ResearchTemplates from "./zh/ResearchTemplates.json";
 
 import ResearchSources from "./zh/ResearchSources.json";
 
-import ResearchSteering from "./zh/ResearchSteering.json";
-
 import EvidenceQuestions from "./zh/EvidenceQuestions.json";
 
 const messages = {
@@ -77,7 +75,6 @@ const messages = {
   Shortcuts,
   ResearchTemplates,
   ResearchSources,
-  ResearchSteering,
   EvidenceQuestions,
   Research,
 };

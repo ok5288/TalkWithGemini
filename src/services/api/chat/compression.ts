@@ -140,6 +140,20 @@ export const prepareHistoryForLLM = async (
     };
   }
 
+  // Keep references from this branch, not a snapshot of report text: the
+  // request resolver checks ownership/status and loads the current version.
+  const taskIds = new Set<string>();
+  const researchBlocks = validMessages
+    .slice(0, lastCompressedIndex + 1)
+    .flatMap((message) => message.outputBlocks ?? [])
+    .filter((block) => {
+      if (block.type !== "research_task" || taskIds.has(block.taskId))
+        return false;
+      taskIds.add(block.taskId);
+      return true;
+    });
+  if (researchBlocks.length) compressedMsg.outputBlocks = researchBlocks;
+
   // 4. Assemble Final Array
   // [First User] -> [Compressed Placeholder] -> [Uncompressed Tail]
   // Note: If firstUserMsg is actually part of the tail (unlikely if compression exists), we shouldn't duplicate it.

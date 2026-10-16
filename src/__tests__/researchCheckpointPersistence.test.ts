@@ -104,3 +104,39 @@ it("aborts an active multi-round stream on checkpoint failure and preserves its 
   expect(nextRound).not.toHaveBeenCalled();
   expect(mocks.collect).not.toHaveBeenCalled();
 });
+
+it.each(["tool", "source", "knowledge", "resume"])(
+  "does not retry a disconnected wave after %s activity",
+  async (activity) => {
+    const current = wave();
+    if (activity === "resume") Object.assign(current, { resumeThisWave: true });
+    const error = new TypeError("Failed to fetch");
+    mocks.stream.mockImplementationOnce(async (...args) => {
+      if (activity === "tool") (args[9] as (calls: unknown[]) => void)([]);
+      if (activity === "source")
+        (args[8] as (searching: boolean) => void)(true);
+      if (activity === "knowledge")
+        (
+          args[17] as { onKnowledgeSources: (sources: unknown[]) => void }
+        ).onKnowledgeSources([]);
+      throw error;
+    });
+    await expect(runWaveStream(current)).rejects.toBe(error);
+    await current.checkpointQueue;
+    expect(mocks.stream).toHaveBeenCalledOnce();
+  },
+);
+
+it("retries a fresh wave only before source or tool work", async () => {
+  vi.useFakeTimers();
+  try {
+    const error = new TypeError("Failed to fetch");
+    mocks.stream.mockRejectedValue(error);
+    const result = expect(runWaveStream(wave())).rejects.toBe(error);
+    await vi.runAllTimersAsync();
+    await result;
+    expect(mocks.stream).toHaveBeenCalledTimes(3);
+  } finally {
+    vi.useRealTimers();
+  }
+});

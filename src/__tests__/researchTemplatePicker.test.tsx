@@ -35,7 +35,6 @@ const labels = {
   deliverable: "Deliverable",
   sections: "Required sections",
   sources: "Source priorities",
-  strategy: "Starting strategy",
 };
 
 function makeTemplate(overrides: Partial<ResearchTemplate> = {}) {
@@ -138,5 +137,6 @@ describe("ResearchTemplatePicker", () => {
       screen.getByRole("combobox", { name: "Deliverable type" }),
     ).toBeTruthy();
     expect(document.querySelector("select")).toBeNull();
+    expect(screen.queryByRole("spinbutton")).toBeNull();
   });
 });

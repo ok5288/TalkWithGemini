@@ -23,25 +23,25 @@ export function ResearchRunRail({ run }: { run: ResearchRunView }) {
         <dl className="flex flex-1 flex-wrap gap-x-5 gap-y-1 text-[11px] text-muted-foreground">
           <div className="inline-flex gap-1.5">
             <dt>{t("metrics.wave")}</dt>
-            <dd className="font-mono tabular-nums text-foreground">
+            <dd className="tabular-nums text-foreground">
               {run.currentWave ?? 0}/{run.waves.length}
             </dd>
           </div>
           <div className="inline-flex gap-1.5">
             <dt>{t("metrics.queries")}</dt>
-            <dd className="font-mono tabular-nums text-foreground">
+            <dd className="tabular-nums text-foreground">
               {run.queryUsage.used}/{run.queryUsage.limit}
             </dd>
           </div>
           <div className="inline-flex gap-1.5">
             <dt>{t("metrics.verifiedClaims")}</dt>
-            <dd className="font-mono tabular-nums text-foreground">
+            <dd className="tabular-nums text-foreground">
               {run.claimCounts.verified}/{run.claimCounts.total}
             </dd>
           </div>
           <div className="inline-flex gap-1.5">
             <dt>{t("metrics.depth")}</dt>
-            <dd className="font-mono tabular-nums text-foreground">
+            <dd className="tabular-nums text-foreground">
               {run.currentDepth}/{run.maxDepth}
             </dd>
           </div>

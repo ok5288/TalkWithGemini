@@ -1,8 +1,8 @@
 {
   "status": {
     "draft": "Draft",
-    "clarifying": "Clarifying scope",
-    "plan_ready": "Plan ready for review",
+    "clarifying": "Preparing plan",
+    "plan_ready": "Plan ready",
     "researching": "Researching",
     "verifying": "Verifying evidence",
     "synthesizing": "Writing report",
@@ -24,39 +24,35 @@
     "tokens": "Tokens"
   },
   "actions": {
-    "openWorkbench": "Open workbench",
+    "openWorkbench": "Open report",
     "open": "Open",
-    "returnWorkbench": "Return to research",
-    "closeWorkbench": "Close research workbench",
-    "closePlan": "Close research plan",
+    "closeWorkbench": "Close research report",
     "closeAdjust": "Close plan adjustment",
-    "closeStrategy": "Close advanced strategy",
     "backToChat": "Back to chat",
-    "start": "Start research",
-    "adjust": "Adjust plan",
-    "advancedStrategy": "Advanced strategy",
-    "tuneStrategy": "Tune strategy",
-    "pause": "Pause safely",
+    "start": "Start",
+    "adjust": "Edit plan",
+    "pause": "Pause",
     "resume": "Resume",
     "retry": "Retry",
-    "newFollowUp": "New follow-up",
+    "newFollowUp": "Research more",
     "cancel": "Cancel",
-    "confirmCancel": "Confirm cancel",
-    "dismiss": "Dismiss",
-    "inspectEvidence": "Inspect evidence",
+    "confirmCancel": "Stop this research?",
+    "dismiss": "Discard",
     "markdown": "Markdown",
     "pdf": "PDF",
-    "askEvidence": "Ask existing evidence",
-    "continueResearch": "Continue research",
-    "updateLatest": "Update latest",
+    "askEvidence": "Ask about this report",
+    "updateLatest": "Refresh with the latest information",
     "downloadReport": "Download",
     "interactiveExplanation": "Explain interactively in chat",
-    "interactiveExplanationPrompt": "Use the attached report to create an interactive explanation in this chat. Keep the original report and evidence unchanged. Report: {title}; task: {taskId}; report: {reportId}; version: {version}."
+    "interactiveExplanationPrompt": "Use the attached report to create an interactive explanation in this chat. Keep the original report and evidence unchanged. Report: {title}; task: {taskId}; report: {reportId}; version: {version}.",
+    "viewProgress": "View progress",
+    "stop": "Stop",
+    "confirmDiscard": "Discard this research task?",
+    "openModelSettings": "Open model settings",
+    "openSearchSettings": "Open search settings"
   },
   "plan": {
-    "title": "Research plan",
-    "steps": "Research steps",
-    "planContract": "Approved research contract",
+    "steps": "I’ll research:",
     "objective": "Objective",
     "scope": "Scope",
     "audience": "Audience",
@@ -84,10 +80,6 @@
     "willNotResearch": "Will not research",
     "noExplicitInclusions": "No additional inclusions were specified.",
     "noExplicitExclusions": "No explicit exclusions were specified.",
-    "advancedDisclosure": "Reconnaissance and advanced strategy",
-    "advancedDisclosureHint": "Assumptions, deliverable, completion criteria, and budget",
-    "decisionSteps": "{count} steps",
-    "decisionQueries": "{count} queries",
     "reconSummary": "Planning reconnaissance: {used}/{limit} queries",
     "knowledgeRecon": "Knowledge-base precheck: {count}/2 queries",
     "reconDisclosure": "Planning precheck is on demand: it checks selected knowledge bases first, then public search summaries only if needed. Results inform the plan and are not formal evidence.",
@@ -99,7 +91,6 @@
       "skipped": "The plan was drafted from available knowledge; no precheck was performed."
     },
     "version": "Version {version}",
-    "showFull": "Show full plan",
     "empty": "The research plan is being prepared. No sources have been contacted yet."
   },
   "planStep": {
@@ -121,21 +112,9 @@
   },
   "run": {
     "statusRail": "Research run status",
-    "topology": "Research topology",
-    "inspector": "Research node inspector",
-    "selectNode": "Expand a research node to inspect its evidence and learnings.",
     "waves": "Research rounds",
     "wave": "Round {wave}",
-    "waveCount": "{count} rounds",
-    "waveSummary": "{queries} queries · {sources} sources · {claims} verified claims",
-    "nodeDepth": "Depth {depth}",
-    "nodeSummary": "{sources} sources · {claims} verified claims",
     "query": "Search query",
-    "queryPending": "The query will be generated when this node enters the frontier.",
-    "parentNode": "Derived from",
-    "learnings": "Learnings",
-    "followUps": "Next directions",
-    "linkedEvidence": "Linked evidence",
     "scopeApproval": "This direction expands the approved source or research scope and requires approval before access.",
     "scopeResume": "This saved task found additional research directions. Resume to continue from committed evidence without rebuilding the plan.",
     "stopReason": "Stop reason",
@@ -171,9 +150,9 @@
     }
   },
   "budget": {
-    "quick": "Quick budget",
-    "standard": "Standard budget",
-    "deep": "Deep budget"
+    "quick": "Quick",
+    "standard": "Standard",
+    "deep": "Thorough"
   },
   "settings": {
     "title": "Deep Research settings",
@@ -182,12 +161,8 @@
     "tab_research": "Research settings",
     "tab_workspace": "Artifact and workspace",
     "futureTasksOnly": "These session defaults apply to new research tasks. Existing plans and active runs do not change.",
-    "budgetTitle": "Research budget",
-    "budgetDescription": "The preset limits model rounds, tool calls, and total run time.",
-    "budgetValues": "{rounds} rounds / {calls} calls / {minutes} minutes",
-    "strategyTitle": "Default strategy",
-    "strategyDescription": "The generated plan starts with these limits and can still be adjusted before approval.",
-    "resetStrategy": "Reset preset"
+    "budgetTitle": "Thoroughness",
+    "estimatedTime": "About {minutes} minutes"
   },
   "sourceScope": {
     "label": "Approved source scope",
@@ -198,7 +173,7 @@
     "attachments": "Attachments ({count})",
     "workspace": "Workspace ({count})",
     "plugins": "Plugins ({count})",
-    "searchWarning": "Web search is not available in this source scope. Enable a compatible external search provider before starting."
+    "searchWarning": "Web search was off when this plan was prepared. Open search settings, then choose Edit plan to include web sources."
   },
   "adjust": {
     "title": "Adjust research plan",
@@ -209,29 +184,17 @@
     "submitting": "Updating plan",
     "error": "The plan could not be updated. Your instruction is still available to retry."
   },
-  "strategyAdjust": {
-    "title": "Advanced research strategy",
-    "help": "Saving creates an immutable plan version without rerunning planning reconnaissance.",
-    "initialBreadth": "Breadth",
-    "maxDepth": "Depth",
-    "maxQueries": "Queries",
-    "resultsPerQuery": "Results",
-    "submit": "Save strategy",
-    "submitting": "Saving strategy",
-    "error": "The strategy could not be saved. Your values remain available to retry."
-  },
   "card": {
-    "knownGaps": "Known gaps",
-    "reportAvailable": "Report version {version} is available in the workbench",
     "preparingSteps": {
       "scope": "Drafting the research scope",
       "sources": "Checking source feasibility",
       "review": "Reviewing the plan"
     },
-    "replyHint": "Reply in the chat to refine this plan, or start the research when it looks right.",
-    "budgetSummary": "{preset} · {queries} queries · depth {depth}",
-    "fullContract": "Full research contract",
-    "liveActivity": "Latest activity"
+    "starterNotice": "The model could not prepare a complete plan. This starter plan is ready for you to review and edit before starting.",
+    "stepProgress": "Step {current} of {total}",
+    "pausedNotice": "Research is paused. Resume when you are ready.",
+    "completeSummary": "Research complete · {sources} sources · {duration}",
+    "partialSummary": "Research finished with limits · {sources} sources · {duration}"
   },
   "global": {
     "label": "Active deep research",
@@ -247,18 +210,12 @@
   "workbench": {
     "loading": "Loading the research task…",
     "notFound": "This research task is unavailable or was removed.",
-    "mobileNavigation": "Research workbench sections",
-    "progressPanel": "Research plan and progress",
-    "evidencePanel": "Evidence inspector",
     "contentTabs": "Research activity and report"
   },
   "tabs": {
-    "progress": "Progress",
-    "activity": "Activity",
     "report": "Report",
-    "evidence": "Evidence",
-    "claims": "Claims",
-    "supplements": "Supplementary material"
+    "sources": "Sources",
+    "process": "How it was researched"
   },
   "activity": {
     "title": "Research activity",
@@ -347,7 +304,7 @@
       "noQuestions": "No additional research question was recorded.",
       "noEvidence": "No formal evidence committed."
     },
-    "supplementsEmpty": "No supplementary material was recorded for this version."
+    "notesAndLimits": "Notes and limits"
   },
   "evidence": {
     "title": "Evidence inspector",
@@ -383,7 +340,9 @@
     "sortNewest": "Newest first",
     "sortOldest": "Oldest first",
     "sortClaimCount": "Most linked claims",
-    "results": "{count, plural, one {# evidence item} other {# evidence items}}"
+    "results": "{count, plural, one {# evidence item} other {# evidence items}}",
+    "moreFilters": "More filters",
+    "citedInReport": "Cited in the report"
   },
   "claims": {
     "title": "Claim inspector",
@@ -434,13 +393,6 @@
     "unknown": "Authority unknown"
   },
   "followup": {
-    "ask": {
-      "title": "Ask the existing evidence",
-      "label": "Question",
-      "help": "This uses only the evidence already collected. It will not access the network or create a report version.",
-      "placeholder": "What does the evidence say about the main disagreement?",
-      "submit": "Ask question"
-    },
     "continue": {
       "title": "Continue the research",
       "label": "Additional research goal",
@@ -465,8 +417,7 @@
       "planReady": "Deep Research plan is ready for approval.",
       "reportReady": "Deep Research report is ready.",
       "reportPartial": "Deep Research finished with evidence gaps.",
-      "evidenceAnswer": "Answer added to the research chat using stored evidence only.",
-      "steeringUnavailable": "Research adjustments are unavailable. The current research will continue."
+      "evidenceAnswer": "Answer added to the research chat using stored evidence only."
     },
     "error": {
       "planInvalid": "The research plan could not be validated after two repair attempts. Please retry or refine the research scope.",
@@ -488,7 +439,16 @@
         "validation": "Research progress could not be validated for saving. The task has been stopped.",
         "conflict": "Another tab changed this research task. Local progress has been retained; reload the task before continuing.",
         "report_verification": "The saved report could not be verified. Research has not been marked complete."
-      }
+      },
+      "adjustFailed": "Could not update the plan. Your previous plan is still available.",
+      "offline": "You are offline. Reconnect, then resume or retry.",
+      "auth": "The model provider rejected the API key. Check your model settings.",
+      "rate_limit": "The model provider is limiting requests. Wait a moment, then retry.",
+      "model_not_found": "This model is unavailable or was not found. Choose a model in settings.",
+      "timeout": "The model request timed out. Please resume or retry.",
+      "network": "The connection to the model was lost. Reconnect, then resume or retry.",
+      "unavailable": "The model provider is temporarily unavailable. Please try again.",
+      "connectionLost": "The connection was lost. Your progress is saved. Reconnect, then resume."
     },
     "gaps": {
       "noEvidence": "No retrievable source evidence was committed.",
@@ -511,10 +471,28 @@
       "leaseConflict": "Another browser tab is running this chat. Return to that tab or retry after it finishes.",
       "checkpointUnavailable": "The interrupted Agent run is unavailable, so committed calls cannot be replayed safely. Keep the task paused or prepare a new plan.",
       "sourceUnavailable": "The approved source \"{source}\" is no longer available. Restore it or adjust the plan."
+    },
+    "starter": {
+      "summary": "A starter plan is ready for your review.",
+      "audience": "The person asking this question",
+      "assumption": "This starter plan needs your review before research starts.",
+      "deliverable": "A source-backed report addressing the research question.",
+      "section": "Findings",
+      "background": "Understand the background",
+      "evidence": "Gather and compare evidence",
+      "synthesis": "Summarize findings and limitations",
+      "backgroundObjective": "Clarify the key concepts and context for {topic}.",
+      "evidenceObjective": "Find and compare relevant evidence for {topic}.",
+      "synthesisObjective": "Answer {topic}, explaining uncertainties and limitations.",
+      "evidenceCriteria": "Use relevant available sources and distinguish facts from assumptions.",
+      "completionCriteria": "Answer the research question with supported conclusions and explicit limitations."
     }
   },
   "legacy": {
     "cleared": "This legacy Deep Research record was cleared during the v2 upgrade.",
     "remove": "Remove reference"
+  },
+  "process": {
+    "advancedDetails": "Advanced details"
   }
 }

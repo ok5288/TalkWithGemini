@@ -1,3 +1,7 @@
+import { useChatStore } from "@/store/core/chatStore";
+import { isTemporarySession } from "@/lib/chat/sessionRetention";
+import { normalizeChatMode } from "@/lib/chat/mode";
+import { selectVisibleResearchTaskId } from "@/lib/research/pendingTask";
 import {
   createReportSectionLabels,
   projectResearchReport,
@@ -106,8 +110,32 @@ export async function deliverResearchReport(
     if (isAbortError(error) || ctx.controller.signal.aborted) throw error;
     throw new ResearchReportDeliveryError(error);
   }
+  const deliveredTask = ctx.store.tasksById[ctx.taskId];
+  const chat = useChatStore.getState();
+  const session = chat.sessions.find((item) => item.id === ctx.task.sessionId);
+  const otherTasks = Object.fromEntries(
+    Object.entries(ctx.store.tasksById).filter(([id]) => id !== ctx.taskId),
+  );
+  if (
+    session &&
+    deliveredTask &&
+    ["completed", "partial_completed"].includes(deliveredTask.status) &&
+    !ctx.controller.signal.aborted &&
+    !isTemporarySession(session) &&
+    normalizeChatMode(
+      session.config?.chatMode,
+      session.config?.useAgentMode,
+      session.config?.useDeepResearch,
+    ) === "research" &&
+    !selectVisibleResearchTaskId(
+      { tasksById: otherTasks, activeTaskId: null },
+      session.id,
+    )
+  ) {
+    chat.setSessionChatMode(session.id, "auto");
+  }
   ctx.reportDraft = undefined;
-  ctx.store.setActiveTask(null);
+  if (ctx.store.activeTaskId === ctx.taskId) ctx.store.setActiveTask(null);
   ctx.onNotice?.(
     gaps.length > 0
       ? ctx.t("runtime.notice.reportPartial")

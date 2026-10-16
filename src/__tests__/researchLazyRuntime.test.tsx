@@ -31,7 +31,11 @@ vi.mock("@/lib/research/runtime/executeResearch", async () => {
 vi.mock("@/store/core/researchStore", () => ({
   useResearchStore: {
     getState: () => ({
-      refreshTask: async () => ({ id: "task", status: "draft" }),
+      refreshTask: async () => ({
+        id: "task",
+        status: "draft",
+        planVersions: [],
+      }),
     }),
   },
 }));

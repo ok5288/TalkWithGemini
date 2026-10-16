@@ -63,6 +63,11 @@ import {
   type KnowledgeSourceNavigationDetail,
 } from "@/lib/knowledge/navigation";
 import { Button } from "@/components/ui/primitives";
+import {
+  SETTINGS_TAB_NAVIGATE_EVENT,
+  isSettingsTabId,
+  type SettingsTabNavigationDetail,
+} from "@/lib/settings/navigation";
 import { ConnectedResearchGlobalBar } from "@/components/research/ConnectedResearchGlobalBar";
 import {
   RESEARCH_TASK_NAVIGATE_EVENT,
@@ -508,6 +513,23 @@ const ChatAppShell = ({
         handleResearchNavigate,
       );
   }, [navigateToPanel, viewMode]);
+
+  React.useEffect(() => {
+    const handleSettingsNavigate = (event: Event) => {
+      const tab = (event as CustomEvent<SettingsTabNavigationDetail>).detail
+        ?.tab;
+      if (isSettingsTabId(tab)) navigateToPanel("settings", tab);
+    };
+    window.addEventListener(
+      SETTINGS_TAB_NAVIGATE_EVENT,
+      handleSettingsNavigate,
+    );
+    return () =>
+      window.removeEventListener(
+        SETTINGS_TAB_NAVIGATE_EVENT,
+        handleSettingsNavigate,
+      );
+  }, [navigateToPanel]);
 
   React.useEffect(() => {
     const previousViewMode = previousViewModeRef.current;

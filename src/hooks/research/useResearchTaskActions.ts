@@ -1,3 +1,5 @@
+import { normalizeChatMode } from "@/lib/chat/mode";
+import { useChatStore } from "@/store/core/chatStore";
 import {
   runResearchTaskAction,
   type LaunchResearch,
@@ -7,8 +9,40 @@ import { useCallback } from "react";
 
 import { DEEP_RESEARCH_INSTRUCTION_MAX_CHARS } from "@/lib/research/toolArguments";
 import { markMutableResearchEvidenceStale } from "@/lib/research/evidence";
-import { transitionResearchTask } from "@/lib/research/task";
+import {
+  transitionResearchTask,
+  restoreResearchTaskAfterPlanning,
+} from "@/lib/research/task";
 import { useResearchStore } from "@/store/core/researchStore";
+
+/** Undo only this action's mode change, never a subsequent user selection. */
+function enterFollowupResearchMode(sessionId: string) {
+  const before = useChatStore.getState();
+  const original = before.sessions.find(
+    (session) => session.id === sessionId,
+  )?.config;
+  const previousMode = normalizeChatMode(
+    original?.chatMode,
+    original?.useAgentMode,
+    original?.useDeepResearch,
+  );
+  before.setSessionChatMode(sessionId, "research");
+  const appliedRevision =
+    useChatStore.getState().sessionModeRevisions[sessionId];
+  return () => {
+    const current = useChatStore.getState();
+    const session = current.sessions.find(
+      (session) => session.id === sessionId,
+    );
+    if (
+      appliedRevision !== undefined &&
+      current.sessionModeRevisions[sessionId] === appliedRevision &&
+      session?.config?.chatMode === "research"
+    ) {
+      current.setSessionChatMode(sessionId, previousMode);
+    }
+  };
+}
 
 /**
  * The task-lifecycle actions that are not plan-stage specific: retrying a
@@ -17,12 +51,14 @@ import { useResearchStore } from "@/store/core/researchStore";
 export function useResearchTaskActions({
   claimActiveSlot,
   checkpointUnavailableText,
+  planningFailureText = checkpointUnavailableText,
   launchResearch,
   preparePlan,
   onNotice,
 }: {
   claimActiveSlot: (sessionId: string, nextTaskId?: string) => Promise<boolean>;
   checkpointUnavailableText: string;
+  planningFailureText?: string;
   launchResearch: LaunchResearch;
   preparePlan: PrepareResearchPlanAction;
   onNotice?: (message: string) => void;
@@ -122,44 +158,120 @@ export function useResearchTaskActions({
         .trim()
         .slice(0, DEEP_RESEARCH_INSTRUCTION_MAX_CHARS);
       if (!value) return;
-      return runResearchTaskAction(taskId, async (task) => {
-        const store = useResearchStore.getState();
-        if (task.status !== "completed" && task.status !== "partial_completed")
-          return;
-        await store.updateTask(taskId, (current) => ({
-          ...transitionResearchTask(current, "clarifying"),
-          pendingReportKind: "continue",
-          error: undefined,
-        }));
-        return { run: (lease) => preparePlan(taskId, value, undefined, lease) };
-      });
+      return runResearchTaskAction(
+        taskId,
+        async (task) => {
+          const store = useResearchStore.getState();
+          if (
+            task.status !== "completed" &&
+            task.status !== "partial_completed"
+          )
+            return;
+          const restoreMode = enterFollowupResearchMode(task.sessionId);
+          await store
+            .updateTask(taskId, (current) => ({
+              ...transitionResearchTask(current, "clarifying"),
+              pendingReportKind: "continue",
+              error: undefined,
+            }))
+            .catch(async (error) => {
+              restoreMode();
+              useResearchStore.setState((state) => {
+                const current = state.tasksById[taskId];
+                return current
+                  ? {
+                      tasksById: {
+                        ...state.tasksById,
+                        [taskId]: restoreResearchTaskAfterPlanning(
+                          current,
+                          task,
+                          current.error,
+                        ),
+                      },
+                    }
+                  : {};
+              });
+              throw error;
+            });
+          return {
+            run: async (lease) => {
+              try {
+                await preparePlan(taskId, value, undefined, lease, task);
+              } catch (error) {
+                restoreMode();
+                throw error;
+              }
+            },
+          };
+        },
+        () => {
+          throw new Error(planningFailureText);
+        },
+      );
     },
-    [preparePlan],
+    [preparePlan, planningFailureText],
   );
 
   const updateLatest = useCallback(
     async (taskId: string) =>
-      runResearchTaskAction(taskId, async (task) => {
-        const store = useResearchStore.getState();
-        if (task.status !== "completed" && task.status !== "partial_completed")
-          return;
-        await store.updateTask(taskId, (current) => ({
-          ...transitionResearchTask(current, "clarifying"),
-          pendingReportKind: "update",
-          evidence: markMutableResearchEvidenceStale(current.evidence),
-          error: undefined,
-        }));
-        return {
-          run: (lease) =>
-            preparePlan(
-              taskId,
-              "Update the report to the latest available state. Re-fetch every mutable web, plugin, and MCP source; reuse local evidence only when its content hash is unchanged. Preserve prior conclusions when the evidence has not changed and call out any changes explicitly.",
-              undefined,
-              lease,
-            ),
-        };
-      }),
-    [preparePlan],
+      runResearchTaskAction(
+        taskId,
+        async (task) => {
+          const store = useResearchStore.getState();
+          if (
+            task.status !== "completed" &&
+            task.status !== "partial_completed"
+          )
+            return;
+          const restoreMode = enterFollowupResearchMode(task.sessionId);
+          await store
+            .updateTask(taskId, (current) => ({
+              ...transitionResearchTask(current, "clarifying"),
+              pendingReportKind: "update",
+              evidence: markMutableResearchEvidenceStale(current.evidence),
+              error: undefined,
+            }))
+            .catch(async (error) => {
+              restoreMode();
+              useResearchStore.setState((state) => {
+                const current = state.tasksById[taskId];
+                return current
+                  ? {
+                      tasksById: {
+                        ...state.tasksById,
+                        [taskId]: restoreResearchTaskAfterPlanning(
+                          current,
+                          task,
+                          current.error,
+                        ),
+                      },
+                    }
+                  : {};
+              });
+              throw error;
+            });
+          return {
+            run: async (lease) => {
+              try {
+                await preparePlan(
+                  taskId,
+                  "Update the report to the latest available state. Re-fetch every mutable web, plugin, and MCP source; reuse local evidence only when its content hash is unchanged. Preserve prior conclusions when the evidence has not changed and call out any changes explicitly.",
+                  undefined,
+                  lease,
+                  task,
+                );
+              } catch (error) {
+                restoreMode();
+                throw error;
+              }
+            },
+          };
+        },
+        () => {
+          throw new Error(planningFailureText);
+        },
+      ),
+    [preparePlan, planningFailureText],
   );
 
   return {

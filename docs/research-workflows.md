@@ -7,7 +7,7 @@ Skills, Memory tools, JavaScript, workspace mutations, or arbitrary Plugin
 functions. Refreshing interrupts a run; reopening the app only offers an
 explicit Resume action.
 
-Use this guide for templates, source adapters, steering, reports, and report
+Use this guide for templates, source adapters, recovery, reports, and report
 questions. See [Trusted Agent Runtime](agent-runtime.md) for shared leases,
 tool journals, approvals, and foreground execution. See
 [environment variables](environment-variables.md) for provider credentials and
@@ -62,11 +62,25 @@ plan. Planning cannot fetch pages, read ordinary attachments or workspace
 files, call Plugins or MCP, load Skills, or use Memory. After the plan appears,
 the source-free clarification surface can adjust or approve it.
 
-Plans contain 2–8 steps. Initial generation and the two bounded, closed-book
+Plans contain 3–8 steps. Initial generation and the two bounded, closed-book
 repair attempts accept the same plan JSON envelope. Repairs receive the actual
 field-validation issues and must merge related steps without discarding research
-questions or required deliverables. An invalid plan is never silently truncated
-or saved for execution; the task offers a localized retry message.
+questions or required deliverables. If a new plan remains invalid, a labelled
+three-step **starter plan** is offered for review. It follows the same host
+validation and template requirements and still needs explicit approval.
+
+The chat card shows the steps, **Thoroughness**, and one **Start** action.
+**Edit plan** opens a dialog for a natural-language instruction. A failed or
+cancelled edit retains the previous plan and the input; it never silently
+replaces a good plan with a starter plan. Failed continuation or refresh also
+preserves the previous report and restores the conversation mode.
+Reloading preserves a ready plan and its thoroughness choice without approving
+it; interrupted planning or execution still requires manual recovery.
+
+If web search was disabled when the plan was created, **Open search settings**
+leads to the relevant setting. Enable search, then choose **Edit plan** to
+prepare a new source snapshot; changing a setting does not rewrite an approved
+plan.
 
 The versioned plan records the objective, audience, time scope, preferred and
 excluded domains, assumptions, deliverable contract, stable steps, query
@@ -79,11 +93,12 @@ exact path, revision, and content hash. Skills and Memory are always excluded.
 
 The host applies approved domains, dates, source types, and function
 fingerprints at invocation time. Model filters may narrow those constraints but
-cannot widen them. Source or semantic scope expansion pauses for the existing
-approval flow; an expansion can add only source types and read-only functions
-already authorized by the conversation.
+cannot widen them. Expansion may use only source types and read-only functions
+already authorized by the conversation. If an older saved task is paused for
+scope approval, **Resume** continues from committed evidence under the current
+host policy; it does not grant new conversation permissions.
 
-## Select a bounded strategy
+## Choose thoroughness
 
 The budget is the lower value from the selected preset and the active Agent
 Profile. Task-level usage is cumulative across report runs.
@@ -92,10 +107,12 @@ Profile. Task-level usage is cumulative across report runs.
 | -------- | ----------: | ---------: | ---------------: | ------: | --------: | ------: | ------------: |
 | Quick    |           6 |         20 |        5 minutes |       2 |         1 |       6 |             5 |
 | Standard |          12 |         50 |       15 minutes |       4 |         2 |      16 |             5 |
-| Deep     |          20 |        100 |       30 minutes |       6 |         3 |      32 |             5 |
+| Thorough |          20 |        100 |       30 minutes |       6 |         3 |      32 |             5 |
 
-Advanced values are clamped to breadth 1–8, depth 1–4, 2–48 queries, and 3–10
-results per query. Exploration uses at most 80% of tool-call capacity and
+Changing thoroughness on a ready plan creates a new version and recomputes both
+the strategy and actual task budget, including Agent Profile limits. Settings
+apply to future tasks. Raw strategy number inputs are hidden; saved template
+strategy values remain compatible. Exploration uses at most 80% of tool-call capacity and
 reserves `max(2, ceil(query cap × 15%))` queries for verification. Two model
 rounds are reserved for verification and synthesis. Source-body reads are
 bounded by `min(query cap × 2, 64, remaining exploration calls)`.
@@ -149,7 +166,10 @@ BYOK decryption recovery is separate from upstream retries.
 Within one browser tab, Research search requests share a FIFO queue with one
 request in flight and at least two seconds between starts. Duplicate queries
 are shown as skipped. A batch retains successful results; it fails as a whole
-only when every query fails. HTTP 429 starts a cooldown from `Retry-After` (or
+only when every query fails. Temporary failures (429, upstream 5xx, or transport
+timeout/network failure) refund only the failed queries and release their
+duplicate-query reservation, including after checkpoint recovery. Successful
+empty results and permanent 4xx failures still consume their queries. HTTP 429 starts a cooldown from `Retry-After` (or
 60 seconds when absent), and neither 429 nor 504 is immediately replayed.
 Pause or cancellation aborts queue waits and active requests. The queue does
 not coordinate other tabs or devices. Search activities distinguish rate limits,
@@ -157,6 +177,13 @@ request timeouts, the overall search deadline, exhausted query budgets, and
 scope restrictions using safe localized summaries. Duplicate queries appear as
 skipped. Raw provider messages, queries, and tool payloads remain hidden; unknown
 or legacy errors use a generic search-failure summary.
+
+During execution, the host saves each query reservation before dispatching its
+request and saves refunds as a net ledger. Refreshing during an in-flight
+search therefore cannot restore its allowance or erase duplicate protection,
+even when the request has no terminal tool receipt. A checkpoint write failure
+stops dispatch. Older checkpoints without the host ledger retain receipt-based
+recovery.
 
 Research search uses the optional `research_summary` profile for summaries and
 image descriptions; raw page bodies come from separate read tools. Results
@@ -179,22 +206,30 @@ timeout. Reconnaissance records accept `timeoutMs` through 90,000; older
 readers that cap the field at 30,000 cannot open those records. No historical
 task or report is rewritten.
 
-## Steer and resume a task
+## Recover and resume a task
 
-During queued or exploration phases, the workbench can move a node to **same
-level first**, **same level later**, or **restore default**, and can add a
-question to an existing plan step. The host trims, validates, deduplicates, and
-limits each request.
+Model requests retry twice with short delays only before any visible output or
+tool/source activity. Authentication, rate limits, unsupported structured
+output, and model-not-found errors are not automatically retried. Existing
+checkpointed waves are not replayed. Provider errors retain their kind so the
+interface can offer model settings, Retry, or Resume.
 
-The UI writes a durable `ResearchSteeringCommand`; it never mutates a run
-directly. The execution owner holds `research-execution:<taskId>`, consumes
-commands only after the current wave and checkpoint are committed, and saves
-core data before acknowledging the command. Other tabs may submit a command
-but cannot apply it. Storage or Web Lock unavailability disables steering with
-a reason, and late, duplicate, scheduled, terminal, or limit-exceeding
-commands are rejected explicitly. An accepted question prevents a soft
-early-stop until its node is attempted, subject to budget, errors, and
-cancellation.
+A connection loss before report text is received pauses research and preserves
+committed progress. Resume is explicit after reconnecting; it does not repeat
+committed tools or reset query usage. Received report text remains deliverable
+as a partial report. Storage failures take priority over connection messages;
+the app never treats an unsaved checkpoint as a successful save.
+
+Repeated interruptions retain all committed tool receipts. If the tool turn
+finished but its closed-book archive was interrupted, Resume finishes that
+archive from saved results, even when tool budget is exhausted. A declared
+checkpoint that is missing, damaged, or belongs to another execution stops
+recovery before another request is sent.
+
+The research map, node steering, and raw strategy controls are no longer
+exposed. Existing steering records and the execution consumer are retained for
+compatibility; an optional sidecar initialization failure does not show a
+steering notice.
 
 Core task saves must succeed before execution can acknowledge a checkpoint.
 A storage failure retains the visible local task but stops further research;
@@ -204,8 +239,8 @@ confirmed task snapshot, and verifies the saved record by reading it back.
 Only that task is recovered. A conflicting change from another tab prevents
 overwriting its progress, and the local unsaved task is retained. Storage
 unavailability, quota limits, blocked access, invalid task data, checkpoint
-failures, and report verification failures have distinct messages. An optional
-steering initialization failure disables adjustments while research continues.
+failures, and report verification failures have distinct messages. Optional extension initialization failures do not prevent unrelated research
+from continuing.
 
 Research is foreground-only. One browser tab can own at most one active task.
 A read already in flight may finish and commit before a safe pause, but the
@@ -223,10 +258,15 @@ interrupted run preserves received text and uses deterministic fallback text
 when no model text exists. Model knowledge never enters the evidence ledger
 and cannot support a current-fact claim without citable evidence.
 
-The workbench separates **Report**, **Supplementary material**, and **Activity**
-views. Supplementary material contains sources, evidence gaps, pending
-questions, and coverage/version details. Markdown and PDF exports include the
-report, appendices, and quality notices. Existing reports receive a read-only
+Finished chat tasks collapse to one summary row above the report preview. The
+report page has three tabs: **Report**, **Sources**, and **How it was
+researched**. Report opens by default when available. **Notes and limits** are
+collapsed below the report; the source appendix moves to Sources. Search and
+sorting remain visible there, with additional filters under **More filters**.
+The process tab contains steps and activity, with fact checks, the approved
+contract, run details, and template saving under **Advanced details**. Only
+multiple report versions show a version selector. Markdown and PDF exports
+still include the complete report, appendices, and quality notices. Existing reports receive a read-only
 heading projection in English, Chinese, and Japanese; saved Artifacts and
 snapshots are not rewritten. A streaming document opens after streaming ends;
 an interrupted partial document remains readable.
@@ -246,7 +286,8 @@ Artifact persistence failures remain real save failures. New versions record
 without this field may use restricted reconstruction from their own run, never
 from later task evidence.
 
-The **Questions** tab supports multiple named topics per exact report version.
+**Ask about this report** opens a dialog with multiple named topics per exact
+report version.
 Each request includes task, report-version, and topic IDs and receives only the
 frozen report, evidence, claims, and completed turns from that topic. Tools,
 network access, Memory, and Research startup are disabled. The host validates
@@ -259,6 +300,28 @@ copies remap sidecar IDs. This sidecar is local to
 across devices. Cleanup checks report references before removing an unpublished
 snapshot; global OPFS orphan sweeping remains suspended until it can share a
 publisher lock.
+
+## Continue the conversation
+
+Only successful durable publication returns the task's conversation from
+Research to **Auto**, provided it is still in Research mode and no other live
+research task is visible in that conversation. Publishing in a background
+conversation does not change the current composer.
+
+Ordinary follow-ups receive the completed report from research cards present
+in the current conversation branch. Each projection is bounded to about 24,000
+characters; oversized reports use their summary, findings, and gaps, and the
+existing overall history limit still applies. Missing report files do not
+block ordinary chat. Cross-conversation and uncompleted reports are excluded.
+Context compression retains the branch's task references, so later replies
+still resolve the latest completed report rather than a frozen report copy.
+
+Choose **Research more** to deliberately prepare a new plan, or **Refresh with
+the latest information** in its dialog. These actions return the conversation
+to Research and require approval of the new plan before execution. A failed
+planning action retains the previous report and conversation mode.
+Changing search or approval settings during planning does not prevent mode
+rollback; a subsequent explicit mode selection is preserved.
 
 ## Images and trust boundaries
 

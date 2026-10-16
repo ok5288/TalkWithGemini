@@ -1,3 +1,5 @@
+import { runResearchModelWithRetry } from "../modelRetry";
+import { isResearchConnectionError } from "../connectionErrors";
 import { createReportSectionLabels } from "@/lib/research/reportSectionLabels";
 import { v7 as uuidv7 } from "uuid";
 
@@ -92,56 +94,62 @@ export async function runSynthesisStage(ctx: ResearchExecutionContext) {
   const sectionLabels = createReportSectionLabels((key) => ctx.t(key));
   let interruption: unknown;
   try {
-    const generated = await streamChatResponse(
-      ctx.task.sessionId,
-      ctx.researchModel,
-      [],
-      buildResearchSynthesisPrompt({
-        task: ctx.store.tasksById[ctx.taskId],
-        plan,
-        run: ctx.run,
-        evidence: ctx.evidence,
-        imageSources: ctx.imageSources,
-        priorReport: ctx.priorReport,
-        sectionLabels,
-      }) +
-        (unansweredSteeringQuestions.length
-          ? `\nThe following user-added research questions remain unanswered. Include them in ${sectionLabels.evidenceGaps} and do not invent answers: ${JSON.stringify(unansweredSteeringQuestions)}`
-          : ""),
-      [],
-      {
-        ...chatConfig,
-        chatMode: "chat",
-        useAgentMode: false,
-        useDeepResearch: false,
-        useSearch: false,
-        useReasoning: false,
-      },
-      (text) => {
-        reportMarkdown = text;
-      },
-      `${effective.systemInstruction}\n\nWrite the requested report even when evidence is incomplete. Tools and external source access are disabled. Use the supplied material and, where useful, model knowledge explicitly labeled as unverified knowledge supplementation. Only committed evidence may be cited; never invent citations or claim that model knowledge was verified during this research.`,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      controller.signal,
-      [],
-      undefined,
-      undefined,
-      undefined,
-      {
-        disableTools: true,
-        agentRun: {
-          id: synthesisRunId,
-          userMessageId: ctx.task.userMessageId,
-          modelMessageId: ctx.task.cardMessageId,
-        },
-      },
-    );
+    const generated = await runResearchModelWithRetry({
+      signal: controller.signal,
+      hasVisibleOutput: () => Boolean(reportMarkdown.trim()),
+      run: () =>
+        streamChatResponse(
+          ctx.task.sessionId,
+          ctx.researchModel,
+          [],
+          buildResearchSynthesisPrompt({
+            task: ctx.store.tasksById[ctx.taskId],
+            plan,
+            run: ctx.run,
+            evidence: ctx.evidence,
+            imageSources: ctx.imageSources,
+            priorReport: ctx.priorReport,
+            sectionLabels,
+          }) +
+            (unansweredSteeringQuestions.length
+              ? `\nThe following user-added research questions remain unanswered. Include them in ${sectionLabels.evidenceGaps} and do not invent answers: ${JSON.stringify(unansweredSteeringQuestions)}`
+              : ""),
+          [],
+          {
+            ...chatConfig,
+            chatMode: "chat",
+            useAgentMode: false,
+            useDeepResearch: false,
+            useSearch: false,
+            useReasoning: false,
+          },
+          (text) => {
+            reportMarkdown = text;
+          },
+          `${effective.systemInstruction}\n\nWrite the requested report even when evidence is incomplete. Tools and external source access are disabled. Use the supplied material and, where useful, model knowledge explicitly labeled as unverified knowledge supplementation. Only committed evidence may be cited; never invent citations or claim that model knowledge was verified during this research.`,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          controller.signal,
+          [],
+          undefined,
+          undefined,
+          undefined,
+          {
+            disableTools: true,
+            agentRun: {
+              id: synthesisRunId,
+              userMessageId: ctx.task.userMessageId,
+              modelMessageId: ctx.task.cardMessageId,
+            },
+          },
+        ),
+    });
     if (generated.trim()) reportMarkdown = generated;
   } catch (error) {
     if (isAbortError(error) || controller.signal.aborted) throw error;
+    if (!reportMarkdown.trim() && isResearchConnectionError(error)) throw error;
     interruption = error;
   }
   controller.signal.throwIfAborted();

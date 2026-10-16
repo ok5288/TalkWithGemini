@@ -1,5 +1,7 @@
+import { runResearchModelWithRetry } from "../modelRetry";
 import { getFrozenResearchSourceContracts } from "@/lib/plugin/researchSources/contracts";
 import {
+  isCommittedCheckpointToolCall,
   mergeResearchImageSources,
   normalizeResearchImageSources,
   type ResearchReportRun,
@@ -37,126 +39,181 @@ export async function runWaveStream(
     checkpointController.signal,
   ]);
   let checkpointFailure: unknown;
-  const saveCheckpoint = () => {
-    void persistWaveCheckpoint(wave).catch((error: unknown) => {
+  let sourceOrToolActivity = false;
+  const saveCheckpoint = async () => {
+    try {
+      await persistWaveCheckpoint(wave);
+    } catch (error: unknown) {
       checkpointFailure ??= error;
       checkpointController.abort(error);
-    });
+      throw error;
+    }
   };
-  const result = await streamChatResponse(
-    ctx.task.sessionId,
-    ctx.researchModel,
-    wave.resumeHistory,
-    wave.savedCheckpoint
-      ? `${wave.wavePrompt}\n\nResume only from committed results above. Do not replay an already committed external call.`
-      : wave.wavePrompt,
-    sourceContext.frozenAttachments,
-    {
-      ...chatConfig,
-      chatMode: "research",
-      useAgentMode: false,
-      useDeepResearch: true,
-      useSearch: snapshot.searchEnabled,
-      useReasoning: snapshot.reasoningMode !== "off",
-      reasoningMode: snapshot.reasoningMode || chatConfig.reasoningMode,
-    },
-    (text) => {
-      wave.latestContent = text;
-    },
-    `${effective.systemInstruction}\n\nThe host-controlled wave, source snapshot, query allowance, and read-only policy are authoritative.`,
-    (isSearching, results) => {
-      if (!isSearching && results?.sources) {
-        wave.webSources = results.sources;
-        const nextImages = normalizeResearchImageSources(
-          results.images,
-          // Images belong to the durable ResearchReportRun, not the
-          // transient model execution run used to collect this wave.
-          wave.activeRun.id,
-        );
-        wave.imageSources = mergeResearchImageSources(
-          wave.imageSources ?? [],
-          nextImages,
-        );
-        ctx.imageSources = mergeResearchImageSources(
-          ctx.imageSources ?? [],
-          nextImages,
-        );
-        saveCheckpoint();
-      }
-    },
-    (toolCalls) => {
-      wave.latestToolCalls = toolCalls;
-      saveCheckpoint();
-    },
-    undefined,
-    undefined,
-    streamSignal,
-    snapshot.pluginIds,
-    undefined,
-    undefined,
-    ctx.toolConfirmationController,
-    {
-      executionWorkflow: { kind: "research", phase: "execute" },
-      knowledgeScope: {
-        attachments: [
-          ...sourceContext.approvedKnowledgeAttachments,
-          ...sourceContext.frozenAttachments,
-        ],
-        collections: sourceContext.collections,
-        ragConfig: { ...settings.rag },
-      },
-      workspaceReadScope: (snapshot.workspaceSources || []).map(
-        (source) => source.path,
-      ),
-      onKnowledgeSources: (sources) => {
-        wave.knowledgeSources = sources;
-      },
-      allowedToolIds: snapshot.toolIds,
-      enforceAllowedToolIds: true,
-      allowedToolEffects: ["local_read", "network_read"],
-      approvalMode: snapshot.approvalMode,
-      researchQueryBudget: wave.queryBudget,
-      researchSourceContracts: await getFrozenResearchSourceContracts(
-        ctx.taskId,
-        snapshot,
-      ),
-      researchSourceBudget: wave.sourceBudget,
-      agentBudget: {
-        ...availableBudget,
-        maxToolRounds: Math.min(
-          3,
-          availableBudget.maxToolRounds - wave.reservedModelRounds,
+  if (wave.queryBudget) {
+    wave.queryBudget.persistQueries = () => {
+      sourceOrToolActivity = true;
+      return saveCheckpoint();
+    };
+  }
+  const queueCheckpoint = () => {
+    void saveCheckpoint().catch(() => undefined);
+  };
+  if (!wave.streamCompleted) {
+    const result = await runResearchModelWithRetry({
+      signal: streamSignal,
+      hasVisibleOutput: () => Boolean(wave.latestContent),
+      hasToolActivity: () =>
+        wave.resumeThisWave ||
+        Boolean(wave.savedCheckpoint) ||
+        Boolean(wave.executedQueries?.length) ||
+        sourceOrToolActivity ||
+        Boolean(checkpointFailure),
+      run: async () =>
+        streamChatResponse(
+          ctx.task.sessionId,
+          ctx.researchModel,
+          wave.resumeHistory,
+          wave.savedCheckpoint
+            ? `${wave.wavePrompt}\n\nResume only from committed results above. Do not replay an already committed external call.`
+            : wave.wavePrompt,
+          sourceContext.frozenAttachments,
+          {
+            ...chatConfig,
+            chatMode: "research",
+            useAgentMode: false,
+            useDeepResearch: true,
+            useSearch: snapshot.searchEnabled,
+            useReasoning: snapshot.reasoningMode !== "off",
+            reasoningMode: snapshot.reasoningMode || chatConfig.reasoningMode,
+          },
+          (text) => {
+            wave.latestContent = text;
+          },
+          `${effective.systemInstruction}\n\nThe host-controlled wave, source snapshot, query allowance, and read-only policy are authoritative.`,
+          (isSearching, results) => {
+            sourceOrToolActivity = true;
+            if (!isSearching && results?.sources) {
+              wave.webSources = results.sources;
+              const nextImages = normalizeResearchImageSources(
+                results.images,
+                // Images belong to the durable ResearchReportRun, not the
+                // transient model execution run used to collect this wave.
+                wave.activeRun.id,
+              );
+              wave.imageSources = mergeResearchImageSources(
+                wave.imageSources ?? [],
+                nextImages,
+              );
+              ctx.imageSources = mergeResearchImageSources(
+                ctx.imageSources ?? [],
+                nextImages,
+              );
+              queueCheckpoint();
+            }
+          },
+          (toolCalls) => {
+            sourceOrToolActivity = true;
+            const merged = new Map(
+              wave.latestToolCalls.map((call) => [call.id, call]),
+            );
+            for (const call of toolCalls) {
+              const previous = merged.get(call.id);
+              // A replay's pending notification cannot erase a durable receipt.
+              if (
+                previous &&
+                isCommittedCheckpointToolCall(previous) &&
+                !isCommittedCheckpointToolCall(call)
+              )
+                continue;
+              merged.set(
+                call.id,
+                previous
+                  ? {
+                      ...previous,
+                      ...call,
+                      result: call.result ?? previous.result,
+                    }
+                  : call,
+              );
+            }
+            wave.latestToolCalls = [...merged.values()];
+            queueCheckpoint();
+          },
+          undefined,
+          undefined,
+          streamSignal,
+          snapshot.pluginIds,
+          undefined,
+          undefined,
+          ctx.toolConfirmationController,
+          {
+            executionWorkflow: { kind: "research", phase: "execute" },
+            knowledgeScope: {
+              attachments: [
+                ...sourceContext.approvedKnowledgeAttachments,
+                ...sourceContext.frozenAttachments,
+              ],
+              collections: sourceContext.collections,
+              ragConfig: { ...settings.rag },
+            },
+            workspaceReadScope: (snapshot.workspaceSources || []).map(
+              (source) => source.path,
+            ),
+            onKnowledgeSources: (sources) => {
+              sourceOrToolActivity = true;
+              wave.knowledgeSources = sources;
+            },
+            allowedToolIds: snapshot.toolIds,
+            enforceAllowedToolIds: true,
+            allowedToolEffects: ["local_read", "network_read"],
+            approvalMode: snapshot.approvalMode,
+            researchQueryBudget: wave.queryBudget,
+            researchSourceContracts: await getFrozenResearchSourceContracts(
+              ctx.taskId,
+              snapshot,
+            ),
+            researchSourceBudget: wave.sourceBudget,
+            agentBudget: {
+              ...availableBudget,
+              maxToolRounds: Math.min(
+                3,
+                availableBudget.maxToolRounds - wave.reservedModelRounds,
+              ),
+              maxToolCalls: wave.phaseToolCallAllowance,
+            },
+            agentRun: {
+              id: agentRunId,
+              userMessageId: ctx.task.userMessageId,
+              modelMessageId: ctx.task.cardMessageId,
+            },
+            resumeAgentRun: wave.resumeThisWave,
+            abortAgentRunAsInterrupted: true,
+            onAgentExecutionPhase: (nextPhase) => {
+              const operation = ctx.operationsRef.current.get(ctx.taskId);
+              if (operation?.controller === controller) {
+                operation.phase = nextPhase;
+              }
+            },
+            shouldPauseAfterToolBatch: () => {
+              const operation = ctx.operationsRef.current.get(ctx.taskId);
+              return Boolean(
+                operation?.controller === controller &&
+                operation.pauseRequested,
+              );
+            },
+            userInputController: ctx.userInputController,
+            memoryScopes: snapshot.memoryScopes,
+            memoryScopeIds: snapshot.memoryScopeIds,
+          },
         ),
-        maxToolCalls: wave.phaseToolCallAllowance,
-      },
-      agentRun: {
-        id: agentRunId,
-        userMessageId: ctx.task.userMessageId,
-        modelMessageId: ctx.task.cardMessageId,
-      },
-      resumeAgentRun: wave.resumeThisWave,
-      abortAgentRunAsInterrupted: true,
-      onAgentExecutionPhase: (nextPhase) => {
-        const operation = ctx.operationsRef.current.get(ctx.taskId);
-        if (operation?.controller === controller) {
-          operation.phase = nextPhase;
-        }
-      },
-      shouldPauseAfterToolBatch: () => {
-        const operation = ctx.operationsRef.current.get(ctx.taskId);
-        return Boolean(
-          operation?.controller === controller && operation.pauseRequested,
-        );
-      },
-      userInputController: ctx.userInputController,
-      memoryScopes: snapshot.memoryScopes,
-      memoryScopeIds: snapshot.memoryScopeIds,
-    },
-  ).catch((error: unknown) => {
-    throw checkpointFailure ?? error;
-  });
-  if (checkpointFailure) throw checkpointFailure;
-  wave.latestContent = result || wave.latestContent;
+    }).catch((error: unknown) => {
+      throw checkpointFailure ?? error;
+    });
+    if (checkpointFailure) throw checkpointFailure;
+    wave.latestContent = result || wave.latestContent;
+    wave.streamCompleted = true;
+    await persistWaveCheckpoint(wave);
+  }
   controller.signal.throwIfAborted();
   await wave.checkpointQueue;
   const currentTaskAfterWave = ctx.store.tasksById[ctx.taskId];

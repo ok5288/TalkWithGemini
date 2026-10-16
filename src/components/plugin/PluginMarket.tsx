@@ -3,15 +3,12 @@ import React, { useState, useEffect, useMemo, useRef, useId } from "react";
 import { createPortal } from "react-dom";
 import { useLocale, useTranslations } from "next-intl";
 import {
-  Search,
   Download,
   Trash2,
   Loader2,
   Cable,
   ExternalLink,
   X,
-  ChevronLeft,
-  ChevronRight,
   Filter,
   Check,
   Settings,
@@ -19,7 +16,6 @@ import {
   ShieldAlert,
   AlertTriangle,
   Save,
-  Plus,
   Zap,
   RefreshCw,
 } from "lucide-react";
@@ -60,6 +56,19 @@ import {
 import type { MarketLoadResult } from "@/lib/market/loadResult";
 import MarketLoadNotice from "@/components/ui/MarketLoadNotice";
 import { Button } from "@/components/ui/primitives";
+import {
+  PanelBadge,
+  PanelCard,
+  PanelCreateButton,
+  PanelEmpty,
+  PanelHeader,
+  PanelIconButton,
+  PanelLoading,
+  PanelPagination,
+  PanelRoot,
+  PanelSearch,
+  PanelSection,
+} from "@/components/ui/panel";
 
 interface PluginMarketProps {
   onClose: () => void;
@@ -285,12 +294,12 @@ const CustomPluginModal = ({
         aria-describedby={descriptionId}
         tabIndex={-1}
         onKeyDown={handleKeyDown}
-        className="flex w-full max-w-lg flex-col gap-4 rounded-2xl border border-gray-200 bg-white p-6 shadow-2xl dark:border-border dark:bg-card"
+        className="flex w-full max-w-lg flex-col gap-4 rounded-2xl border border-border bg-card p-6 shadow-2xl"
       >
         <div className="flex justify-between items-center">
           <h2
             id={titleId}
-            className="flex items-center gap-2 text-lg font-bold text-gray-800 dark:text-foreground"
+            className="flex items-center gap-2 text-lg font-bold text-foreground"
           >
             <Cable size={20} className="text-blue-500" aria-hidden="true" />
             {t("addCustomPlugin")}
@@ -301,7 +310,7 @@ const CustomPluginModal = ({
             type="button"
             aria-label={t("closeCustomInstaller")}
             onClick={handleClose}
-            className="rounded-full p-1 text-gray-500 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-muted"
+            className="rounded-full p-1 text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:cursor-not-allowed disabled:opacity-60"
             disabled={isLoading}
           >
             <X size={20} aria-hidden="true" />
@@ -311,7 +320,7 @@ const CustomPluginModal = ({
         <div className="space-y-2">
           <label
             htmlFor={inputId}
-            className="text-sm font-medium text-gray-700 dark:text-foreground/85"
+            className="text-sm font-medium text-foreground/85"
           >
             {t("openApiSpecLabel")}
           </label>
@@ -319,7 +328,7 @@ const CustomPluginModal = ({
             id={inputId}
             name="custom-plugin-openapi"
             aria-describedby={`${descriptionId}${error ? ` ${errorId}` : ""}`}
-            className="w-full h-40 p-3 bg-gray-50 dark:bg-muted border border-gray-200 dark:border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-xs font-mono resize-none custom-scrollbar"
+            className="h-40 w-full resize-none rounded-xl border border-border bg-muted p-3 text-xs font-mono focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 custom-scrollbar"
             placeholder={t("openApiPlaceholder")}
             value={input}
             maxLength={CUSTOM_PLUGIN_INPUT_MAX_CHARS}
@@ -327,7 +336,7 @@ const CustomPluginModal = ({
             spellCheck={false}
             onChange={(e) => setInput(e.target.value)}
           />
-          <p id={descriptionId} className="text-[10px] text-gray-500">
+          <p id={descriptionId} className="text-[10px] text-muted-foreground">
             {t("openApiHint")}
           </p>
         </div>
@@ -349,7 +358,7 @@ const CustomPluginModal = ({
             type="button"
             onClick={handleClose}
             disabled={isLoading}
-            className="rounded-lg px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:cursor-not-allowed disabled:opacity-60 dark:text-muted-foreground dark:hover:bg-muted"
+            className="rounded-lg px-4 py-2 text-sm text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {t("cancel")}
           </Button>
@@ -468,12 +477,12 @@ const McpInstallAuthModal = ({
         aria-describedby={descriptionId}
         tabIndex={-1}
         onKeyDown={handleKeyDown}
-        className="flex w-full max-w-md flex-col gap-4 rounded-2xl border border-gray-200 bg-white p-6 shadow-2xl dark:border-border dark:bg-card"
+        className="flex w-full max-w-md flex-col gap-4 rounded-2xl border border-border bg-card p-6 shadow-2xl"
       >
         <div className="flex items-center justify-between gap-3">
           <h2
             id={titleId}
-            className="flex min-w-0 items-center gap-2 text-lg font-bold text-gray-800 dark:text-foreground"
+            className="flex min-w-0 items-center gap-2 text-lg font-bold text-foreground"
           >
             <KeyRound
               size={20}
@@ -489,7 +498,7 @@ const McpInstallAuthModal = ({
             aria-label={t("closeMcpAuthInstaller")}
             onClick={handleClose}
             disabled={isLoading}
-            className="rounded-full p-1 text-gray-500 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-muted"
+            className="rounded-full p-1 text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <X size={20} aria-hidden="true" />
           </Button>
@@ -497,7 +506,7 @@ const McpInstallAuthModal = ({
 
         <p
           id={descriptionId}
-          className="text-sm leading-relaxed text-gray-500 dark:text-muted-foreground"
+          className="text-sm leading-relaxed text-muted-foreground"
         >
           {t("mcpInstallAuthDescription", { title: plugin.title })}
         </p>
@@ -505,7 +514,7 @@ const McpInstallAuthModal = ({
         <div className="space-y-2">
           <label
             htmlFor={inputId}
-            className="text-sm font-medium text-gray-700 dark:text-foreground/85"
+            className="text-sm font-medium text-foreground/85"
           >
             {t("mcpInstallAuthLabel")}
           </label>
@@ -520,7 +529,7 @@ const McpInstallAuthModal = ({
             spellCheck={false}
             aria-describedby={`${descriptionId}${error ? ` ${errorId}` : ""}`}
             placeholder={t("authPlaceholder")}
-            className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 font-mono text-sm text-gray-800 transition-[background-color,border-color,box-shadow,color] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-border dark:bg-muted dark:text-foreground"
+            className="w-full rounded-lg border border-border bg-muted px-3 py-2 font-mono text-sm text-foreground transition-[background-color,border-color,box-shadow,color] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
           />
         </div>
 
@@ -541,7 +550,7 @@ const McpInstallAuthModal = ({
             type="button"
             onClick={handleClose}
             disabled={isLoading}
-            className="rounded-lg px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:cursor-not-allowed disabled:opacity-60 dark:text-muted-foreground dark:hover:bg-muted"
+            className="rounded-lg px-4 py-2 text-sm text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {t("cancel")}
           </Button>
@@ -768,12 +777,12 @@ const CustomMcpServerModal = ({
         aria-describedby={descriptionId}
         tabIndex={-1}
         onKeyDown={handleKeyDown}
-        className="custom-scrollbar flex max-h-[90vh] w-full max-w-lg flex-col gap-4 overflow-y-auto rounded-2xl border border-gray-200 bg-white p-6 shadow-2xl dark:border-border dark:bg-card"
+        className="custom-scrollbar flex max-h-[90vh] w-full max-w-lg flex-col gap-4 overflow-y-auto rounded-2xl border border-border bg-card p-6 shadow-2xl"
       >
         <div className="flex justify-between items-center">
           <h2
             id={titleId}
-            className="flex items-center gap-2 text-lg font-bold text-gray-800 dark:text-foreground"
+            className="flex items-center gap-2 text-lg font-bold text-foreground"
           >
             <Cable size={20} className="text-blue-500" aria-hidden="true" />
             {t("addCustomMcpServer")}
@@ -784,7 +793,7 @@ const CustomMcpServerModal = ({
             type="button"
             aria-label={t("closeCustomMcpInstaller")}
             onClick={handleClose}
-            className="rounded-full p-1 text-gray-500 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-muted"
+            className="rounded-full p-1 text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:cursor-not-allowed disabled:opacity-60"
             disabled={isLoading || isDiscovering}
           >
             <X size={20} aria-hidden="true" />
@@ -817,11 +826,11 @@ const CustomMcpServerModal = ({
               <div>
                 <h3
                   id={bridgeSectionId}
-                  className="text-sm font-semibold text-gray-800 dark:text-foreground"
+                  className="text-sm font-semibold text-foreground"
                 >
                   {t("bridgeDiscoveryTitle")}
                 </h3>
-                <p className="mt-0.5 text-[11px] leading-4 text-gray-500 dark:text-muted-foreground">
+                <p className="mt-0.5 text-[11px] leading-4 text-muted-foreground">
                   {t("bridgeDiscoveryHint")}
                 </p>
               </div>
@@ -831,7 +840,7 @@ const CustomMcpServerModal = ({
               <div className="space-y-1.5">
                 <label
                   htmlFor={bridgeUrlInputId}
-                  className="text-xs font-medium text-gray-700 dark:text-foreground/85"
+                  className="text-xs font-medium text-foreground/85"
                 >
                   {t("bridgeManifestUrlLabel")}
                 </label>
@@ -844,14 +853,14 @@ const CustomMcpServerModal = ({
                   autoComplete="off"
                   placeholder={t("bridgeManifestUrlPlaceholder")}
                   onChange={(event) => setBridgeManifestUrl(event.target.value)}
-                  className="w-full rounded-xl border border-blue-200 bg-white px-3 py-2 font-mono text-xs text-gray-800 transition-[border-color,box-shadow] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-blue-400/20 dark:bg-background dark:text-foreground"
+                  className="w-full rounded-xl border border-blue-200 bg-card px-3 py-2 font-mono text-xs text-foreground transition-[border-color,box-shadow] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-blue-400/20 dark:bg-background"
                 />
               </div>
 
               <div className="space-y-1.5">
                 <label
                   htmlFor={bridgeTokenInputId}
-                  className="text-xs font-medium text-gray-700 dark:text-foreground/85"
+                  className="text-xs font-medium text-foreground/85"
                 >
                   {t("bridgeTokenLabel")}
                 </label>
@@ -864,7 +873,7 @@ const CustomMcpServerModal = ({
                   autoComplete="off"
                   placeholder={t("bridgeTokenPlaceholder")}
                   onChange={(event) => setBridgeToken(event.target.value)}
-                  className="w-full rounded-xl border border-blue-200 bg-white px-3 py-2 text-xs text-gray-800 transition-[border-color,box-shadow] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-blue-400/20 dark:bg-background dark:text-foreground"
+                  className="w-full rounded-xl border border-blue-200 bg-card px-3 py-2 text-xs text-foreground transition-[border-color,box-shadow] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-blue-400/20 dark:bg-background"
                 />
               </div>
 
@@ -880,7 +889,7 @@ const CustomMcpServerModal = ({
                   !bridgeToken.trim()
                 }
                 aria-busy={isDiscovering || undefined}
-                className="flex w-full items-center justify-center gap-2 rounded-xl border border-blue-200 bg-white px-3 py-2 text-xs font-semibold text-blue-700 transition-colors hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:cursor-not-allowed disabled:opacity-50 dark:border-blue-400/20 dark:bg-background dark:text-blue-300 dark:hover:bg-blue-400/10"
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-blue-200 bg-card px-3 py-2 text-xs font-semibold text-blue-700 transition-colors hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:cursor-not-allowed disabled:opacity-50 dark:border-blue-400/20 dark:bg-background dark:text-blue-300 dark:hover:bg-blue-400/10"
               >
                 <RefreshCw
                   size={14}
@@ -900,13 +909,13 @@ const CustomMcpServerModal = ({
                     return (
                       <li
                         key={server.id}
-                        className="flex items-center justify-between gap-3 rounded-xl bg-white/80 px-3 py-2 dark:bg-background/70"
+                        className="flex items-center justify-between gap-3 rounded-xl bg-card/80 px-3 py-2 dark:bg-background/70"
                       >
                         <div className="min-w-0">
-                          <p className="truncate text-xs font-semibold text-gray-800 dark:text-foreground">
+                          <p className="truncate text-xs font-semibold text-foreground">
                             {server.label}
                           </p>
-                          <p className="truncate font-mono text-[10px] text-gray-500 dark:text-muted-foreground">
+                          <p className="truncate font-mono text-[10px] text-muted-foreground">
                             {server.id}
                           </p>
                         </div>
@@ -942,7 +951,7 @@ const CustomMcpServerModal = ({
           <div className="space-y-2">
             <label
               htmlFor={nameInputId}
-              className="text-sm font-medium text-gray-700 dark:text-foreground/85"
+              className="text-sm font-medium text-foreground/85"
             >
               {t("mcpServerNameLabel")}
             </label>
@@ -955,14 +964,14 @@ const CustomMcpServerModal = ({
               autoComplete="off"
               placeholder={t("mcpServerNamePlaceholder")}
               onChange={(event) => setName(event.target.value)}
-              className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-800 transition-[border-color,box-shadow] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-border dark:bg-muted dark:text-foreground"
+              className="w-full rounded-xl border border-border bg-muted px-3 py-2.5 text-sm text-foreground transition-[border-color,box-shadow] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
             />
           </div>
 
           <div className="space-y-2">
             <label
               htmlFor={urlInputId}
-              className="text-sm font-medium text-gray-700 dark:text-foreground/85"
+              className="text-sm font-medium text-foreground/85"
             >
               {t("mcpServerUrlLabel")}
             </label>
@@ -976,9 +985,9 @@ const CustomMcpServerModal = ({
               placeholder={t("mcpServerUrlPlaceholder")}
               aria-describedby={`${descriptionId}${error ? ` ${errorId}` : ""}`}
               onChange={(event) => setServerUrl(event.target.value)}
-              className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 font-mono text-sm text-gray-800 transition-[border-color,box-shadow] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-border dark:bg-muted dark:text-foreground"
+              className="w-full rounded-xl border border-border bg-muted px-3 py-2.5 font-mono text-sm text-foreground transition-[border-color,box-shadow] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
             />
-            <p id={descriptionId} className="text-[10px] text-gray-500">
+            <p id={descriptionId} className="text-[10px] text-muted-foreground">
               {t("mcpServerUrlHint")}
             </p>
           </div>
@@ -986,7 +995,7 @@ const CustomMcpServerModal = ({
           <div className="space-y-2">
             <label
               htmlFor={tokenInputId}
-              className="text-sm font-medium text-gray-700 dark:text-foreground/85"
+              className="text-sm font-medium text-foreground/85"
             >
               {t("mcpBearerTokenLabel")}
             </label>
@@ -999,9 +1008,9 @@ const CustomMcpServerModal = ({
               autoComplete="off"
               placeholder={t("mcpBearerTokenPlaceholder")}
               onChange={(event) => setBearerToken(event.target.value)}
-              className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-800 transition-[border-color,box-shadow] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-border dark:bg-muted dark:text-foreground"
+              className="w-full rounded-xl border border-border bg-muted px-3 py-2.5 text-sm text-foreground transition-[border-color,box-shadow] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
             />
-            <p className="text-[10px] text-gray-500">
+            <p className="text-[10px] text-muted-foreground">
               {t("mcpBearerTokenHint")}
             </p>
           </div>
@@ -1024,7 +1033,7 @@ const CustomMcpServerModal = ({
             type="button"
             onClick={handleClose}
             disabled={isLoading || isDiscovering}
-            className="rounded-lg px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:cursor-not-allowed disabled:opacity-60 dark:text-muted-foreground dark:hover:bg-muted"
+            className="rounded-lg px-4 py-2 text-sm text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {t("cancel")}
           </Button>
@@ -1278,12 +1287,12 @@ const PluginDetailsModal = ({
         aria-describedby={descriptionId}
         tabIndex={-1}
         onKeyDown={handleKeyDown}
-        className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden overscroll-contain rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-border dark:bg-card"
+        className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden overscroll-contain rounded-2xl border border-border bg-card shadow-2xl"
       >
         {/* Header */}
-        <div className="flex items-start justify-between gap-3 border-b border-gray-100 bg-gray-50/50 px-6 py-4 dark:border-border dark:bg-card/50">
+        <div className="flex items-start justify-between gap-3 border-b border-border bg-muted/50 px-6 py-4">
           <div className="flex min-w-0 items-center gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-gray-100 bg-white p-2 shadow-sm dark:border-border dark:bg-muted">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-border bg-card p-2 shadow-sm dark:bg-muted">
               <SafeImage
                 src={plugin.logoUrl}
                 alt=""
@@ -1291,7 +1300,7 @@ const PluginDetailsModal = ({
                 fallback={
                   <Cable
                     size={24}
-                    className="text-gray-400"
+                    className="text-muted-foreground"
                     aria-hidden="true"
                   />
                 }
@@ -1300,7 +1309,7 @@ const PluginDetailsModal = ({
             <div className="min-w-0">
               <h2
                 id={titleId}
-                className="flex min-w-0 flex-wrap items-center gap-2 text-lg font-bold text-gray-800 dark:text-foreground"
+                className="flex min-w-0 flex-wrap items-center gap-2 text-lg font-bold text-foreground"
               >
                 <span className="min-w-0 truncate">{plugin.title}</span>
                 {plugin.builtIn && (
@@ -1314,7 +1323,7 @@ const PluginDetailsModal = ({
                   </span>
                 )}
               </h2>
-              <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500 dark:text-muted-foreground">
+              <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                 <span className="min-w-0 truncate">{plugin.id}</span>
                 <span className="shrink-0">•</span>
                 {safeManifestUrl ? (
@@ -1356,44 +1365,44 @@ const PluginDetailsModal = ({
             type="button"
             aria-label={t("closeDetails")}
             onClick={handleClose}
-            className="shrink-0 rounded-full p-1.5 text-gray-500 transition-colors hover:bg-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:hover:bg-muted"
+            className="shrink-0 rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
           >
             <X size={20} aria-hidden="true" />
           </Button>
         </div>
 
-        <div className="px-6 py-4 border-b border-gray-100 dark:border-border">
+        <div className="border-b border-border px-6 py-4">
           <div className="max-h-40 overflow-y-auto custom-scrollbar pr-2">
             <p
               id={descriptionId}
-              className="text-sm leading-relaxed text-gray-600 dark:text-foreground/85"
+              className="text-sm leading-relaxed text-foreground/85"
             >
               {plugin.description}
             </p>
           </div>
-          <dl className="mt-4 grid grid-cols-1 gap-2 rounded-xl border border-gray-200 bg-white/60 p-3 text-xs dark:border-border dark:bg-card/50 sm:grid-cols-3">
+          <dl className="mt-4 grid grid-cols-1 gap-2 rounded-xl border border-border bg-card/60 p-3 text-xs sm:grid-cols-3">
             <div className="min-w-0">
-              <dt className="font-medium text-gray-500 dark:text-muted-foreground">
+              <dt className="font-medium text-muted-foreground">
                 {t("connectionBaseUrl")}
               </dt>
-              <dd className="mt-1 truncate font-mono text-gray-800 dark:text-foreground">
+              <dd className="mt-1 truncate font-mono text-foreground">
                 {pluginBaseUrl}
               </dd>
             </div>
             <div className="min-w-0">
-              <dt className="font-medium text-gray-500 dark:text-muted-foreground">
+              <dt className="font-medium text-muted-foreground">
                 {t("connectionAuth")}
               </dt>
-              <dd className="mt-1 truncate font-mono text-gray-800 dark:text-foreground">
+              <dd className="mt-1 truncate font-mono text-foreground">
                 {pluginAuthType}
                 {pluginAuthType !== "none" ? ` / ${pluginAuthLocation}` : ""}
               </dd>
             </div>
             <div className="min-w-0">
-              <dt className="font-medium text-gray-500 dark:text-muted-foreground">
+              <dt className="font-medium text-muted-foreground">
                 {t("connectionTools")}
               </dt>
-              <dd className="mt-1 truncate font-mono text-gray-800 dark:text-foreground">
+              <dd className="mt-1 truncate font-mono text-foreground">
                 {plugin.functions?.length || 0}
               </dd>
             </div>
@@ -1405,7 +1414,7 @@ const PluginDetailsModal = ({
           role="tablist"
           aria-label={t("detailsSectionsAria")}
           onKeyDown={handleTabListKeyDown}
-          className="flex border-b border-gray-100 px-6 dark:border-border"
+          className="flex border-b border-border px-6"
         >
           <Button
             variant="bare"
@@ -1416,7 +1425,7 @@ const PluginDetailsModal = ({
             aria-controls={toolsPanelId}
             tabIndex={activeTab === "tools" ? 0 : -1}
             onClick={() => setActiveTab("tools")}
-            className={`mr-6 border-b-2 px-1 py-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 ${activeTab === "tools" ? "border-blue-500 text-blue-600 dark:text-blue-400" : "border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-foreground/85"}`}
+            className={`mr-6 border-b-2 px-1 py-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 ${activeTab === "tools" ? "border-blue-500 text-blue-600 dark:text-blue-400" : "border-transparent text-muted-foreground hover:text-foreground"}`}
           >
             {t("toolsTab", { count: plugin.functions?.length || 0 })}
           </Button>
@@ -1429,14 +1438,14 @@ const PluginDetailsModal = ({
             aria-controls={authPanelId}
             tabIndex={activeTab === "auth" ? 0 : -1}
             onClick={() => setActiveTab("auth")}
-            className={`border-b-2 px-1 py-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 ${activeTab === "auth" ? "border-blue-500 text-blue-600 dark:text-blue-400" : "border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-foreground/85"}`}
+            className={`border-b-2 px-1 py-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 ${activeTab === "auth" ? "border-blue-500 text-blue-600 dark:text-blue-400" : "border-transparent text-muted-foreground hover:text-foreground"}`}
           >
             {t("authTab")}
           </Button>
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6 bg-gray-50/30 dark:bg-background/60">
+        <div className="flex-1 overflow-y-auto bg-muted/30 p-6 dark:bg-background/60">
           {activeTab === "tools" && (
             <div
               id={toolsPanelId}
@@ -1449,21 +1458,21 @@ const PluginDetailsModal = ({
                 return (
                   <div
                     key={fn.name}
-                    className="flex items-start justify-between p-3 bg-white dark:bg-muted border border-gray-200 dark:border-border rounded-xl"
+                    className="flex items-start justify-between rounded-xl border border-border bg-card p-3 dark:bg-muted"
                   >
                     <div className="flex-1 pr-4">
                       <div className="flex items-center gap-2 mb-1">
-                        <div className="text-sm font-semibold text-gray-800 dark:text-foreground">
+                        <div className="text-sm font-semibold text-foreground">
                           {formatToolName(fn.name)}
                         </div>
-                        <span className="text-[10px] text-gray-400 uppercase tracking-wide font-medium bg-gray-100 dark:bg-card px-1.5 py-0.5 rounded">
+                        <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                           {fn.mcpToolName ? t("mcp") : fn.method}
                         </span>
                       </div>
-                      <div className="text-[10px] text-gray-400 font-mono mb-1">
+                      <div className="mb-1 font-mono text-[10px] text-muted-foreground">
                         {fn.name}
                       </div>
-                      <p className="text-xs text-gray-600 dark:text-muted-foreground line-clamp-2">
+                      <p className="line-clamp-2 text-xs text-muted-foreground">
                         {fn.description}
                       </p>
                     </div>
@@ -1513,7 +1522,7 @@ const PluginDetailsModal = ({
               </div>
 
               {isResearchSourceProvider(plugin.id) && (
-                <p className="text-sm text-gray-600 dark:text-foreground/75">
+                <p className="text-sm text-foreground/75">
                   {tSource("fixedEndpoints")}
                 </p>
               )}
@@ -1524,14 +1533,14 @@ const PluginDetailsModal = ({
                   onClear={handleClearAuthSecret}
                 />
               ) : plugin.auth?.type === "none" ? (
-                <div className="text-sm text-gray-500 text-center py-4">
+                <div className="py-4 text-center text-sm text-muted-foreground">
                   {t("noAuthRequired")}
                 </div>
               ) : (
                 <div className="space-y-2">
                   <label
                     htmlFor={authInputId}
-                    className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-foreground/85"
+                    className="flex items-center gap-2 text-sm font-medium text-foreground/85"
                   >
                     <KeyRound size={16} aria-hidden="true" />{" "}
                     {plugin.id === "sec-edgar"
@@ -1551,12 +1560,12 @@ const PluginDetailsModal = ({
                       hasSecret={hasPluginAuthValue(config.auth)}
                       onSave={handleSaveAuthSecret}
                       onClear={handleClearAuthSecret}
-                      inputClassName="min-w-0 flex-1 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm transition-[border-color,box-shadow] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-border dark:bg-muted"
+                      inputClassName="min-w-0 flex-1 rounded-xl border border-border bg-muted px-4 py-2.5 text-sm transition-[border-color,box-shadow] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                     />
                   </div>
                   <p
                     id={authDescriptionId}
-                    className="mt-1 text-xs text-gray-500"
+                    className="mt-1 text-xs text-muted-foreground"
                   >
                     {safeDocsUrl
                       ? t.rich("authDocsHint", {
@@ -1580,7 +1589,7 @@ const PluginDetailsModal = ({
                 <div className="space-y-2">
                   <label
                     htmlFor={`${modalId}-endpoint-input`}
-                    className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-foreground/85"
+                    className="flex items-center gap-2 text-sm font-medium text-foreground/85"
                   >
                     <ExternalLink size={16} aria-hidden="true" />{" "}
                     {t("endpointLabel")}
@@ -1597,19 +1606,21 @@ const PluginDetailsModal = ({
                       )}
                       onChange={(event) => setEndpointValue(event.target.value)}
                       onBlur={handleSaveEndpoint}
-                      className="min-w-0 flex-1 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm transition-[border-color,box-shadow] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-border dark:bg-muted"
+                      className="min-w-0 flex-1 rounded-xl border border-border bg-muted px-4 py-2.5 text-sm transition-[border-color,box-shadow] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                     />
                     <Button
                       variant="bare"
                       type="button"
                       onClick={handleClearEndpoint}
                       disabled={!endpointValue && !config.baseUrl}
-                      className="rounded-xl border border-gray-200 px-3 py-2 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:cursor-not-allowed disabled:opacity-50 dark:border-border dark:text-muted-foreground dark:hover:bg-muted"
+                      className="rounded-xl border border-border px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {t("clearEndpoint")}
                     </Button>
                   </div>
-                  <p className="text-xs text-gray-500">{t("endpointHint")}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {t("endpointHint")}
+                  </p>
                 </div>
               )}
 
@@ -1617,7 +1628,7 @@ const PluginDetailsModal = ({
                 <div className="space-y-2">
                   <label
                     htmlFor={`${modalId}-model-input`}
-                    className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-foreground/85"
+                    className="flex items-center gap-2 text-sm font-medium text-foreground/85"
                   >
                     <Settings size={16} aria-hidden="true" /> {t("modelLabel")}
                   </label>
@@ -1633,26 +1644,28 @@ const PluginDetailsModal = ({
                       )}
                       onChange={(event) => setModelValue(event.target.value)}
                       onBlur={handleSaveModel}
-                      className="min-w-0 flex-1 rounded-xl border border-gray-200 bg-white px-4 py-2.5 font-mono text-sm transition-[border-color,box-shadow] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-border dark:bg-muted"
+                      className="min-w-0 flex-1 rounded-xl border border-border bg-muted px-4 py-2.5 font-mono text-sm transition-[border-color,box-shadow] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                     />
                     <Button
                       variant="bare"
                       type="button"
                       onClick={handleClearModel}
                       disabled={!modelValue && !config.model}
-                      className="rounded-xl border border-gray-200 px-3 py-2 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:cursor-not-allowed disabled:opacity-50 dark:border-border dark:text-muted-foreground dark:hover:bg-muted"
+                      className="rounded-xl border border-border px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {t("clearModel")}
                     </Button>
                   </div>
-                  <p className="text-xs text-gray-500">{t("modelHint")}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {t("modelHint")}
+                  </p>
                 </div>
               )}
             </div>
           )}
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 bg-gray-50/50 p-4 dark:border-border dark:bg-card/50">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-muted/50 p-4">
           <Button
             variant="bare"
             type="button"
@@ -1667,7 +1680,7 @@ const PluginDetailsModal = ({
             }
             className={`flex shrink-0 items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60 ${
               plugin.builtIn
-                ? "text-gray-400 cursor-not-allowed"
+                ? "text-muted-foreground cursor-not-allowed"
                 : isUninstallConfirming
                   ? "bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-200"
                   : "text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
@@ -2193,8 +2206,6 @@ const PluginMarket: React.FC<PluginMarketProps> = ({ onClose }) => {
     activeSource === "mcp"
       ? currentPage > 1 || !!mcpNextCursor
       : totalPages > 1;
-  const isNextPageDisabled =
-    activeSource === "mcp" ? !mcpNextCursor : currentPage === totalPages;
   const marketNoticeMessage = (() => {
     if (marketLoadResult?.status === "stale") {
       const time = marketLoadResult.fetchedAt
@@ -2212,7 +2223,7 @@ const PluginMarket: React.FC<PluginMarketProps> = ({ onClose }) => {
   })();
 
   return (
-    <div className="flex flex-col h-full w-full relative overflow-hidden animate-in fade-in duration-300">
+    <PanelRoot accent="plugins">
       {/* Detail Modal */}
       {selectedPluginForDetails && (
         <PluginDetailsModal
@@ -2250,50 +2261,28 @@ const PluginMarket: React.FC<PluginMarketProps> = ({ onClose }) => {
       )}
 
       {/* Header */}
-      <div className="sticky top-0 z-10 flex shrink-0 items-center justify-between gap-3 border-b border-gray-200/50 bg-white/40 px-6 py-4 backdrop-blur-md dark:border-border dark:bg-card/40">
-        <div className="flex min-w-0 items-center gap-3">
-          <div
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-linear-to-tr from-blue-500 to-purple-500 text-white shadow-lg shadow-blue-500/20"
-            aria-hidden="true"
-          >
-            <Cable size={20} />
-          </div>
-          <div className="min-w-0">
-            <h1 className="truncate text-lg font-bold text-gray-800 dark:text-foreground">
-              {t("title")}
-            </h1>
-            <p className="truncate text-xs text-gray-500 dark:text-muted-foreground">
-              {t("subtitle")}
-            </p>
-          </div>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <Button
-            variant="bare"
+      <PanelHeader
+        icon={<Cable size={20} />}
+        title={t("title")}
+        subtitle={t("subtitle")}
+        actions={
+          <PanelIconButton
             type="button"
             aria-label={t("refreshAria")}
             aria-busy={isRefreshing || undefined}
             onClick={handleRefresh}
             disabled={!isOnline || isRefreshing}
-            className="rounded-full p-2 text-gray-500 transition-colors hover:bg-gray-200/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:cursor-not-allowed disabled:opacity-50 dark:text-muted-foreground dark:hover:bg-accent/50"
           >
             <RefreshCw
               size={18}
               className={isRefreshing ? "animate-spin" : ""}
               aria-hidden="true"
             />
-          </Button>
-          <Button
-            variant="bare"
-            type="button"
-            aria-label={t("closeMarket")}
-            onClick={onClose}
-            className="rounded-full p-2 text-gray-500 transition-colors hover:bg-gray-200/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:text-muted-foreground dark:hover:bg-accent/50"
-          >
-            <X size={20} aria-hidden="true" />
-          </Button>
-        </div>
-      </div>
+          </PanelIconButton>
+        }
+        onClose={onClose}
+        closeLabel={t("closeMarket")}
+      />
 
       {!isOnline && (
         <div
@@ -2336,9 +2325,9 @@ const PluginMarket: React.FC<PluginMarketProps> = ({ onClose }) => {
         </div>
       ) : null}
 
-      <div className="mx-auto flex w-full max-w-7xl shrink-0 justify-center px-6 pt-5">
+      <div className="mx-auto flex w-full max-w-7xl shrink-0 justify-center px-4 pt-5 sm:px-6">
         <div
-          className="grid w-full max-w-[360px] grid-cols-2 rounded-2xl border border-gray-200/80 bg-white/70 p-1.5 backdrop-blur-xl dark:border-border dark:bg-muted/50"
+          className="grid w-full max-w-[360px] grid-cols-2 rounded-2xl border border-border bg-card/70 p-1.5 backdrop-blur-xl dark:bg-muted/50"
           role="tablist"
           aria-label={t("sourceTabsAria")}
         >
@@ -2353,10 +2342,10 @@ const PluginMarket: React.FC<PluginMarketProps> = ({ onClose }) => {
                 setActiveSource(tab.value);
                 setSelectedCategories([]);
               }}
-              className={`relative rounded-xl px-5 py-2.5 text-sm font-semibold transition-[background-color,color,transform] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 active:scale-[0.98] ${
+              className={`relative rounded-xl px-5 py-2.5 text-sm font-semibold transition-[background-color,color,transform] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-panel-accent/60 active:scale-[0.98] ${
                 activeSource === tab.value
-                  ? "bg-blue-600 text-white ring-1 ring-inset ring-white/35 dark:bg-blue-500"
-                  : "text-gray-500 hover:bg-gray-100/80 hover:text-gray-900 dark:text-muted-foreground dark:hover:bg-accent/80 dark:hover:text-foreground"
+                  ? "bg-panel-accent text-white ring-1 ring-inset ring-white/35"
+                  : "text-muted-foreground hover:bg-accent/80 hover:text-foreground"
               }`}
             >
               {tab.label}
@@ -2365,47 +2354,30 @@ const PluginMarket: React.FC<PluginMarketProps> = ({ onClose }) => {
         </div>
       </div>
 
-      {/* Search Bar & Filter */}
-      <div className="mx-auto flex w-full max-w-7xl shrink-0 px-6 pb-6 pt-4">
-        <div className="group relative min-w-0 flex-1">
-          <div className="absolute inset-0 bg-blue-500/20 dark:bg-blue-500/10 rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-          <div className="relative flex items-center rounded-2xl border border-gray-200 bg-white/60 px-4 py-3 shadow-sm backdrop-blur-xl transition-[border-color,box-shadow] focus-within:border-blue-500/50 focus-within:ring-2 focus-within:ring-blue-500/30 dark:border-border dark:bg-muted/60">
-            <label htmlFor={searchInputId} className="sr-only">
-              {t("searchLabel")}
-            </label>
-            <Search
-              size={20}
-              className="mr-3 text-gray-400"
-              aria-hidden="true"
-            />
-            <input
-              id={searchInputId}
-              type="text"
-              name="plugin-search"
-              autoComplete="off"
-              spellCheck={false}
-              placeholder={t("searchPlaceholder")}
-              className="min-w-0 flex-1 border-none bg-transparent text-base text-gray-800 outline-none placeholder-gray-400 dark:text-foreground"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-        </div>
-      </div>
+      {/* Search Bar */}
+      <PanelSearch
+        id={searchInputId}
+        name="plugin-search"
+        label={t("searchLabel")}
+        placeholder={t("searchPlaceholder")}
+        type="text"
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+      />
 
       {/* Content Grid */}
       <div className="flex-1 overflow-y-auto px-4 pb-10 custom-scrollbar">
         <div className="max-w-7xl mx-auto flex flex-col min-h-full">
           {/* Installed Section */}
-          <div className="mb-8 shrink-0">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 px-1">
-              <h2 className="text-sm font-bold text-gray-500 dark:text-muted-foreground uppercase tracking-wider">
-                {activeSource === "mcp"
-                  ? t("installedMcpServers")
-                  : t("installedPlugins")}
-              </h2>
-              <Button
-                variant="bare"
+          <PanelSection
+            className="mb-8 shrink-0"
+            title={
+              activeSource === "mcp"
+                ? t("installedMcpServers")
+                : t("installedPlugins")
+            }
+            actions={
+              <PanelCreateButton
                 type="button"
                 aria-label={
                   activeSource === "mcp"
@@ -2418,12 +2390,11 @@ const PluginMarket: React.FC<PluginMarketProps> = ({ onClose }) => {
                     : setShowCustomPluginModal(true)
                 }
                 disabled={!isOnline}
-                className="flex shrink-0 items-center gap-1 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/30"
               >
-                <Plus size={14} aria-hidden="true" />{" "}
                 {activeSource === "mcp" ? t("customMcp") : t("custom")}
-              </Button>
-            </div>
+              </PanelCreateButton>
+            }
+          >
             {filteredInstalledPlugins.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {filteredInstalledPlugins.map((plugin) => {
@@ -2436,13 +2407,10 @@ const PluginMarket: React.FC<PluginMarketProps> = ({ onClose }) => {
                   const showWarning = needsAuth && !hasAuth && !isUnsplash;
 
                   return (
-                    <div
-                      key={plugin.id}
-                      className="group relative flex flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white/40 p-4 backdrop-blur-md transition-[border-color,box-shadow] duration-300 hover:border-blue-300 dark:border-border dark:bg-muted/40 dark:hover:border-blue-700"
-                    >
+                    <PanelCard as="article" key={plugin.id} className="p-4">
                       <div className="mb-3 flex items-center justify-between gap-3">
                         <div className="flex min-w-0 items-center gap-3 overflow-hidden">
-                          <div className="w-12 h-12 rounded-xl bg-white dark:bg-accent border border-gray-100 dark:border-input flex items-center justify-center p-2 shrink-0">
+                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-border bg-card p-2 dark:bg-accent">
                             <SafeImage
                               src={plugin.logoUrl}
                               alt=""
@@ -2450,7 +2418,7 @@ const PluginMarket: React.FC<PluginMarketProps> = ({ onClose }) => {
                               fallback={
                                 <Cable
                                   size={24}
-                                  className="text-gray-400"
+                                  className="text-muted-foreground"
                                   aria-hidden="true"
                                 />
                               }
@@ -2458,25 +2426,34 @@ const PluginMarket: React.FC<PluginMarketProps> = ({ onClose }) => {
                           </div>
                           <div className="flex min-w-0 flex-col items-start gap-1">
                             {plugin.builtIn && (
-                              <span className="flex max-w-full items-center gap-0.5 rounded bg-purple-100 px-1.5 py-0.5 text-[9px] font-medium text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
+                              <PanelBadge tone="info" className="max-w-full">
                                 <Zap size={8} aria-hidden="true" />{" "}
                                 {t("builtIn")}
-                              </span>
+                              </PanelBadge>
                             )}
                             {plugin.source === "mcp" && (
-                              <span className="max-w-full truncate rounded bg-emerald-100 px-1.5 py-0.5 text-[9px] font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                              <PanelBadge
+                                tone="accent"
+                                className="max-w-full truncate"
+                              >
                                 {t("mcp")}
-                              </span>
+                              </PanelBadge>
                             )}
                             {plugin.source === "mcp" && plugin.mcp && (
-                              <span className="max-w-full truncate rounded bg-gray-100 px-1.5 py-0.5 font-mono text-[9px] text-gray-500 dark:bg-card dark:text-muted-foreground">
+                              <PanelBadge
+                                tone="neutral"
+                                className="max-w-full truncate font-mono"
+                              >
                                 {plugin.mcp.transport}
-                              </span>
+                              </PanelBadge>
                             )}
                             {plugin.category && (
-                              <span className="max-w-25 truncate rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-600 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-300">
+                              <PanelBadge
+                                tone="accent"
+                                className="max-w-25 truncate"
+                              >
                                 {formatCategoryName(plugin.category)}
-                              </span>
+                              </PanelBadge>
                             )}
                           </div>
                         </div>
@@ -2491,10 +2468,10 @@ const PluginMarket: React.FC<PluginMarketProps> = ({ onClose }) => {
                           }
                         />
                       </div>
-                      <h3 className="font-semibold text-gray-800 dark:text-foreground mb-1 truncate pr-2">
+                      <h3 className="mb-1 truncate pr-2 font-semibold text-foreground">
                         {plugin.title}
                       </h3>
-                      <p className="text-xs text-gray-500 dark:text-muted-foreground line-clamp-2 leading-relaxed mb-3 flex-1">
+                      <p className="mb-3 line-clamp-2 flex-1 text-xs leading-relaxed text-muted-foreground">
                         {plugin.description}
                       </p>
 
@@ -2521,7 +2498,7 @@ const PluginMarket: React.FC<PluginMarketProps> = ({ onClose }) => {
                       )}
 
                       <div className="mt-auto flex items-center justify-between gap-3">
-                        <div className="flex min-w-0 items-center gap-2 rounded bg-gray-100 px-2 py-1 font-mono text-[10px] text-gray-400 dark:bg-muted/50">
+                        <div className="flex min-w-0 items-center gap-2 rounded bg-muted px-2 py-1 font-mono text-[10px] text-muted-foreground">
                           <span>
                             {t(
                               plugin.source === "mcp"
@@ -2540,32 +2517,26 @@ const PluginMarket: React.FC<PluginMarketProps> = ({ onClose }) => {
                             title: plugin.title,
                           })}
                           onClick={() => setSelectedPluginForDetails(plugin)}
-                          className={`rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:hover:bg-accent dark:hover:text-foreground/85 ${showWarning ? "bg-amber-50 text-amber-500 dark:bg-amber-900/10 dark:text-amber-400" : ""}`}
+                          className={`rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-panel-accent/60 ${showWarning ? "bg-amber-50 text-amber-500 dark:bg-amber-900/10 dark:text-amber-400" : ""}`}
                         >
                           <Settings size={16} aria-hidden="true" />
                         </Button>
                       </div>
-                    </div>
+                    </PanelCard>
                   );
                 })}
               </div>
             ) : (
-              <div className="rounded-2xl border border-dashed border-gray-200 bg-white/30 px-4 py-6 text-center text-sm text-gray-400 dark:border-border dark:bg-muted/20">
-                {t("noPluginsFound")}
-              </div>
+              <PanelEmpty>{t("noPluginsFound")}</PanelEmpty>
             )}
-          </div>
+          </PanelSection>
 
           {/* Available Section */}
-          <div className="flex-1 flex flex-col">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 px-1">
-              <div className="flex min-w-0 flex-wrap items-center gap-3">
-                <h2 className="min-w-0 truncate text-sm font-bold uppercase tracking-wider text-gray-500 dark:text-muted-foreground">
-                  {searchTerm ? t("searchResults") : t("explore")}
-                </h2>
-              </div>
-
-              {/* Category Filter */}
+          <PanelSection
+            className="flex-1 flex flex-col"
+            muted
+            title={searchTerm ? t("searchResults") : t("explore")}
+            actions={
               <div className="relative shrink-0">
                 <DropdownMenu
                   open={showCategoryFilter}
@@ -2582,10 +2553,10 @@ const PluginMarket: React.FC<PluginMarketProps> = ({ onClose }) => {
                             })
                           : t("filterCategoryAria")
                       }
-                      className={`flex shrink-0 items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 ${
+                      className={`flex shrink-0 items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-panel-accent/60 ${
                         selectedCategories.length > 0
-                          ? "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400"
-                          : "bg-transparent text-gray-600 hover:bg-gray-100 dark:text-foreground/85 dark:hover:bg-muted"
+                          ? "bg-panel-accent-soft text-panel-accent-text"
+                          : "bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
                       }`}
                     >
                       <Filter size={12} aria-hidden="true" />
@@ -2627,35 +2598,19 @@ const PluginMarket: React.FC<PluginMarketProps> = ({ onClose }) => {
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
-            </div>
-
+            }
+          >
             {isLoading ? (
-              <div
-                role="status"
-                aria-live="polite"
-                className="flex h-64 flex-col items-center justify-center gap-4 text-gray-400"
-              >
-                <Loader2
-                  size={32}
-                  className="animate-spin text-blue-500"
-                  aria-hidden="true"
-                />
-                <span className="text-sm font-medium">
-                  {t("loadingEcosystem")}
-                </span>
-              </div>
+              <PanelLoading label={t("loadingEcosystem")} />
             ) : (
               <>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 flex-1 content-start">
                   {paginatedPlugins.map((plugin) => {
                     return (
-                      <div
-                        key={plugin.id}
-                        className="flex h-full flex-col rounded-2xl border border-gray-200 bg-white/40 p-4 backdrop-blur-md transition-[border-color,box-shadow] duration-300 hover:border-blue-300 dark:border-border dark:bg-muted/40 dark:hover:border-blue-700"
-                      >
+                      <PanelCard key={plugin.id} className="p-4">
                         <div className="mb-3 flex items-center justify-between gap-3">
                           <div className="flex min-w-0 items-center gap-3 overflow-hidden">
-                            <div className="w-10 h-10 rounded-xl bg-white dark:bg-accent border border-gray-100 dark:border-input flex items-center justify-center p-1.5 shrink-0">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-card p-1.5 dark:bg-accent">
                               <SafeImage
                                 src={plugin.logoUrl}
                                 alt=""
@@ -2663,7 +2618,7 @@ const PluginMarket: React.FC<PluginMarketProps> = ({ onClose }) => {
                                 fallback={
                                   <Cable
                                     size={20}
-                                    className="text-gray-400"
+                                    className="text-muted-foreground"
                                     aria-hidden="true"
                                   />
                                 }
@@ -2671,28 +2626,37 @@ const PluginMarket: React.FC<PluginMarketProps> = ({ onClose }) => {
                             </div>
                             <div className="flex min-w-0 flex-wrap gap-1">
                               {plugin.source === "mcp" && (
-                                <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300 border border-emerald-100 dark:border-emerald-800 truncate max-w-25">
+                                <PanelBadge
+                                  tone="accent"
+                                  className="max-w-25 truncate"
+                                >
                                   {t("mcp")}
-                                </span>
+                                </PanelBadge>
                               )}
                               {plugin.source === "mcp" && plugin.mcp && (
-                                <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-gray-50 text-gray-500 dark:bg-card dark:text-muted-foreground border border-gray-100 dark:border-border truncate max-w-32">
+                                <PanelBadge
+                                  tone="neutral"
+                                  className="max-w-32 truncate"
+                                >
                                   {plugin.mcp.transport}
-                                </span>
+                                </PanelBadge>
                               )}
                               {plugin.category && (
-                                <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-300 border border-blue-100 dark:border-blue-800 truncate max-w-25">
+                                <PanelBadge
+                                  tone="accent"
+                                  className="max-w-25 truncate"
+                                >
                                   {formatCategoryName(plugin.category)}
-                                </span>
+                                </PanelBadge>
                               )}
                             </div>
                           </div>
                         </div>
 
-                        <h3 className="font-semibold text-gray-800 dark:text-foreground mb-1 truncate text-sm">
+                        <h3 className="mb-1 truncate text-sm font-semibold text-foreground">
                           {plugin.title}
                         </h3>
-                        <p className="text-xs text-gray-500 dark:text-muted-foreground line-clamp-2 leading-relaxed mb-4 flex-1">
+                        <p className="mb-4 line-clamp-2 flex-1 text-xs leading-relaxed text-muted-foreground">
                           {plugin.description}
                         </p>
 
@@ -2711,7 +2675,7 @@ const PluginMarket: React.FC<PluginMarketProps> = ({ onClose }) => {
                           disabled={
                             !isOnline || installingIds.includes(plugin.id)
                           }
-                          className="group flex w-full items-center justify-center gap-2 rounded-xl border border-transparent bg-gray-50 py-2 text-xs font-medium text-gray-600 transition-[background-color,border-color,color] hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-accent/50 dark:text-foreground/85 dark:hover:border-blue-800 dark:hover:bg-blue-900/20 dark:hover:text-blue-400"
+                          className="group flex w-full items-center justify-center gap-2 rounded-xl border border-transparent bg-muted py-2 text-xs font-medium text-muted-foreground transition-[background-color,border-color,color] hover:border-panel-accent/30 hover:bg-panel-accent-soft hover:text-panel-accent-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-panel-accent/60 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-accent/50 dark:text-foreground/85"
                         >
                           {installingIds.includes(plugin.id) ? (
                             <Loader2
@@ -2730,7 +2694,7 @@ const PluginMarket: React.FC<PluginMarketProps> = ({ onClose }) => {
                             </>
                           )}
                         </Button>
-                      </div>
+                      </PanelCard>
                     );
                   })}
                 </div>
@@ -2740,50 +2704,33 @@ const PluginMarket: React.FC<PluginMarketProps> = ({ onClose }) => {
                   ["fresh", "cache", "fallback"].includes(
                     marketLoadResult.status,
                   ) && (
-                    <div
-                      data-testid="plugin-market-empty"
-                      className="text-center py-12 text-gray-400"
-                    >
+                    <PanelEmpty data-testid="plugin-market-empty">
                       <p>{t("noPluginsFound")}</p>
-                    </div>
+                    </PanelEmpty>
                   )}
 
                 {/* Pagination Controls */}
                 {showPagination && (
-                  <div className="py-6 flex items-center justify-center gap-4 mt-auto">
-                    <Button
-                      variant="bare"
-                      type="button"
-                      aria-label={t("prevPageAria")}
-                      onClick={handlePreviousPage}
-                      disabled={currentPage === 1}
-                      className="rounded-lg border border-gray-200 bg-white p-2 text-gray-600 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:cursor-not-allowed disabled:opacity-50 dark:border-border dark:bg-muted dark:text-foreground/85 dark:hover:bg-accent"
-                    >
-                      <ChevronLeft size={16} aria-hidden="true" />
-                    </Button>
-                    <span className="text-sm font-medium tabular-nums text-gray-600 dark:text-foreground/85">
-                      {activeSource === "mcp"
+                  <PanelPagination
+                    page={currentPage}
+                    totalPages={totalPages}
+                    onPrev={handlePreviousPage}
+                    onNext={handleNextPage}
+                    prevLabel={t("prevPageAria")}
+                    nextLabel={t("nextPageAria")}
+                    label={
+                      activeSource === "mcp"
                         ? t("pageCurrent", { currentPage })
-                        : t("pageOf", { currentPage, totalPages })}
-                    </span>
-                    <Button
-                      variant="bare"
-                      type="button"
-                      aria-label={t("nextPageAria")}
-                      onClick={handleNextPage}
-                      disabled={isNextPageDisabled}
-                      className="rounded-lg border border-gray-200 bg-white p-2 text-gray-600 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:cursor-not-allowed disabled:opacity-50 dark:border-border dark:bg-muted dark:text-foreground/85 dark:hover:bg-accent"
-                    >
-                      <ChevronRight size={16} aria-hidden="true" />
-                    </Button>
-                  </div>
+                        : t("pageOf", { currentPage, totalPages })
+                    }
+                  />
                 )}
               </>
             )}
-          </div>
+          </PanelSection>
         </div>
       </div>
-    </div>
+    </PanelRoot>
   );
 };
 

@@ -256,7 +256,8 @@ export function recoverResearchTask(
       };
   if (
     isTerminalResearchStatus(recovered.status) ||
-    recovered.status === "paused"
+    recovered.status === "paused" ||
+    recovered.status === "plan_ready"
   ) {
     return recovered;
   }
@@ -298,9 +299,10 @@ export function getCurrentResearchReportRunIds(task: ResearchTask): string[] {
 export type ResearchRunResumeDecision =
   | { action: "new" }
   | { action: "resume"; runId: string }
+  | { action: "archive"; runId: string }
   | { action: "unavailable"; runId: string };
 
-/** Resume only the same interrupted run so committed calls cannot be replayed. */
+/** Resume interrupted tools or completed tools awaiting closed-book archive. */
 export function getResearchRunResumeDecision(
   task: ResearchTask,
   runsById: Readonly<Record<string, AgentRun>>,
@@ -310,5 +312,33 @@ export function getResearchRunResumeDecision(
   if (!task.checkpoint.historyPath) return { action: "new" };
   return runsById[runId]?.status === "interrupted"
     ? { action: "resume", runId }
-    : { action: "unavailable", runId };
+    : runsById[runId]?.status === "completed"
+      ? { action: "archive", runId }
+      : { action: "unavailable", runId };
+}
+
+/** Planning rollback is a deliberate exception to forward status transitions.
+ * Restore only planning-owned fields; retain run history and cancellation.
+ */
+export function restoreResearchTaskAfterPlanning(
+  current: ResearchTask,
+  previous: ResearchTask,
+  error?: ResearchTask["error"],
+): ResearchTask {
+  if (current.status === "cancelled") return current;
+  return {
+    ...current,
+    status: previous.status,
+    endedAt: previous.endedAt,
+    planVersions: previous.planVersions,
+    activePlanVersion: previous.activePlanVersion,
+    sourceSnapshot: previous.sourceSnapshot,
+    checkpoint: previous.checkpoint,
+    pendingReportKind: previous.pendingReportKind,
+    evidence: previous.evidence,
+    error: current.error?.code?.startsWith("RESEARCH_STORAGE_")
+      ? current.error
+      : error,
+    updatedAt: Math.max(current.updatedAt, Date.now()),
+  };
 }

@@ -49,6 +49,9 @@ vi.mock("@/lib/research/runtime/sourceSnapshot", () => ({
 }));
 vi.mock("@/lib/research/runtime/taskContext", () => ({
   getResearchDependencyError: vi.fn(() => undefined),
+  resolveTaskContext: () => ({
+    effective: { agentBudget: { maxToolCalls: 30, maxDurationMs: 600000 } },
+  }),
 }));
 vi.mock("@/lib/research/runtime/evidenceConversation", () => ({
   cancelAllEvidenceAnswers: vi.fn(),
@@ -60,6 +63,7 @@ import { createResearchTask } from "@/lib/research";
 import { useResearchStore } from "@/store/core/researchStore";
 import { useResearchOperations } from "@/hooks/research/useResearchOperations";
 import { runResearchTaskAction } from "@/lib/research/runtime/taskLifecycle";
+import { useChatStore } from "@/store/core/chatStore";
 import { useResearchTaskActions } from "@/hooks/research/useResearchTaskActions";
 import { usePlanActions } from "@/hooks/research/usePlanActions";
 import { ResearchWorkspaceUnavailableError } from "@/lib/research/runtime/dependencyErrors";
@@ -648,5 +652,350 @@ describe("fresh task ownership across tabs", () => {
     expect(repository.remove).not.toHaveBeenCalled();
     expect(data.tasks.get("task")).toEqual(active);
     expect(useResearchStore.getState().tasksById.task).toEqual(active);
+  });
+});
+
+it("updates preset, strategy and profile-capped budgets under the same lease", async () => {
+  const ready = task("plan_ready");
+  data.tasks.set("task", ready);
+  hydrateLocal(ready);
+  const { result } = renderHook(() =>
+    usePlanActions({
+      ...dependencies(),
+      pauseTask: vi.fn(async () => {}),
+      dependencyText: {} as Parameters<
+        typeof usePlanActions
+      >[0]["dependencyText"],
+      t: ((key: string) => key) as Parameters<typeof usePlanActions>[0]["t"],
+    }),
+  );
+  await act(() => result.current.updatePlanPreset("task", "deep"));
+  const changed = data.tasks.get("task")!;
+  expect(changed.budgetPreset).toBe("deep");
+  expect(changed.budget).toEqual({
+    maxToolRounds: 20,
+    maxToolCalls: 30,
+    maxDurationMs: 600000,
+  });
+  expect(changed.activePlanVersion).toBe(2);
+  expect(changed.planVersions[1].strategy).toEqual(changed.requestedStrategy);
+  expect(changed.planVersions[0]).toEqual(ready.planVersions[0]);
+});
+
+it("rejects an edit lease conflict so the form retains its input", async () => {
+  const ready = task("plan_ready");
+  data.tasks.set("task", ready);
+  hydrateLocal(ready);
+  browserLocks.add("research-execution:task");
+  const deps = {
+    ...dependencies(),
+    pauseTask: vi.fn(async () => {}),
+    dependencyText: {} as Parameters<
+      typeof usePlanActions
+    >[0]["dependencyText"],
+    t: ((key: string) => key) as Parameters<typeof usePlanActions>[0]["t"],
+  };
+  const { result } = renderHook(() => usePlanActions(deps));
+  await expect(
+    result.current.adjustPlan("task", "Keep this instruction"),
+  ).rejects.toThrow("runtime.dependency.leaseConflict");
+  expect(deps.preparePlan).not.toHaveBeenCalled();
+  expect(data.tasks.get("task")).toEqual(ready);
+});
+
+it.each(["continue", "update"])(
+  "passes the pre-planning snapshot and switches the correct session for %s",
+  async (kind) => {
+    const completed = latestReport();
+    data.tasks.set("task", completed);
+    hydrateLocal(completed);
+    const mode = vi
+      .spyOn(useChatStore.getState(), "setSessionChatMode")
+      .mockImplementation(() => {});
+    const deps = dependencies();
+    const { result } = renderHook(() => useResearchTaskActions(deps));
+    try {
+      await act(() =>
+        kind === "continue"
+          ? result.current.continueResearch("task", "More detail")
+          : result.current.updateLatest("task"),
+      );
+      expect(mode).toHaveBeenCalledWith("session", "research");
+      expect(deps.preparePlan).toHaveBeenCalledWith(
+        "task",
+        expect.any(String),
+        undefined,
+        expect.anything(),
+        completed,
+      );
+    } finally {
+      mode.mockRestore();
+    }
+  },
+);
+
+it("restores a finished report when the initial refresh transition cannot persist", async () => {
+  const { ResearchPersistenceError } =
+    await import("@/services/research/taskRepository/errors");
+  const completed = latestReport();
+  data.tasks.set("task", completed);
+  hydrateLocal(completed);
+  data.saves.mockRejectedValueOnce(new ResearchPersistenceError("quota"));
+  const deps = dependencies();
+  const { result } = renderHook(() => useResearchTaskActions(deps));
+  await expect(result.current.updateLatest("task")).rejects.toMatchObject({
+    reason: "quota",
+  });
+  expect(deps.preparePlan).not.toHaveBeenCalled();
+  expect(useResearchStore.getState().tasksById.task).toMatchObject({
+    status: "completed",
+    pendingReportKind: completed.pendingReportKind,
+    evidence: completed.evidence,
+    error: { code: "RESEARCH_STORAGE_quota" },
+  });
+});
+
+it.each(["quota", "conflict"] as const)(
+  "retains planning rollback storage diagnostics through the action wrapper for %s",
+  async (reason) => {
+    const { ResearchPersistenceError } =
+      await import("@/services/research/taskRepository/errors");
+    const ready = task("plan_ready");
+    data.tasks.set("task", ready);
+    hydrateLocal(ready);
+    const failure = new ResearchPersistenceError(reason);
+    await expect(
+      runResearchTaskAction("task", async () => {
+        useResearchStore.setState({
+          tasksById: {
+            task: {
+              ...ready,
+              error: {
+                code: `RESEARCH_STORAGE_${reason}`,
+                message: "Localized storage failure",
+                recoverable: true,
+              },
+            },
+          },
+        });
+        throw failure;
+      }),
+    ).rejects.toBe(failure);
+    expect(useResearchStore.getState().tasksById.task).toMatchObject({
+      status: "plan_ready",
+      error: {
+        code: `RESEARCH_STORAGE_${reason}`,
+        message: "Localized storage failure",
+      },
+    });
+    expect(data.saves).not.toHaveBeenCalled();
+    expect(data.tasks.get("task")).toEqual(ready);
+  },
+);
+
+describe("follow-up mode rollback", () => {
+  beforeEach(() => {
+    useChatStore.setState({
+      sessions: ["session", "other"].map((id) => ({
+        id,
+        title: id,
+        updatedAt: 1,
+        model: "model",
+        pinned: false,
+        messageCount: 1,
+        config: { chatMode: id === "session" ? "auto" : "agent" },
+      })),
+      currentSessionId: "session",
+      chatConfig: {
+        ...useChatStore.getState().chatConfig,
+        chatMode: "auto",
+        useAgentMode: false,
+        useDeepResearch: false,
+      },
+    });
+  });
+  afterEach(() =>
+    useChatStore.setState({ sessions: [], currentSessionId: null }),
+  );
+
+  it.each([
+    ["continue", false],
+    ["update", false],
+    ["continue", true],
+    ["update", true],
+  ] as const)(
+    "restores Auto after a failed %s with session switch %s",
+    async (kind, switchSession) => {
+      const completed = latestReport();
+      data.tasks.set("task", completed);
+      hydrateLocal(completed);
+      const entered = deferred();
+      const finish = deferred();
+      const deps = dependencies();
+      deps.preparePlan.mockImplementation(async () => {
+        entered.resolve();
+        await finish.promise;
+        await useResearchStore.getState().updateTask("task", () => completed);
+        throw new Error("Planning failed");
+      });
+      const { result } = renderHook(() => useResearchTaskActions(deps));
+      const pending =
+        kind === "continue"
+          ? result.current.continueResearch("task", "More detail")
+          : result.current.updateLatest("task");
+      const rejected = expect(pending).rejects.toThrow("Planning failed");
+      await entered.promise;
+      expect(useChatStore.getState().chatConfig.chatMode).toBe("research");
+      if (switchSession) {
+        useChatStore.setState({
+          currentSessionId: "other",
+          chatConfig: {
+            ...useChatStore.getState().chatConfig,
+            chatMode: "agent",
+            useAgentMode: true,
+            useDeepResearch: false,
+          },
+        });
+      }
+      finish.resolve();
+      await rejected;
+      expect(
+        useChatStore
+          .getState()
+          .sessions.find((session) => session.id === "session")!.config
+          ?.chatMode,
+      ).toBe("auto");
+      expect(useChatStore.getState().chatConfig.chatMode).toBe(
+        switchSession ? "agent" : "auto",
+      );
+      expect(useResearchStore.getState().tasksById.task.status).toBe(
+        "completed",
+      );
+    },
+  );
+
+  it.each(["continue", "update"] as const)(
+    "restores Auto after failed %s despite unrelated config changes",
+    async (kind) => {
+      const completed = latestReport();
+      data.tasks.set("task", completed);
+      hydrateLocal(completed);
+      const deps = dependencies();
+      deps.preparePlan.mockImplementation(async () => {
+        useChatStore.getState().setChatConfig({ useSearch: true });
+        useChatStore.getState().updateSessionConfig("session", {
+          useSearch: true,
+          approvalMode: "strict",
+        });
+        await useResearchStore.getState().updateTask("task", () => completed);
+        throw new Error("Planning failed");
+      });
+      const { result } = renderHook(() => useResearchTaskActions(deps));
+      await expect(
+        kind === "continue"
+          ? result.current.continueResearch("task", "More detail")
+          : result.current.updateLatest("task"),
+      ).rejects.toThrow("Planning failed");
+      expect(useChatStore.getState().sessions[0].config).toMatchObject({
+        chatMode: "auto",
+        useSearch: true,
+        approvalMode: "strict",
+      });
+      expect(useChatStore.getState().chatConfig).toMatchObject({
+        chatMode: "auto",
+        useSearch: true,
+      });
+    },
+  );
+
+  it.each([
+    ["agent", "session"],
+    ["research", "session"],
+    ["agent", "composer"],
+    ["research", "composer"],
+    ["agent", "config"],
+    ["research", "config"],
+  ] as const)(
+    "preserves the user's later %s selection via %s when planning fails",
+    async (selected, path) => {
+      const completed = latestReport();
+      data.tasks.set("task", completed);
+      hydrateLocal(completed);
+      const deps = dependencies();
+      deps.preparePlan.mockImplementation(async () => {
+        for (const mode of ["agent", selected] as const) {
+          if (path === "session")
+            useChatStore.getState().setSessionChatMode("session", mode);
+          else {
+            const patch = {
+              chatMode: mode,
+              useAgentMode: mode === "agent",
+              useDeepResearch: mode === "research",
+            };
+            if (path === "composer")
+              useChatStore.getState().setChatConfig(patch);
+            useChatStore.getState().updateSessionConfig("session", patch);
+          }
+        }
+        throw new Error("Planning failed");
+      });
+      const { result } = renderHook(() => useResearchTaskActions(deps));
+      await expect(result.current.updateLatest("task")).rejects.toThrow(
+        "Planning failed",
+      );
+      expect(useChatStore.getState().sessions[0].config?.chatMode).toBe(
+        selected,
+      );
+      if (path !== "config")
+        expect(useChatStore.getState().chatConfig.chatMode).toBe(selected);
+    },
+  );
+
+  it("does not change mode when another tab owns the follow-up lease", async () => {
+    const completed = latestReport();
+    data.tasks.set("task", completed);
+    hydrateLocal(completed);
+    browserLocks.add("research-execution:task");
+    const deps = dependencies();
+    const { result } = renderHook(() => useResearchTaskActions(deps));
+    await expect(result.current.updateLatest("task")).rejects.toThrow();
+    expect(useChatStore.getState().chatConfig.chatMode).toBe("auto");
+    expect(deps.preparePlan).not.toHaveBeenCalled();
+  });
+
+  it("restores mode without reviving a cancelled follow-up", async () => {
+    const completed = latestReport();
+    data.tasks.set("task", completed);
+    hydrateLocal(completed);
+    const deps = dependencies();
+    deps.preparePlan.mockImplementation(async () => {
+      await useResearchStore
+        .getState()
+        .updateTask("task", (current) => ({ ...current, status: "cancelled" }));
+      throw new DOMException("Aborted", "AbortError");
+    });
+    const { result } = renderHook(() => useResearchTaskActions(deps));
+    await expect(result.current.updateLatest("task")).rejects.toThrow(
+      "Aborted",
+    );
+    expect(useResearchStore.getState().tasksById.task.status).toBe("cancelled");
+    expect(useChatStore.getState().chatConfig.chatMode).toBe("auto");
+  });
+
+  it("restores the current session's mode when planning fails before startup saves", async () => {
+    const { ResearchPersistenceError } =
+      await import("@/services/research/taskRepository/errors");
+    const completed = latestReport();
+    data.tasks.set("task", completed);
+    hydrateLocal(completed);
+    data.saves.mockRejectedValueOnce(new ResearchPersistenceError("conflict"));
+    const { result } = renderHook(() => useResearchTaskActions(dependencies()));
+    await expect(result.current.updateLatest("task")).rejects.toMatchObject({
+      reason: "conflict",
+    });
+    expect(useChatStore.getState().chatConfig.chatMode).toBe("auto");
+    expect(useChatStore.getState().sessions[0].config?.chatMode).toBe("auto");
+    expect(data.saves).toHaveBeenCalledOnce();
+    expect(data.tasks.get("task")).toEqual(completed);
   });
 });

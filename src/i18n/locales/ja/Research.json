@@ -1,8 +1,8 @@
 {
   "status": {
     "draft": "下書き",
-    "clarifying": "範囲を確認中",
-    "plan_ready": "計画の確認待ち",
+    "clarifying": "計画を準備中",
+    "plan_ready": "計画の準備完了",
     "researching": "調査中",
     "verifying": "根拠を検証中",
     "synthesizing": "レポートを作成中",
@@ -24,39 +24,35 @@
     "tokens": "トークン"
   },
   "actions": {
-    "openWorkbench": "ワークベンチを開く",
+    "openWorkbench": "レポートを開く",
     "open": "開く",
-    "returnWorkbench": "調査に戻る",
-    "closeWorkbench": "調査ワークベンチを閉じる",
-    "closePlan": "調査計画を閉じる",
+    "closeWorkbench": "研究レポートを閉じる",
     "closeAdjust": "計画の調整を閉じる",
-    "closeStrategy": "詳細戦略を閉じる",
     "backToChat": "チャットに戻る",
-    "start": "調査を開始",
-    "adjust": "計画を調整",
-    "advancedStrategy": "詳細戦略",
-    "tuneStrategy": "詳細戦略を調整",
-    "pause": "安全に一時停止",
+    "start": "開始",
+    "adjust": "計画を編集",
+    "pause": "一時停止",
     "resume": "再開",
     "retry": "再試行",
-    "newFollowUp": "新しい追加調査",
+    "newFollowUp": "さらに研究する",
     "cancel": "キャンセル",
-    "confirmCancel": "キャンセルを確定",
-    "dismiss": "閉じる",
-    "inspectEvidence": "根拠を確認",
+    "confirmCancel": "この研究を停止しますか？",
+    "dismiss": "破棄",
     "markdown": "Markdown",
     "pdf": "PDF",
-    "askEvidence": "既存の根拠に質問",
-    "continueResearch": "調査を続ける",
-    "updateLatest": "最新情報に更新",
+    "askEvidence": "このレポートについて質問",
+    "updateLatest": "最新情報で更新",
     "downloadReport": "ダウンロード",
     "interactiveExplanation": "チャットで対話的に説明",
-    "interactiveExplanationPrompt": "添付のレポートを基に、このチャットで対話的な説明を作成してください。元のレポートと証拠は変更しないでください。レポート：{title}、タスク：{taskId}、レポート ID：{reportId}、バージョン：{version}。"
+    "interactiveExplanationPrompt": "添付のレポートを基に、このチャットで対話的な説明を作成してください。元のレポートと証拠は変更しないでください。レポート：{title}、タスク：{taskId}、レポート ID：{reportId}、バージョン：{version}。",
+    "viewProgress": "進捗を見る",
+    "stop": "停止",
+    "confirmDiscard": "この研究タスクを破棄しますか？",
+    "openModelSettings": "モデル設定を開く",
+    "openSearchSettings": "検索設定を開く"
   },
   "plan": {
-    "title": "調査計画",
-    "steps": "調査ステップ",
-    "planContract": "承認済みの調査契約",
+    "steps": "次の内容を調べます：",
     "objective": "調査目標",
     "scope": "調査範囲",
     "audience": "対象読者",
@@ -84,10 +80,6 @@
     "willNotResearch": "調査しないこと",
     "noExplicitInclusions": "追加の対象項目は指定されていません。",
     "noExplicitExclusions": "明示的な除外項目は指定されていません。",
-    "advancedDisclosure": "偵察段階と詳細戦略",
-    "advancedDisclosureHint": "前提、成果物、完了条件、予算",
-    "decisionSteps": "{count} ステップ",
-    "decisionQueries": "{count} クエリ",
     "reconSummary": "計画前の偵察：{used}/{limit} クエリ",
     "knowledgeRecon": "ナレッジベースの事前確認: {count}/2 回",
     "reconDisclosure": "計画前の確認は必要な場合だけ行います。まず選択したナレッジベースを確認し、必要な場合に限り公開検索の要約を使います。結果は計画にのみ反映し、正式な根拠にはしません。",
@@ -99,7 +91,6 @@
       "skipped": "既存の知識に基づいて計画を作成したため、事前確認は行いませんでした。"
     },
     "version": "バージョン {version}",
-    "showFull": "計画をすべて表示",
     "empty": "調査計画を準備中です。まだ情報源にはアクセスしていません。"
   },
   "planStep": {
@@ -121,21 +112,9 @@
   },
   "run": {
     "statusRail": "調査実行ステータス",
-    "topology": "調査トポロジー",
-    "inspector": "調査ノードインスペクター",
-    "selectNode": "調査ノードを展開すると、根拠と学びを確認できます。",
     "waves": "調査ラウンド",
     "wave": "ラウンド {wave}",
-    "waveCount": "{count} ラウンド",
-    "waveSummary": "{queries} クエリ · {sources} 情報源 · {claims} 検証済み主張",
-    "nodeDepth": "深度 {depth}",
-    "nodeSummary": "{sources} 情報源 · {claims} 検証済み主張",
     "query": "検索クエリ",
-    "queryPending": "このノードが frontier に入るとクエリが生成されます。",
-    "parentNode": "派生元",
-    "learnings": "学び",
-    "followUps": "次の方向性",
-    "linkedEvidence": "関連する根拠",
     "scopeApproval": "この方向は承認済みの情報源または調査範囲を拡張するため、アクセス前に確認が必要です。",
     "scopeResume": "この保存済みタスクでは追加の調査方向が見つかりました。再開すると計画を作り直さず、確定済みの根拠から続行します。",
     "stopReason": "停止理由",
@@ -171,9 +150,9 @@
     }
   },
   "budget": {
-    "quick": "クイック予算",
-    "standard": "標準予算",
-    "deep": "詳細予算"
+    "quick": "簡易",
+    "standard": "標準",
+    "deep": "詳細"
   },
   "settings": {
     "title": "ディープリサーチ設定",
@@ -182,12 +161,8 @@
     "tab_research": "リサーチ設定",
     "tab_workspace": "Artifact とワークスペース",
     "futureTasksOnly": "このセッションの既定値は新しい調査にのみ適用され、既存の計画や実行中の調査は変更されません。",
-    "budgetTitle": "調査予算",
-    "budgetDescription": "プリセットはモデルのラウンド数、ツール呼び出し数、実行時間を制限します。",
-    "budgetValues": "{rounds} ラウンド / {calls} 回 / {minutes} 分",
-    "strategyTitle": "既定の調査戦略",
-    "strategyDescription": "生成される計画はこの上限から始まり、承認前に個別調整できます。",
-    "resetStrategy": "プリセットに戻す"
+    "budgetTitle": "研究の詳しさ",
+    "estimatedTime": "約 {minutes} 分"
   },
   "sourceScope": {
     "label": "承認済みの情報源スコープ",
@@ -198,7 +173,7 @@
     "attachments": "添付ファイル（{count}）",
     "workspace": "ワークスペース（{count}）",
     "plugins": "プラグイン（{count}）",
-    "searchWarning": "この情報源スコープではウェブ検索を利用できません。開始前に互換性のある外部検索プロバイダーを有効にしてください。"
+    "searchWarning": "この計画の作成時にウェブ検索は無効でした。検索設定を開き、「計画を編集」でウェブ出典を追加してください。"
   },
   "adjust": {
     "title": "調査計画を調整",
@@ -209,29 +184,17 @@
     "submitting": "計画を更新中",
     "error": "計画を更新できませんでした。入力内容は保持されているため、再試行できます。"
   },
-  "strategyAdjust": {
-    "title": "詳細な調査戦略",
-    "help": "保存すると不変の新しい計画版が作成されますが、計画前の偵察は再実行されません。",
-    "initialBreadth": "Breadth",
-    "maxDepth": "深度",
-    "maxQueries": "クエリ",
-    "resultsPerQuery": "結果数",
-    "submit": "戦略を保存",
-    "submitting": "戦略を保存中",
-    "error": "戦略を保存できませんでした。値は保持されているため再試行できます。"
-  },
   "card": {
-    "knownGaps": "既知の不足",
-    "reportAvailable": "レポートのバージョン {version} をワークベンチで確認できます",
     "preparingSteps": {
       "scope": "調査範囲を作成中",
       "sources": "情報源の実現性を確認中",
       "review": "調査計画を確認中"
     },
-    "replyHint": "チャットで返信して計画を調整できます。問題なければ調査を開始してください。",
-    "budgetSummary": "{preset} · 検索 {queries} 回 · 深さ {depth}",
-    "fullContract": "調査契約の全文",
-    "liveActivity": "最新のアクティビティ"
+    "starterNotice": "モデルが完全な計画を作成できませんでした。基本計画を用意しましたので、開始前に確認・編集してください。",
+    "stepProgress": "ステップ {current} / {total}",
+    "pausedNotice": "研究は一時停止中です。準備ができたら再開してください。",
+    "completeSummary": "研究完了 · 出典 {sources} 件 · {duration}",
+    "partialSummary": "制約付きで研究終了 · 出典 {sources} 件 · {duration}"
   },
   "global": {
     "label": "実行中のディープリサーチ",
@@ -247,18 +210,12 @@
   "workbench": {
     "loading": "調査タスクを読み込んでいます…",
     "notFound": "この調査タスクは利用できないか、削除されています。",
-    "mobileNavigation": "調査ワークベンチのセクション",
-    "progressPanel": "調査計画と進捗",
-    "evidencePanel": "根拠インスペクター",
     "contentTabs": "調査アクティビティとレポート"
   },
   "tabs": {
-    "progress": "進捗",
-    "activity": "アクティビティ",
     "report": "レポート",
-    "evidence": "根拠",
-    "claims": "主張",
-    "supplements": "補足資料"
+    "sources": "出典",
+    "process": "研究の進め方"
   },
   "activity": {
     "title": "調査アクティビティ",
@@ -347,7 +304,7 @@
       "noQuestions": "追加の調査質問は記録されていません。",
       "noEvidence": "正式な証拠は収集されていません。"
     },
-    "supplementsEmpty": "このバージョンの補足資料はありません。"
+    "notesAndLimits": "補足と制約"
   },
   "evidence": {
     "title": "根拠インスペクター",
@@ -383,7 +340,9 @@
     "sortNewest": "新しい順",
     "sortOldest": "古い順",
     "sortClaimCount": "関連する主張が多い順",
-    "results": "根拠 {count} 件"
+    "results": "根拠 {count} 件",
+    "moreFilters": "その他の絞り込み",
+    "citedInReport": "レポートで引用した出典"
   },
   "claims": {
     "title": "主張インスペクター",
@@ -434,13 +393,6 @@
     "unknown": "権威性不明"
   },
   "followup": {
-    "ask": {
-      "title": "既存の根拠に質問する",
-      "label": "質問",
-      "help": "収集済みの根拠のみを使用します。ネットワークにはアクセスせず、新しいレポート版も作成しません。",
-      "placeholder": "主要な見解の相違について、既存の根拠から何が分かりますか？",
-      "submit": "質問を送信"
-    },
     "continue": {
       "title": "調査を続ける",
       "label": "追加の調査目標",
@@ -465,8 +417,7 @@
       "planReady": "ディープリサーチ計画を作成しました。承認を待っています。",
       "reportReady": "ディープリサーチのレポートを作成しました。",
       "reportPartial": "ディープリサーチは完了しましたが、根拠に不足があります。",
-      "evidenceAnswer": "保存済みの根拠だけを使った回答を調査チャットに追加しました。",
-      "steeringUnavailable": "研究の調整機能を利用できません。現在の研究は続行します。"
+      "evidenceAnswer": "保存済みの根拠だけを使った回答を調査チャットに追加しました。"
     },
     "error": {
       "planInvalid": "研究計画は2回の修正後も検証に合格しませんでした。再試行するか、研究範囲を調整してください。",
@@ -488,7 +439,16 @@
         "validation": "研究の進行状況が保存時の検証に失敗したため、タスクを停止しました。",
         "conflict": "別のタブで研究タスクが変更されました。ローカルの進行状況は保持されています。タスクを再読み込みしてください。",
         "report_verification": "保存したレポートを検証できませんでした。研究は完了として記録されていません。"
-      }
+      },
+      "adjustFailed": "計画を更新できませんでした。前の計画は保持されています。",
+      "offline": "オフラインです。接続を回復してから再開または再試行してください。",
+      "auth": "モデル提供元が API キーを拒否しました。モデル設定を確認してください。",
+      "rate_limit": "モデル提供元のリクエスト制限に達しました。少し待って再試行してください。",
+      "model_not_found": "モデルが見つからないか利用できません。設定でモデルを選択してください。",
+      "timeout": "モデルへのリクエストがタイムアウトしました。再開または再試行してください。",
+      "network": "モデルへの接続が切れました。接続を回復して再開または再試行してください。",
+      "unavailable": "モデル提供元を一時的に利用できません。後でもう一度お試しください。",
+      "connectionLost": "接続が切れました。進捗は保存されています。接続を回復して再開してください。"
     },
     "gaps": {
       "noEvidence": "参照可能な正式な根拠が保存されていません。",
@@ -511,10 +471,28 @@
       "leaseConflict": "別のブラウザータブでこのチャットを実行しています。そのタブに戻るか、完了後に再試行してください。",
       "checkpointUnavailable": "中断した Agent 実行を利用できず、確定済みの呼び出しを安全に再利用できません。タスクを一時停止したままにするか、新しい計画を作成してください。",
       "sourceUnavailable": "承認済みの情報源「{source}」を利用できません。復元するか、計画を調整してください。"
+    },
+    "starter": {
+      "summary": "基本計画を確認してください。",
+      "audience": "この質問をした方",
+      "assumption": "研究の開始前に、この基本計画の確認が必要です。",
+      "deliverable": "研究の質問に出典付きで答えるレポート。",
+      "section": "研究結果",
+      "background": "背景と概念を理解する",
+      "evidence": "根拠を集めて比較する",
+      "synthesis": "結果と制約をまとめる",
+      "backgroundObjective": "「{topic}」の主要な概念と背景を明らかにする。",
+      "evidenceObjective": "「{topic}」に関連する根拠を探して比較する。",
+      "synthesisObjective": "「{topic}」に答え、不確実性と制約を説明する。",
+      "evidenceCriteria": "利用可能な関連出典を使い、事実と仮定を区別する。",
+      "completionCriteria": "根拠のある結論で研究の質問に答え、制約を明示する。"
     }
   },
   "legacy": {
     "cleared": "旧版のディープリサーチ記録は v2 への更新時に消去されました。",
     "remove": "参照を削除"
+  },
+  "process": {
+    "advancedDetails": "詳細情報"
   }
 }

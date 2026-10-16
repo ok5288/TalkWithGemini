@@ -1,8 +1,8 @@
 {
   "status": {
     "draft": "草稿",
-    "clarifying": "正在澄清范围",
-    "plan_ready": "计划待确认",
+    "clarifying": "正在准备计划",
+    "plan_ready": "计划已就绪",
     "researching": "正在研究",
     "verifying": "正在核验证据",
     "synthesizing": "正在撰写报告",
@@ -24,39 +24,35 @@
     "tokens": "令牌"
   },
   "actions": {
-    "openWorkbench": "打开工作台",
+    "openWorkbench": "打开报告",
     "open": "打开",
-    "returnWorkbench": "返回研究",
-    "closeWorkbench": "关闭研究工作台",
-    "closePlan": "关闭研究计划",
+    "closeWorkbench": "关闭研究报告",
     "closeAdjust": "关闭计划调整",
-    "closeStrategy": "关闭高级策略",
     "backToChat": "返回聊天",
-    "start": "开始研究",
-    "adjust": "调整计划",
-    "advancedStrategy": "高级策略",
-    "tuneStrategy": "调整高级策略",
-    "pause": "安全暂停",
+    "start": "开始",
+    "adjust": "编辑计划",
+    "pause": "暂停",
     "resume": "继续研究",
     "retry": "重试",
-    "newFollowUp": "新增后续研究",
+    "newFollowUp": "继续研究",
     "cancel": "取消",
-    "confirmCancel": "确认取消",
-    "dismiss": "关闭",
-    "inspectEvidence": "查看证据",
+    "confirmCancel": "停止这项研究？",
+    "dismiss": "丢弃",
     "markdown": "Markdown",
     "pdf": "PDF",
-    "askEvidence": "基于现有证据提问",
-    "continueResearch": "继续研究",
-    "updateLatest": "更新最新",
+    "askEvidence": "询问这份报告",
+    "updateLatest": "用最新信息刷新",
     "downloadReport": "下载",
     "interactiveExplanation": "在聊天中交互解释",
-    "interactiveExplanationPrompt": "请基于附件报告在当前聊天中生成交互解释，保留原报告与证据不变。报告：{title}；任务：{taskId}；报告 ID：{reportId}；版本：{version}。"
+    "interactiveExplanationPrompt": "请基于附件报告在当前聊天中生成交互解释，保留原报告与证据不变。报告：{title}；任务：{taskId}；报告 ID：{reportId}；版本：{version}。",
+    "viewProgress": "查看进度",
+    "stop": "停止",
+    "confirmDiscard": "丢弃这项研究任务？",
+    "openModelSettings": "打开模型设置",
+    "openSearchSettings": "打开搜索设置"
   },
   "plan": {
-    "title": "研究计划",
-    "steps": "研究步骤",
-    "planContract": "已批准的研究契约",
+    "steps": "将研究以下内容：",
     "objective": "研究目标",
     "scope": "研究范围",
     "audience": "目标受众",
@@ -84,10 +80,6 @@
     "willNotResearch": "不会研究",
     "noExplicitInclusions": "未指定其他纳入项。",
     "noExplicitExclusions": "未指定明确的排除项。",
-    "advancedDisclosure": "侦察阶段与高级策略",
-    "advancedDisclosureHint": "假设、交付物、完成条件与预算",
-    "decisionSteps": "{count} 个步骤",
-    "decisionQueries": "{count} 次查询",
     "reconSummary": "计划侦察：{used}/{limit} 次查询",
     "knowledgeRecon": "知识库预查：{count}/2 次",
     "reconDisclosure": "计划预查按需进行：先检查选定的知识库，仅在需要时再使用公共搜索摘要。结果只用于拟定计划，不会作为正式论据。",
@@ -99,7 +91,6 @@
       "skipped": "已根据已有知识拟定计划，未进行预查。"
     },
     "version": "版本 {version}",
-    "showFull": "查看完整计划",
     "empty": "正在准备研究计划，尚未调用任何来源。"
   },
   "planStep": {
@@ -121,21 +112,9 @@
   },
   "run": {
     "statusRail": "研究运行状态",
-    "topology": "研究拓扑",
-    "inspector": "研究节点检查器",
-    "selectNode": "展开一个研究节点，检查其证据与阶段性认识。",
     "waves": "研究轮次",
     "wave": "第 {wave} 轮",
-    "waveCount": "共 {count} 个研究轮次",
-    "waveSummary": "{queries} 次查询 · {sources} 个来源 · {claims} 条已验证主张",
-    "nodeDepth": "深度 {depth}",
-    "nodeSummary": "{sources} 个来源 · {claims} 条已验证主张",
     "query": "搜索查询",
-    "queryPending": "此节点进入研究前沿后才会生成查询。",
-    "parentNode": "来源节点",
-    "learnings": "阶段性认识",
-    "followUps": "下一步方向",
-    "linkedEvidence": "关联证据",
     "scopeApproval": "此方向会扩大已批准的来源或研究范围，获得确认前不会访问。",
     "scopeResume": "此历史任务发现了新的研究方向。点击继续后会从已提交证据原地续跑，不会重新生成计划。",
     "stopReason": "停止原因",
@@ -171,9 +150,9 @@
     }
   },
   "budget": {
-    "quick": "快速预算",
-    "standard": "标准预算",
-    "deep": "深度预算"
+    "quick": "快速",
+    "standard": "标准",
+    "deep": "深入"
   },
   "settings": {
     "title": "深度研究设置",
@@ -182,12 +161,8 @@
     "tab_research": "深度研究设置",
     "tab_workspace": "Artifact 与工作区",
     "futureTasksOnly": "这些会话默认值只作用于新建研究，现有计划与运行不会改变。",
-    "budgetTitle": "研究预算",
-    "budgetDescription": "预设限制模型轮次、工具调用次数与总运行时长。",
-    "budgetValues": "{rounds} 轮 / {calls} 次 / {minutes} 分钟",
-    "strategyTitle": "默认研究策略",
-    "strategyDescription": "生成计划时采用这些上限，确认前仍可为单次任务调整。",
-    "resetStrategy": "恢复预设"
+    "budgetTitle": "研究程度",
+    "estimatedTime": "预计约 {minutes} 分钟"
   },
   "sourceScope": {
     "label": "已批准的来源范围",
@@ -198,7 +173,7 @@
     "attachments": "附件（{count}）",
     "workspace": "工作区（{count}）",
     "plugins": "插件（{count}）",
-    "searchWarning": "当前来源范围不包含网页搜索。请先启用兼容的外部搜索服务，再开始研究。"
+    "searchWarning": "生成这份计划时未开启联网搜索。请打开搜索设置，再选择“编辑计划”以纳入网络来源。"
   },
   "adjust": {
     "title": "调整研究计划",
@@ -209,29 +184,17 @@
     "submitting": "正在更新计划",
     "error": "计划更新失败。调整说明仍会保留，可以重试。"
   },
-  "strategyAdjust": {
-    "title": "高级研究策略",
-    "help": "保存后会创建不可变的新计划版本，但不会重新运行计划侦察。",
-    "initialBreadth": "广度",
-    "maxDepth": "深度",
-    "maxQueries": "查询",
-    "resultsPerQuery": "结果数",
-    "submit": "保存策略",
-    "submitting": "正在保存策略",
-    "error": "策略保存失败。当前数值会保留，可以重试。"
-  },
   "card": {
-    "knownGaps": "已知缺口",
-    "reportAvailable": "报告版本 {version} 已保存，可在工作台中查看",
     "preparingSteps": {
       "scope": "正在拟定研究范围",
       "sources": "正在评估来源可行性",
       "review": "正在检查研究计划"
     },
-    "replyHint": "可直接在对话中回复以调整此计划，确认无误后开始研究。",
-    "budgetSummary": "{preset} · {queries} 次检索 · 深度 {depth}",
-    "fullContract": "完整研究约定",
-    "liveActivity": "最新动态"
+    "starterNotice": "模型未能生成完整计划。已为你准备基础计划，请审阅或编辑后再开始。",
+    "stepProgress": "第 {current} 步，共 {total} 步",
+    "pausedNotice": "研究已暂停，准备好后可继续。",
+    "completeSummary": "研究完成 · {sources} 个来源 · {duration}",
+    "partialSummary": "研究已结束，存在局限 · {sources} 个来源 · {duration}"
   },
   "global": {
     "label": "正在运行的深度研究",
@@ -247,18 +210,12 @@
   "workbench": {
     "loading": "正在加载研究任务…",
     "notFound": "此研究任务不可用或已被删除。",
-    "mobileNavigation": "研究工作台区域",
-    "progressPanel": "研究计划与进度",
-    "evidencePanel": "证据检查器",
     "contentTabs": "研究活动与报告"
   },
   "tabs": {
-    "progress": "进度",
-    "activity": "活动",
     "report": "报告",
-    "evidence": "证据",
-    "claims": "论据",
-    "supplements": "补充材料"
+    "sources": "来源",
+    "process": "研究过程"
   },
   "activity": {
     "title": "研究活动",
@@ -347,7 +304,7 @@
       "noQuestions": "未记录其他待研究问题。",
       "noEvidence": "尚未收集正式证据。"
     },
-    "supplementsEmpty": "此版本未记录补充材料。"
+    "notesAndLimits": "说明与局限"
   },
   "evidence": {
     "title": "证据检查器",
@@ -383,7 +340,9 @@
     "sortNewest": "最新优先",
     "sortOldest": "最早优先",
     "sortClaimCount": "关联论据最多",
-    "results": "{count} 条证据"
+    "results": "{count} 条证据",
+    "moreFilters": "更多筛选",
+    "citedInReport": "报告引用的来源"
   },
   "claims": {
     "title": "论据检查器",
@@ -434,13 +393,6 @@
     "unknown": "权威性未知"
   },
   "followup": {
-    "ask": {
-      "title": "基于现有证据提问",
-      "label": "问题",
-      "help": "只使用已经收集的证据，不访问网络，也不会创建新的报告版本。",
-      "placeholder": "现有证据如何解释主要分歧？",
-      "submit": "提交问题"
-    },
     "continue": {
       "title": "继续研究",
       "label": "补充研究目标",
@@ -465,8 +417,7 @@
       "planReady": "深度研究计划已生成，等待确认。",
       "reportReady": "深度研究报告已生成。",
       "reportPartial": "深度研究已完成，但仍存在证据缺口。",
-      "evidenceAnswer": "已仅基于现有证据在研究会话中添加回答。",
-      "steeringUnavailable": "研究调整功能暂不可用，当前研究将继续。"
+      "evidenceAnswer": "已仅基于现有证据在研究会话中添加回答。"
     },
     "error": {
       "planInvalid": "研究计划经两次修复后仍未通过校验。请重试或调整研究范围。",
@@ -488,7 +439,16 @@
         "validation": "研究进度未通过保存校验，任务已停止。",
         "conflict": "其他标签页已修改此研究任务。本地进度已保留，请重新加载任务后继续。",
         "report_verification": "未能验证已保存的报告，研究尚未标记为完成。"
-      }
+      },
+      "adjustFailed": "未能更新计划，之前的计划仍然保留。",
+      "offline": "当前处于离线状态，请重新联网后恢复或重试。",
+      "auth": "模型服务拒绝了 API 密钥，请检查模型设置。",
+      "rate_limit": "模型服务请求过于频繁，请稍后重试。",
+      "model_not_found": "找不到此模型或模型不可用，请在设置中选择模型。",
+      "timeout": "模型请求超时，请恢复或重试。",
+      "network": "与模型的连接已中断，请重新联网后恢复或重试。",
+      "unavailable": "模型服务暂不可用，请稍后重试。",
+      "connectionLost": "连接已中断，研究进度已保存。请重新联网后继续。"
     },
     "gaps": {
       "noEvidence": "没有提交可检索的正式来源证据。",
@@ -511,10 +471,28 @@
       "leaseConflict": "另一个浏览器标签页正在运行此对话。请返回该标签页，或在其结束后重试。",
       "checkpointUnavailable": "中断的 Agent 运行已不可用，无法安全复用已提交调用。请保持暂停或生成新计划。",
       "sourceUnavailable": "已批准的来源“{source}”不可用。请恢复该来源或调整计划。"
+    },
+    "starter": {
+      "summary": "基础计划已准备好，请先审阅。",
+      "audience": "提出问题的读者",
+      "assumption": "此基础计划需要你审阅后才能开始研究。",
+      "deliverable": "围绕研究问题提供有来源支持的报告。",
+      "section": "研究发现",
+      "background": "了解背景与概念",
+      "evidence": "搜集与比较论据",
+      "synthesis": "总结发现与局限",
+      "backgroundObjective": "厘清“{topic}”的关键概念与背景。",
+      "evidenceObjective": "查找并比较与“{topic}”相关的论据。",
+      "synthesisObjective": "回答“{topic}”，说明不确定性与局限。",
+      "evidenceCriteria": "使用可用的相关来源，区分事实与假设。",
+      "completionCriteria": "以有依据的结论回答研究问题，并明确说明局限。"
     }
   },
   "legacy": {
     "cleared": "旧版深度研究记录已在 v2 升级时清理。",
     "remove": "移除此引用"
+  },
+  "process": {
+    "advancedDetails": "高级详情"
   }
 }

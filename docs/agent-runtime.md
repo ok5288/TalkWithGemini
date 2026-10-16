@@ -126,13 +126,33 @@ read-only effects. Plan approval does not bypass the normal Agent approval
 policy. The host supplies session and message identity out of band, and
 model-supplied filters may narrow approved domains and dates but cannot widen
 them. See [Deep Research workflows](research-workflows.md) for templates, source
-adapters, steering, reports, and report questions.
+adapters, recovery, reports, and report questions.
 
 Research reports are immutable, content-addressed Artifacts. Synthesis runs
 without tools and keeps source-backed findings, unverified material, and model
 knowledge visibly separate. A partial report remains readable with its gaps.
 Refreshing never launches network work automatically; a checkpoint is resumed
 only after the user explicitly chooses Resume.
+
+Research requests use bounded pre-output retries. Text, tools, source callbacks,
+checkpoint activity, or resuming a wave prevent replay. Explicit provider
+rejections are preserved as coded errors. A connection failure without report
+text pauses for manual Resume, preserving committed tool results and query
+accounting; storage failures take priority.
+Completed tool turns awaiting archive resume without tool dispatch. Pending
+checkpoints are validated and settled before stage budget or stop checks;
+missing or mismatched history stops recovery.
+Query reservations are durable before dispatch, including requests interrupted
+without a terminal tool receipt; refunds commit the updated net ledger.
+
+A successful, verified report publication conditionally changes its session
+from Research to Auto. Ordinary chat lazily projects completed reports found in
+that request's branch, with session and version checks and a per-report size
+limit. Research more and refresh explicitly return to planning. A failed edit
+or follow-up keeps the previous plan/report and restores the prior mode.
+Compression retains branch-local Research task references and resolves the
+latest report at request time. A runtime-only mode revision protects explicit
+user mode selections while unrelated settings can change during rollback.
 
 ## Profiles and precedence
 

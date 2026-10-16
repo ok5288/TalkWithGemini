@@ -300,7 +300,7 @@ export const CustomSelect = React.forwardRef<
         placement="bottom-start"
         matchAnchorWidth
         maxHeight={240}
-        className={`z-50 overflow-hidden overflow-y-auto rounded-md border border-input bg-popover text-popover-foreground shadow-md custom-scrollbar transform transition-[opacity,transform] duration-200 origin-top ${
+        className={`z-[10000] overflow-hidden overflow-y-auto rounded-md border border-input bg-popover text-popover-foreground shadow-md custom-scrollbar transform transition-[opacity,transform] duration-200 origin-top ${
           isClosing
             ? "opacity-0 scale-95"
             : "opacity-100 scale-100 animate-in fade-in zoom-in-95"

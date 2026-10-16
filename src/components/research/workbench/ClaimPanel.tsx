@@ -44,7 +44,7 @@ export function ClaimPanel({
   }, [claims, query, status]);
 
   return (
-    <div className="mx-auto w-full max-w-5xl p-4 sm:p-6">
+    <div className="mx-auto w-full max-w-3xl p-4 sm:p-6">
       <h2 className="text-lg font-semibold">{t("claims.title")}</h2>
       <div className="mt-4 grid gap-3 border-b border-border pb-4 sm:grid-cols-2">
         <label className="min-w-0 text-xs font-medium text-foreground">

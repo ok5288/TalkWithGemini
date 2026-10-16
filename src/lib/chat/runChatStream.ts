@@ -45,7 +45,7 @@ import {
   isGoogleProviderType,
   OPENAI_COMPATIBLE_PROVIDER_TYPE,
 } from "../providers/providerTypes";
-import { ValidationError } from "../errors";
+import { ApiError, ValidationError } from "../errors";
 import {
   ANTHROPIC_FILES_BETA,
   hasUploadedImageFiles,
@@ -53,6 +53,8 @@ import {
   uploadGoogleImageFiles,
   uploadOpenAIImageFiles,
 } from "../providers/imageFiles";
+
+import { classifyModelError, getModelErrorStatus } from "./providerErrors";
 
 export type ProviderConfig = ProviderRuntimeConfig;
 
@@ -348,9 +350,27 @@ export async function runChatStream(
     if (isAbortError(error, signal)) {
       return;
     }
-    const normalizedError = responseFormat
+    let normalizedError = responseFormat
       ? normalizeStructuredOutputCapabilityError(error)
       : error;
+    const status = getModelErrorStatus(normalizedError);
+    if (
+      !(normalizedError instanceof ApiError) &&
+      status !== undefined &&
+      ([401, 403, 404, 408, 429].includes(status) ||
+        (status >= 500 && status <= 599))
+    ) {
+      const kind = classifyModelError(normalizedError);
+      normalizedError = new ApiError(
+        normalizedError instanceof Error
+          ? normalizedError.message
+          : "Provider request failed",
+        status,
+        kind === "rate_limit"
+          ? "PROVIDER_RATE_LIMITED"
+          : `PROVIDER_${kind.toUpperCase()}`,
+      );
+    }
     runtime.logStreamError(normalizedError, options);
     throw normalizedError;
   }

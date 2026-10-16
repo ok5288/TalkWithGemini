@@ -1,3 +1,4 @@
+import type { ResearchBudgetPreset } from "@/lib/research/types";
 import { useMemo } from "react";
 
 import { useResearchRuntime } from "@/components/research/ResearchRuntimeProvider";
@@ -13,12 +14,8 @@ export function useTaskActions(taskId: string) {
       onConfirmPlan: () => void runtime.confirmPlan(taskId),
       onAdjustPlan: (instruction: string) =>
         runtime.adjustPlan(taskId, instruction),
-      onUpdatePlanStrategy: (strategy: {
-        initialBreadth: number;
-        maxDepth: number;
-        maxQueries: number;
-        resultsPerQuery: number;
-      }) => runtime.updatePlanStrategy(taskId, strategy),
+      onUpdatePlanPreset: (preset: ResearchBudgetPreset) =>
+        runtime.updatePlanPreset(taskId, preset),
       onPause: () => void runtime.pauseTask(taskId),
       onResume: () => void runtime.resumeTask(taskId),
       onCancel: () => void runtime.cancelTask(taskId),

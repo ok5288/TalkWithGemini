@@ -12,19 +12,16 @@ import { createPortal } from "react-dom";
 import { useLocale, useTranslations } from "next-intl";
 import {
   Check,
-  ChevronLeft,
-  ChevronRight,
   Download,
   Filter,
+  Layers3,
   Loader2,
   Plus,
   RefreshCw,
   Save,
-  Search,
   ScrollText,
   Trash2,
   X,
-  Layers3,
 } from "lucide-react";
 import type { SkillBundle, SkillCatalogEntry, TextSkill } from "@/types";
 import { useSettingsStore } from "@/store/core/settingsStore";
@@ -44,6 +41,19 @@ import { MARKET_LIMITS } from "@/config/limits";
 import { logDevError } from "@/lib/utils/devLogger";
 import type { MarketLoadResult } from "@/lib/market/loadResult";
 import MarketLoadNotice from "@/components/ui/MarketLoadNotice";
+import {
+  PanelBadge,
+  PanelCard,
+  PanelCreateButton,
+  PanelEmpty,
+  PanelHeader,
+  PanelIconButton,
+  PanelLoading,
+  PanelPagination,
+  PanelRoot,
+  PanelSearch,
+  PanelSection,
+} from "@/components/ui/panel";
 import SkillParameterEditor from "./SkillParameterEditor";
 import SkillBundleEditor from "./SkillBundleEditor";
 import { Button } from "@/components/ui/primitives";
@@ -280,12 +290,12 @@ const SkillEditorModal = ({
         aria-labelledby={titleId}
         tabIndex={-1}
         onKeyDown={handleKeyDown}
-        className="flex max-h-[calc(100dvh-2rem)] w-full max-w-2xl flex-col gap-4 overflow-hidden overscroll-contain rounded-2xl border border-gray-200 bg-white p-6 shadow-2xl dark:border-border dark:bg-card sm:max-h-[90vh]"
+        className="flex max-h-[calc(100dvh-2rem)] w-full max-w-2xl flex-col gap-4 overflow-hidden overscroll-contain rounded-2xl border border-border bg-card p-6 shadow-2xl sm:max-h-[90vh]"
       >
         <div className="flex items-center justify-between gap-3">
           <h2
             id={titleId}
-            className="flex min-w-0 items-center gap-2 truncate text-lg font-bold text-gray-800 dark:text-foreground"
+            className="flex min-w-0 items-center gap-2 truncate text-lg font-bold text-foreground"
           >
             <ScrollText size={20} className="text-emerald-500" />
             {skill ? t("editSkill") : t("createSkill")}
@@ -296,7 +306,7 @@ const SkillEditorModal = ({
             type="button"
             aria-label={t("closeEditor")}
             onClick={onClose}
-            className="rounded-full p-1 text-gray-500 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 dark:hover:bg-muted"
+            className="rounded-full p-1 text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
           >
             <X size={20} aria-hidden="true" />
           </Button>
@@ -304,7 +314,7 @@ const SkillEditorModal = ({
 
         <div className="grid flex-1 gap-4 overflow-y-auto pr-1 custom-scrollbar md:grid-cols-2">
           {!skill && (
-            <label className="space-y-1 text-sm font-medium text-gray-700 dark:text-foreground/85">
+            <label className="space-y-1 text-sm font-medium text-foreground/85">
               <span>{t("skillId")}</span>
               <input
                 type="text"
@@ -314,11 +324,11 @@ const SkillEditorModal = ({
                 value={draft.id}
                 onChange={(event) => updateDraft({ id: event.target.value })}
                 placeholder="custom-writing-helper"
-                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm outline-none focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/20 dark:border-border dark:bg-muted"
+                className="w-full rounded-xl border border-border bg-muted px-3 py-2 text-sm outline-none focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/20"
               />
             </label>
           )}
-          <label className="space-y-1 text-sm font-medium text-gray-700 dark:text-foreground/85">
+          <label className="space-y-1 text-sm font-medium text-foreground/85">
             <span>{t("skillTitle")}</span>
             <input
               type="text"
@@ -326,10 +336,10 @@ const SkillEditorModal = ({
               autoComplete="off"
               value={draft.title}
               onChange={(event) => updateDraft({ title: event.target.value })}
-              className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm outline-none focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/20 dark:border-border dark:bg-muted"
+              className="w-full rounded-xl border border-border bg-muted px-3 py-2 text-sm outline-none focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/20"
             />
           </label>
-          <label className="space-y-1 text-sm font-medium text-gray-700 dark:text-foreground/85">
+          <label className="space-y-1 text-sm font-medium text-foreground/85">
             <span>{t("category")}</span>
             <input
               type="text"
@@ -340,10 +350,10 @@ const SkillEditorModal = ({
               onChange={(event) =>
                 updateDraft({ category: event.target.value })
               }
-              className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm outline-none focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/20 dark:border-border dark:bg-muted"
+              className="w-full rounded-xl border border-border bg-muted px-3 py-2 text-sm outline-none focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/20"
             />
           </label>
-          <label className="space-y-1 text-sm font-medium text-gray-700 dark:text-foreground/85 md:col-span-2">
+          <label className="space-y-1 text-sm font-medium text-foreground/85 md:col-span-2">
             <span>{t("skillDescription")}</span>
             <textarea
               name="skill-description"
@@ -351,16 +361,16 @@ const SkillEditorModal = ({
               onChange={(event) =>
                 updateDraft({ description: event.target.value })
               }
-              className="h-20 w-full resize-none rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm outline-none focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/20 dark:border-border dark:bg-muted"
+              className="h-20 w-full resize-none rounded-xl border border-border bg-muted px-3 py-2 text-sm outline-none focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/20"
             />
           </label>
-          <label className="space-y-1 text-sm font-medium text-gray-700 dark:text-foreground/85 md:col-span-2">
+          <label className="space-y-1 text-sm font-medium text-foreground/85 md:col-span-2">
             <span>{t("skillInstructions")}</span>
             <textarea
               name="skill-instructions"
               value={draft.content}
               onChange={(event) => updateDraft({ content: event.target.value })}
-              className="h-28 w-full resize-none rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm outline-none focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/20 dark:border-border dark:bg-muted"
+              className="h-28 w-full resize-none rounded-xl border border-border bg-muted px-3 py-2 text-sm outline-none focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/20"
             />
           </label>
           <SkillParameterEditor
@@ -370,7 +380,7 @@ const SkillEditorModal = ({
           <div className="space-y-2 md:col-span-2">
             <label
               htmlFor={tagInputId}
-              className="text-sm font-medium text-gray-700 dark:text-foreground/85"
+              className="text-sm font-medium text-foreground/85"
             >
               {t("tags")}
             </label>
@@ -389,7 +399,7 @@ const SkillEditorModal = ({
                   }
                 }}
                 placeholder={t("tagPlaceholder")}
-                className="min-w-0 flex-1 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm outline-none focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/20 dark:border-border dark:bg-muted"
+                className="min-w-0 flex-1 rounded-xl border border-border bg-muted px-3 py-2 text-sm outline-none focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/20"
               />
               <Button
                 variant="bare"
@@ -413,7 +423,7 @@ const SkillEditorModal = ({
                       tags: draft.tags.filter((item) => item !== tag),
                     })
                   }
-                  className="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-600 hover:bg-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 dark:bg-muted dark:text-foreground/80"
+                  className="rounded-full bg-muted px-2 py-1 text-xs text-muted-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
                 >
                   {tag}
                 </Button>
@@ -457,7 +467,7 @@ const SkillEditorModal = ({
               variant="bare"
               type="button"
               onClick={onClose}
-              className="rounded-lg px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 dark:text-foreground/85 dark:hover:bg-muted"
+              className="rounded-lg px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
             >
               {t("cancel")}
             </Button>
@@ -501,44 +511,43 @@ const SkillCard = ({
   const isInstalled = mode === "installed";
 
   return (
-    <div className="flex h-full flex-col rounded-2xl border border-gray-200 bg-white/40 p-4 backdrop-blur-md transition-[border-color,box-shadow] duration-300 hover:border-emerald-300 dark:border-border dark:bg-muted/40 dark:hover:border-emerald-700">
+    <PanelCard className="p-4">
       <div className="mb-3 flex items-start justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-1">
-          <span className="w-fit max-w-full truncate rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-600 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300">
+          <PanelBadge className="w-fit max-w-full truncate border border-panel-accent/20">
             {categoryLabel}
-          </span>
+          </PanelBadge>
           <div className="flex flex-wrap gap-1">
             {skill.isCustom ? (
-              <span className="w-fit rounded bg-gray-100 px-1.5 py-0.5 text-[9px] font-medium text-gray-500 dark:bg-accent dark:text-muted-foreground">
+              <PanelBadge tone="neutral" className="w-fit">
                 {t("custom")}
-              </span>
+              </PanelBadge>
             ) : null}
             {isInstalled ? (
-              <span className="w-fit rounded bg-emerald-100 px-1.5 py-0.5 text-[9px] font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
-                {t("installed")}
-              </span>
+              <PanelBadge className="w-fit">{t("installed")}</PanelBadge>
             ) : null}
           </div>
         </div>
         {isInstalled ? (
-          <Check size={16} className="shrink-0 text-emerald-500" />
+          <Check size={16} className="shrink-0 text-panel-accent-text" />
         ) : null}
       </div>
-      <h3 className="mb-1 truncate text-sm font-semibold text-gray-800 dark:text-foreground">
+      <h3 className="mb-1 truncate text-sm font-semibold text-foreground">
         {skill.title}
       </h3>
-      <p className="mb-3 line-clamp-3 flex-1 text-xs leading-relaxed text-gray-500 dark:text-muted-foreground">
+      <p className="mb-3 line-clamp-3 flex-1 text-xs leading-relaxed text-muted-foreground">
         {skill.description}
       </p>
       <div className="mt-auto flex items-center justify-between gap-2">
         <div className="flex min-w-0 flex-wrap gap-1">
           {skill.tags.slice(0, 3).map((tag) => (
-            <span
+            <PanelBadge
               key={tag}
-              className="max-w-20 truncate rounded bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-500 dark:bg-muted dark:text-muted-foreground"
+              tone="neutral"
+              className="max-w-20 truncate rounded"
             >
               {tag}
-            </span>
+            </PanelBadge>
           ))}
         </div>
         <div className="flex shrink-0 items-center gap-1">
@@ -548,7 +557,7 @@ const SkillCard = ({
                 variant="bare"
                 type="button"
                 onClick={onEdit}
-                className="rounded-lg px-2 py-1 text-xs font-medium text-emerald-600 hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 dark:text-emerald-300 dark:hover:bg-emerald-900/20"
+                className="rounded-lg px-2 py-1 text-xs font-medium text-panel-accent-text hover:bg-panel-accent-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-panel-accent/60"
               >
                 {t("edit")}
               </Button>
@@ -571,7 +580,7 @@ const SkillCard = ({
               aria-busy={isBusy || undefined}
               onClick={onInstall}
               disabled={isBusy}
-              className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex items-center gap-1 rounded-lg bg-panel-accent px-2.5 py-1.5 text-xs font-medium text-white hover:bg-panel-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-panel-accent/60 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isBusy ? (
                 <Loader2
@@ -587,7 +596,7 @@ const SkillCard = ({
           )}
         </div>
       </div>
-    </div>
+    </PanelCard>
   );
 };
 
@@ -811,10 +820,10 @@ const SkillMarket: React.FC<SkillMarketProps> = ({ onClose }) => {
                   })
                 : t("filterCategoryAria")
             }
-            className={`flex shrink-0 items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 ${
+            className={`flex shrink-0 items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-panel-accent/60 ${
               selectedCategories.length > 0
-                ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-300"
-                : "bg-transparent text-gray-600 hover:bg-gray-100 dark:text-foreground/85 dark:hover:bg-muted"
+                ? "bg-panel-accent-soft text-panel-accent-text"
+                : "bg-transparent text-muted-foreground hover:bg-muted"
             }`}
           >
             <Filter size={12} aria-hidden="true" />
@@ -875,7 +884,7 @@ const SkillMarket: React.FC<SkillMarketProps> = ({ onClose }) => {
   })();
 
   return (
-    <div className="flex h-full w-full flex-col overflow-hidden animate-in fade-in duration-300">
+    <PanelRoot accent="skills">
       {showEditor && (
         <SkillEditorModal
           skill={editingSkill}
@@ -899,53 +908,31 @@ const SkillMarket: React.FC<SkillMarketProps> = ({ onClose }) => {
         />
       ) : null}
 
-      <div className="sticky top-0 z-10 flex shrink-0 items-center justify-between gap-3 border-b border-gray-200/50 bg-white/40 px-6 py-4 backdrop-blur-md dark:border-border dark:bg-card/40">
-        <div className="flex min-w-0 items-center gap-3">
-          <div
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-linear-to-tr from-emerald-500 to-cyan-500 text-white shadow-lg shadow-emerald-500/20"
-            aria-hidden="true"
-          >
-            <ScrollText size={20} />
-          </div>
-          <div className="min-w-0">
-            <h1 className="truncate text-lg font-bold text-gray-800 dark:text-foreground">
-              {t("title")}
-            </h1>
-            <p className="truncate text-xs text-gray-500 dark:text-muted-foreground">
-              {t("subtitle")}
-            </p>
-          </div>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <Button
-            variant="bare"
+      <PanelHeader
+        icon={<ScrollText size={20} />}
+        title={t("title")}
+        subtitle={t("subtitle")}
+        actions={
+          <PanelIconButton
             type="button"
             aria-label={t("refreshAria")}
             aria-busy={isRefreshing || undefined}
             onClick={() => void loadSkills(true)}
             disabled={isRefreshing}
-            className="rounded-full p-2 text-gray-500 transition-colors hover:bg-gray-200/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 disabled:cursor-not-allowed disabled:opacity-50 dark:text-muted-foreground dark:hover:bg-accent/50"
           >
             {isRefreshing ? (
               <Loader2 size={18} className="animate-spin" aria-hidden="true" />
             ) : (
               <RefreshCw size={18} aria-hidden="true" />
             )}
-          </Button>
-          <Button
-            variant="bare"
-            type="button"
-            aria-label={t("closeMarket")}
-            onClick={onClose}
-            className="rounded-full p-2 text-gray-500 transition-colors hover:bg-gray-200/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 dark:text-muted-foreground dark:hover:bg-accent/50"
-          >
-            <X size={20} aria-hidden="true" />
-          </Button>
-        </div>
-      </div>
+          </PanelIconButton>
+        }
+        onClose={onClose}
+        closeLabel={t("closeMarket")}
+      />
 
       {marketNoticeMessage ? (
-        <div className="mx-6 mt-4">
+        <div className="mx-4 mt-4 sm:mx-6">
           <MarketLoadNotice
             status={marketLoadResult?.status}
             message={marketNoticeMessage}
@@ -957,28 +944,15 @@ const SkillMarket: React.FC<SkillMarketProps> = ({ onClose }) => {
       ) : null}
 
       {/* Search Bar */}
-      <div className="mx-auto flex w-full max-w-7xl shrink-0 flex-wrap gap-3 px-6 pb-6 pt-6">
-        <div className="group relative min-w-0 flex-1">
-          <div className="absolute inset-0 rounded-2xl bg-emerald-500/20 opacity-0 blur-xl transition-opacity duration-500 group-hover:opacity-100 dark:bg-emerald-500/10" />
-          <div className="relative flex items-center rounded-2xl border border-gray-200 bg-white/60 px-4 py-3 shadow-sm backdrop-blur-xl transition-[border-color,box-shadow] focus-within:border-emerald-500/50 focus-within:ring-2 focus-within:ring-emerald-500/30 dark:border-border dark:bg-muted/60">
-            <label htmlFor={searchInputId} className="sr-only">
-              {t("searchLabel")}
-            </label>
-            <Search size={20} className="mr-3 text-gray-400" />
-            <input
-              id={searchInputId}
-              type="search"
-              name="skill-search"
-              autoComplete="off"
-              spellCheck={false}
-              value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
-              placeholder={t("searchPlaceholder")}
-              className="min-w-0 flex-1 border-none bg-transparent text-base text-gray-800 outline-none placeholder-gray-400 dark:text-foreground"
-            />
-          </div>
-        </div>
-      </div>
+      <PanelSearch
+        id={searchInputId}
+        name="skill-search"
+        type="search"
+        label={t("searchLabel")}
+        placeholder={t("searchPlaceholder")}
+        value={searchTerm}
+        onChange={(event) => setSearchTerm(event.target.value)}
+      />
 
       <div className="flex-1 overflow-y-auto px-4 pb-10 custom-scrollbar">
         <div className="mx-auto flex min-h-full max-w-7xl flex-col gap-8">
@@ -991,31 +965,25 @@ const SkillMarket: React.FC<SkillMarketProps> = ({ onClose }) => {
             </div>
           ) : null}
 
-          <section>
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 px-1">
-              <div>
-                <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-gray-800 dark:text-foreground">
-                  <Layers3 size={16} className="text-cyan-500" />
-                  {t("bundles.heading")}
-                </h2>
-                <p className="mt-1 text-xs text-gray-500 dark:text-muted-foreground">
-                  {t("bundles.headingDescription")}
-                </p>
-              </div>
-              <Button
-                variant="bare"
+          <PanelSection
+            title={t("bundles.heading")}
+            icon={<Layers3 size={16} />}
+            actions={
+              <PanelCreateButton
                 type="button"
                 onClick={() => {
                   setEditingBundle(undefined);
                   setShowBundleEditor(true);
                 }}
                 disabled={installedSkills.length === 0}
-                className="inline-flex items-center gap-1 rounded-lg bg-cyan-50 px-3 py-1.5 text-xs font-medium text-cyan-700 transition-colors hover:bg-cyan-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/60 disabled:opacity-50 dark:bg-cyan-950/30 dark:text-cyan-300"
               >
-                <Plus size={14} aria-hidden="true" />
                 {t("bundles.new")}
-              </Button>
-            </div>
+              </PanelCreateButton>
+            }
+          >
+            <p className="-mt-2 mb-4 px-1 text-xs text-muted-foreground">
+              {t("bundles.headingDescription")}
+            </p>
             {skillBundles.length > 0 ? (
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {skillBundles.map((bundle) => {
@@ -1024,16 +992,16 @@ const SkillMarket: React.FC<SkillMarketProps> = ({ onClose }) => {
                   );
                   const isActive = activeSkillBundleIds.includes(bundle.id);
                   return (
-                    <div
+                    <PanelCard
                       key={bundle.id}
-                      className="flex flex-col rounded-2xl border border-cyan-100 bg-cyan-50/30 p-4 dark:border-cyan-900/40 dark:bg-cyan-950/10"
+                      className="bg-panel-accent-2/5 border-panel-accent-2/20 p-4"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <h3 className="truncate text-sm font-semibold text-gray-800 dark:text-foreground">
+                          <h3 className="truncate text-sm font-semibold text-foreground">
                             {bundle.title}
                           </h3>
-                          <p className="mt-1 line-clamp-2 text-xs text-gray-500 dark:text-muted-foreground">
+                          <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
                             {bundle.description ||
                               t("bundles.stepCount", {
                                 count: bundle.steps.length,
@@ -1047,7 +1015,7 @@ const SkillMarket: React.FC<SkillMarketProps> = ({ onClose }) => {
                           aria-checked={isActive}
                           disabled={missingSkills.length > 0}
                           onClick={() => toggleSkillBundleActive(bundle.id)}
-                          className={`rounded-full px-2 py-1 text-[10px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/60 disabled:opacity-50 ${isActive ? "bg-cyan-600 text-white" : "bg-gray-100 text-gray-500 dark:bg-muted dark:text-muted-foreground"}`}
+                          className={`rounded-full px-2 py-1 text-[10px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-panel-accent/60 disabled:opacity-50 ${isActive ? "bg-panel-accent text-white" : "bg-muted text-muted-foreground"}`}
                         >
                           {isActive
                             ? t("bundles.active")
@@ -1056,12 +1024,21 @@ const SkillMarket: React.FC<SkillMarketProps> = ({ onClose }) => {
                       </div>
                       <div className="mt-3 flex flex-wrap gap-1">
                         {bundle.steps.map((step, index) => (
-                          <span
+                          <PanelBadge
                             key={step.id}
-                            className={`rounded px-1.5 py-0.5 text-[10px] ${installedIdSet.has(step.skillId) ? "bg-white text-gray-600 dark:bg-card dark:text-foreground/75" : "bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-300"}`}
+                            tone={
+                              installedIdSet.has(step.skillId)
+                                ? "neutral"
+                                : "accent"
+                            }
+                            className={
+                              installedIdSet.has(step.skillId)
+                                ? "rounded bg-card text-foreground/75"
+                                : "rounded bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-300"
+                            }
                           >
                             {index + 1}. {step.skillId}
-                          </span>
+                          </PanelBadge>
                         ))}
                       </div>
                       {missingSkills.length > 0 ? (
@@ -1076,40 +1053,37 @@ const SkillMarket: React.FC<SkillMarketProps> = ({ onClose }) => {
                           setEditingBundle(bundle);
                           setShowBundleEditor(true);
                         }}
-                        className="mt-4 self-end rounded-lg px-2 py-1 text-xs font-medium text-cyan-700 hover:bg-cyan-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/60 dark:text-cyan-300 dark:hover:bg-cyan-950/30"
+                        className="mt-4 self-end rounded-lg px-2 py-1 text-xs font-medium text-panel-accent-text hover:bg-panel-accent-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-panel-accent/60"
                       >
                         {t("edit")}
                       </Button>
-                    </div>
+                    </PanelCard>
                   );
                 })}
               </div>
             ) : (
-              <div className="rounded-xl border border-dashed border-cyan-200 px-4 py-8 text-center text-xs text-gray-500 dark:border-cyan-900/50 dark:text-muted-foreground">
+              <PanelEmpty className="rounded-xl px-4 py-8 text-xs">
                 {t("bundles.none")}
-              </div>
+              </PanelEmpty>
             )}
-          </section>
+          </PanelSection>
 
-          <section>
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 px-1">
-              <h2 className="flex min-w-0 items-center gap-2 truncate text-sm font-bold uppercase tracking-wider text-gray-800 dark:text-foreground">
-                <ScrollText size={16} className="text-emerald-500" />
-                <span className="truncate">{t("installedSkills")}</span>
-              </h2>
-              <Button
-                variant="bare"
+          <PanelSection
+            title={t("installedSkills")}
+            icon={<ScrollText size={16} />}
+            actions={
+              <PanelCreateButton
                 type="button"
                 aria-label={t("createCustomAria")}
                 onClick={() => {
                   setEditingSkill(undefined);
                   setShowEditor(true);
                 }}
-                className="flex shrink-0 items-center gap-1 rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-600 transition-colors hover:bg-emerald-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 dark:bg-emerald-900/20 dark:text-emerald-300"
               >
-                <Plus size={14} aria-hidden="true" /> {t("custom")}
-              </Button>
-            </div>
+                {t("custom")}
+              </PanelCreateButton>
+            }
+          >
             {filteredInstalledSkills.length > 0 ? (
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {filteredInstalledSkills.map((skill) => (
@@ -1131,33 +1105,21 @@ const SkillMarket: React.FC<SkillMarketProps> = ({ onClose }) => {
                 ))}
               </div>
             ) : (
-              <div className="py-10 text-center text-sm text-gray-400">
+              <PanelEmpty className="border-0 py-10">
                 {t("noInstalledSkills")}
-              </div>
+              </PanelEmpty>
             )}
-          </section>
+          </PanelSection>
 
           {/* Available Section */}
-          <section className="flex flex-1 flex-col">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 px-1">
-              <h2 className="min-w-0 truncate text-sm font-bold uppercase tracking-wider text-gray-500 dark:text-muted-foreground">
-                {searchTerm ? t("searchResults") : t("allSkills")}
-              </h2>
-              {renderCategoryFilter()}
-            </div>
+          <PanelSection
+            className="flex flex-1 flex-col"
+            title={searchTerm ? t("searchResults") : t("allSkills")}
+            muted
+            actions={renderCategoryFilter()}
+          >
             {isLoading ? (
-              <div
-                role="status"
-                aria-live="polite"
-                className="flex h-64 flex-col items-center justify-center gap-4 text-gray-400"
-              >
-                <Loader2
-                  size={32}
-                  className="animate-spin text-emerald-500"
-                  aria-hidden="true"
-                />
-                <span className="text-sm font-medium">{t("loading")}</span>
-              </div>
+              <PanelLoading label={t("loading")} />
             ) : (
               <>
                 <div className="grid flex-1 grid-cols-1 content-start gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -1177,47 +1139,31 @@ const SkillMarket: React.FC<SkillMarketProps> = ({ onClose }) => {
                   ["fresh", "cache", "fallback"].includes(
                     marketLoadResult.status,
                   ) && (
-                    <div className="py-12 text-center text-gray-400">
+                    <PanelEmpty className="border-0 py-12">
                       {t("noSkillsFound")}
-                    </div>
+                    </PanelEmpty>
                   )}
                 {totalPages > 1 && (
-                  <div className="mt-auto flex items-center justify-center gap-4 py-6">
-                    <Button
-                      variant="bare"
-                      type="button"
-                      aria-label={t("prevPageAria")}
-                      onClick={() =>
-                        setCurrentPage((page) => Math.max(1, page - 1))
-                      }
-                      disabled={currentPage === 1}
-                      className="rounded-lg border border-gray-200 bg-white p-2 text-gray-600 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 disabled:cursor-not-allowed disabled:opacity-50 dark:border-border dark:bg-muted dark:text-foreground/85 dark:hover:bg-accent"
-                    >
-                      <ChevronLeft size={16} aria-hidden="true" />
-                    </Button>
-                    <span className="text-sm font-medium tabular-nums text-gray-600 dark:text-foreground/85">
-                      {t("pageOf", { currentPage, totalPages })}
-                    </span>
-                    <Button
-                      variant="bare"
-                      type="button"
-                      aria-label={t("nextPageAria")}
-                      onClick={() =>
-                        setCurrentPage((page) => Math.min(totalPages, page + 1))
-                      }
-                      disabled={currentPage === totalPages}
-                      className="rounded-lg border border-gray-200 bg-white p-2 text-gray-600 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 disabled:cursor-not-allowed disabled:opacity-50 dark:border-border dark:bg-muted dark:text-foreground/85 dark:hover:bg-accent"
-                    >
-                      <ChevronRight size={16} aria-hidden="true" />
-                    </Button>
-                  </div>
+                  <PanelPagination
+                    page={currentPage}
+                    totalPages={totalPages}
+                    onPrev={() =>
+                      setCurrentPage((page) => Math.max(1, page - 1))
+                    }
+                    onNext={() =>
+                      setCurrentPage((page) => Math.min(totalPages, page + 1))
+                    }
+                    prevLabel={t("prevPageAria")}
+                    nextLabel={t("nextPageAria")}
+                    label={t("pageOf", { currentPage, totalPages })}
+                  />
                 )}
               </>
             )}
-          </section>
+          </PanelSection>
         </div>
       </div>
-    </div>
+    </PanelRoot>
   );
 };
 

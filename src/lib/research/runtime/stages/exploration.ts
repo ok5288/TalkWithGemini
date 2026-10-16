@@ -12,6 +12,7 @@ import { hasUnattemptedSteeringQuestions } from "@/lib/research/steering";
 import { persistRun, type ResearchExecutionContext } from "../executionContext";
 import { consumeResearchSteering, reopenResearchSteering } from "../steering";
 import { aggregateExecutionUsage, remainingBudget } from "../usage";
+import { ResearchCheckpointUnavailableError } from "../dependencyErrors";
 import { executeWave } from "../wave";
 
 /** Hard limits also apply to newly submitted questions. */
@@ -66,13 +67,16 @@ export async function runExplorationStage(ctx: ResearchExecutionContext) {
   while (waveGuard < 64) {
     waveGuard += 1;
     ctx.controller.signal.throwIfAborted();
-    await consumeResearchSteering(ctx);
+    const recovering = Boolean(
+      ctx.store.tasksById[ctx.taskId].checkpoint?.historyPath,
+    );
+    if (!recovering) await consumeResearchSteering(ctx);
     if (ctx.run.phase === "awaiting_scope_approval") return;
-    if (!explorationBudgetAvailable(ctx)) {
+    if (!recovering && !explorationBudgetAvailable(ctx)) {
       await consumeResearchSteering(ctx, true);
       break;
     }
-    if (ctx.run.stopReason) {
+    if (!recovering && ctx.run.stopReason) {
       await consumeResearchSteering(ctx, true);
       const isSoftStop = [
         "coverage_satisfied",
@@ -93,6 +97,10 @@ export async function runExplorationStage(ctx: ResearchExecutionContext) {
     let activeWave = ctx.run.waves.find((wave) =>
       ["queued", "running", "paused"].includes(wave.status),
     );
+    if (recovering && !activeWave)
+      throw new ResearchCheckpointUnavailableError(
+        ctx.dependencyText.checkpointUnavailable,
+      );
     if (!activeWave) {
       let next = createNextResearchWave(ctx.run);
       if (!next) {
