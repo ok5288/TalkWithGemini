@@ -179,6 +179,21 @@ export function getProviderApiKey(provider: ProviderRuntimeConfig): string {
   return provider.apiKey?.trim() || "";
 }
 
+export function isDefaultProviderUrl(baseUrl: string | undefined): boolean {
+  if (!baseUrl || !baseUrl.trim() || baseUrl === "default") return true;
+  const clean = trimBaseUrl(baseUrl);
+  return Object.values(DEFAULT_PROVIDER_API).some(
+    (entry) => clean === entry.baseUrl || clean.startsWith(entry.baseUrl),
+  );
+}
+
+export function getDefaultProviderBaseUrl(type: ProviderType): string {
+  const normalized = normalizeProviderType(type);
+  const rootUrl = DEFAULT_PROVIDER_API[normalized].baseUrl;
+  return normalizeProviderBaseUrl(rootUrl, normalized);
+}
+
+
 export function redactUrl(url: string): string {
   try {
     const parsed = new URL(url);
