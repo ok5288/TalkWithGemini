@@ -62,6 +62,7 @@ import {
   fetchDirectProviderModels,
   shouldUseDirectCall,
 } from "@/services/api/chat/transport";
+import { getDefaultProviderBaseUrl, isDefaultProviderUrl } from "@/lib/security/urlPolicy";
 
 type ProviderTypeOption = {
   value: ProviderType;
@@ -618,11 +619,21 @@ const ProviderSettings = () => {
                     <CustomSelect
                       id={providerTypeInputId}
                       value={currentProvider.type}
-                      onChange={(value) =>
+                      onChange={(value) => {
+                        const nextType = value as ProviderType;
+                        const shouldUpdateUrl = isDefaultProviderUrl(currentProvider.baseUrl);
+                        const nextUrl = shouldUpdateUrl
+                          ? getDefaultProviderBaseUrl(nextType)
+                          : currentProvider.baseUrl;
+                        if (shouldUpdateUrl) {
+                          setBaseUrlDraft(nextUrl);
+                          setBaseUrlError(null);
+                        }
                         updateProvider(currentProvider.id, {
-                          type: value as ProviderType,
-                        })
-                      }
+                          type: nextType,
+                          baseUrl: nextUrl,
+                        });
+                      }}
                       options={providerTypeOptions}
                       icon={Server}
                       ariaLabel={t("apiType")}
@@ -633,8 +644,8 @@ const ProviderSettings = () => {
                       renderValue={(option, label) =>
                         option
                           ? renderProviderTypeOption(
-                              option as ProviderTypeOption,
-                            )
+                            option as ProviderTypeOption,
+                          )
                           : label
                       }
                     />
@@ -808,16 +819,16 @@ const ProviderSettings = () => {
                       aria-label={
                         deleteConfirmProviderId === currentProvider.id
                           ? t("confirmDeleteAria", {
-                              name: currentProvider.name,
-                            })
+                            name: currentProvider.name,
+                          })
                           : t("deleteAria", { name: currentProvider.name })
                       }
                       onClick={handleDeleteProvider}
                       className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-[color,background-color,box-shadow] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60 ${
                         deleteConfirmProviderId === currentProvider.id
-                          ? "bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-200"
-                          : "text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600"
-                      }`}
+                        ? "bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-200"
+                        : "text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600"
+                        }`}
                     >
                       {deleteConfirmProviderId === currentProvider.id ? (
                         <Check size={16} aria-hidden="true" />

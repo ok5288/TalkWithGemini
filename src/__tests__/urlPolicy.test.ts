@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  getDefaultProviderBaseUrl,
   getProviderApiKey,
   getProviderChatUrl,
   getProviderGoogleSdkOptions,
   getProviderModelsUrl,
   getSafeUrlPolicy,
+  isDefaultProviderUrl,
   isPrivateIpAddress,
   normalizeProviderBaseUrl,
   validateOutboundUrl,
@@ -400,5 +402,27 @@ describe("url policy and provider runtime helpers", () => {
     await vi.advanceTimersByTimeAsync(25);
 
     await expectation;
+  });
+
+    it("resolves default provider base URLs and detects default provider URLs", () => {
+    expect(getDefaultProviderBaseUrl("Google")).toBe(
+      "https://generativelanguage.googleapis.com/v1beta",
+    );
+    expect(getDefaultProviderBaseUrl("Anthropic")).toBe(
+      "https://api.anthropic.com/v1",
+    );
+    expect(getDefaultProviderBaseUrl("OpenAI")).toBe(
+      "https://api.openai.com/v1",
+    );
+    expect(getDefaultProviderBaseUrl("OpenAI Compatible")).toBe(
+      "https://api.openai.com/v1",
+    );
+
+    expect(isDefaultProviderUrl("")).toBe(true);
+    expect(isDefaultProviderUrl("default")).toBe(true);
+    expect(isDefaultProviderUrl("https://api.openai.com")).toBe(true);
+    expect(isDefaultProviderUrl("https://generativelanguage.googleapis.com")).toBe(true);
+    expect(isDefaultProviderUrl("https://api.anthropic.com")).toBe(true);
+    expect(isDefaultProviderUrl("https://my-custom-proxy.example.com")).toBe(false);
   });
 });
