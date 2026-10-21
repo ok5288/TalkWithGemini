@@ -7,7 +7,22 @@ group changes under a level-2 heading that matches the release tag, such as
 `## v2.0.0`; the release workflow uses that section as the GitHub release notes
 when the matching tag is pushed.
 
-## Unreleased
+## v2.7.0
+
+- **Intelligent UI viewer:** Added a dedicated viewer with a desktop side panel
+  and a narrow-screen dialog, plus navigation back to the original message.
+  Moving an interface saves pending state before transferring its live runtime;
+  failed saves and unconfirmed imports keep it in its current view.
+- **Interface explanations and repair:** Explain, Modify, and supported Repair
+  actions prepare editable chat drafts with frozen visible-result context while
+  preserving unsent text and attachments. Requests require manual sending and
+  recheck source access. Retrying an HTML interface stays local; ordinary chat
+  follow-ups can use bounded interface context.
+- **Explorer v2:** Added ordered sections with multiple charts, metrics, tables,
+  and controls linked to the same filtered dataset. Backups preserve v2 data;
+  older clients keep unsupported definitions quarantined and reject incompatible
+  sync data. Current clients can recover valid known v2 definitions while keeping
+  unknown or damaged content inactive.
 
 - **Deep Research flow:** Simplified plan approval with Quick/Standard/Thorough
   choices, compact progress and completion cards, and a report-first reader with
@@ -27,6 +42,21 @@ when the matching tag is pushed.
   user selections while retaining unrelated settings changes.
 - **Shared controls:** Kept research primary actions blue in both themes, fixed
   nested-dialog Escape and select layering, and synchronized session chat modes.
+- **Provider settings:** Switching provider types updates official default Base
+  URLs while preserving explicit custom hosts, paths, API versions, ports, and
+  query settings. Default detection now compares complete URLs instead of host
+  prefixes.
+- **Dependency security:** Updated Hono to 4.13.11 in the application and optional
+  MCP bridge, OpenNext Cloudflare to 1.20.2, MCP SDK to 1.32.0, and the Vite test
+  dependency to 8.1.6 to address published security advisories. Existing deployed
+  applications and bridge images need rebuilding to receive these updates.
+- **MCP redirect safety:** Preserved the SDK's redirect policy in the application
+  fetch wrapper so custom credentials, session IDs, and request bodies are not
+  resent to another origin. Configure a server's final URL when it redirects
+  across hosts or ports, or from HTTPS to HTTP.
+- **Release verification:** Validate matching, non-empty release notes before
+  installing dependencies, cover extraction edge cases with regression tests,
+  and run the browser smoke suite before publishing a GitHub release.
 
 ## v2.6.0
 

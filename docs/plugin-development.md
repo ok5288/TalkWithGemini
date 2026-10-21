@@ -80,6 +80,13 @@ A manifest may raise the risk level, never lower it.
 
 ## MCP servers
 
+MCP HTTP transports follow redirects only within the SDK's origin policy;
+cross-host, cross-port, and HTTPS-to-HTTP redirects are rejected. Configure the
+final MCP endpoint directly when a service redirects to a different origin.
+Custom headers, session identifiers, and tool request bodies must not be forwarded
+to that destination. Directly configured private-network HTTP endpoints remain
+supported.
+
 MCP is part of the plugin system. Installed servers live in
 `installedPlugins`, enabled servers in `activePlugins`, and credentials in
 `pluginConfigs` through the same local BYOK secret path as OpenAPI plugins.

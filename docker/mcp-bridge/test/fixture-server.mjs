@@ -64,7 +64,7 @@ server.registerTool(
       {
         type: "text",
         text: JSON.stringify({
-          path: process.env.PATH ?? null,
+          hasPath: Boolean(process.env.PATH),
           home: process.env.HOME ?? null,
           user: process.env.USER ?? null,
           allowed: process.env.BRIDGE_ALLOWED_TEST ?? null,

@@ -306,8 +306,7 @@ describe("authenticated stdio to Streamable HTTP bridge", () => {
       assert.equal(environment.forbidden, null);
       assert.equal(environment.home, "");
       assert.equal(environment.user, "");
-      assert.equal(typeof environment.path, "string");
-      assert.equal(environment.path.length > 0, true);
+      assert.equal(environment.hasPath, true);
 
       const joinedLogs = logs.join("\n");
       assert.equal(joinedLogs.includes("dXNlcjpwYXNz"), false);
@@ -316,6 +315,32 @@ describe("authenticated stdio to Streamable HTTP bridge", () => {
       await client.close();
     }
   });
+
+  for (const chunked of [false, true]) {
+    it(`rejects oversized ${chunked ? "streamed" : "advertised"} bodies before MCP dispatch`, async () => {
+      const oversized = "x".repeat(1024 * 1024 + 1);
+      const body = chunked
+        ? new ReadableStream({
+            start(controller) {
+              controller.enqueue(new TextEncoder().encode(oversized));
+              controller.close();
+            },
+          })
+        : oversized;
+      const response = await fetch(`${endpoint}/mcp/fixture`, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${TOKEN}`,
+          "content-type": "application/json",
+        },
+        body,
+        ...(chunked ? { duplex: "half" } : {}),
+      });
+      assert.equal(response.status, 413);
+      assert.match((await response.json()).error.message, /too large/);
+      assert.equal((await fetch(`${endpoint}/health`)).status, 200);
+    });
+  }
 
   it("retires a timed-out child and restarts it after bounded backoff", async () => {
     const transport = new StreamableHTTPClientTransport(

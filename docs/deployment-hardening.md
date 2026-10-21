@@ -16,6 +16,13 @@ Dependency audits in the [CI](../.github/workflows/ci.yml) and
 or audit service failures produce GitHub Actions warnings without blocking builds
 or releases. Review the full audit output in the affected step's log.
 
+Tag releases first check that `package.json` and a non-empty `CHANGELOG.md`
+section match the tag, then run source checks, the browser smoke suite, and both
+Next.js and Cloudflare Worker builds before creating the GitHub release. Docker
+image publication runs in its own workflow. A failed tag run always uses the
+tagged source when rerun; fixes made afterward must be included in the source
+chosen for the next release attempt.
+
 ## Official Docker image
 
 The [Docker workflow](../.github/workflows/docker.yml) publishes

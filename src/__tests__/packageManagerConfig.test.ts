@@ -47,7 +47,7 @@ describe("package manager configuration", () => {
       '"brace-expansion@>=4.0.0 <5.0.12": 5.0.12',
       "dompurify: 3.4.16",
       "fast-uri: 3.1.8",
-      "hono: 4.13.7",
+      "hono: 4.13.11",
       "ip-address: 10.7.1",
       '"js-yaml@>=4.0.0 <4.3.2": 4.3.2',
       "protobufjs: 7.6.5",
@@ -59,7 +59,7 @@ describe("package manager configuration", () => {
     for (const override of [
       '"@hono/node-server": 1.19.15',
       "fast-uri: 3.1.8",
-      "hono: 4.13.7",
+      "hono: 4.13.11",
       "ip-address: 10.7.1",
       "qs: 6.16.0",
     ]) {

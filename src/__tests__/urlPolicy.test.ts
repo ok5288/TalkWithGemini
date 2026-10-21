@@ -404,7 +404,7 @@ describe("url policy and provider runtime helpers", () => {
     await expectation;
   });
 
-    it("resolves default provider base URLs and detects default provider URLs", () => {
+  it("resolves default provider base URLs and detects default provider URLs", () => {
     expect(getDefaultProviderBaseUrl("Google")).toBe(
       "https://generativelanguage.googleapis.com/v1beta",
     );
@@ -421,8 +421,37 @@ describe("url policy and provider runtime helpers", () => {
     expect(isDefaultProviderUrl("")).toBe(true);
     expect(isDefaultProviderUrl("default")).toBe(true);
     expect(isDefaultProviderUrl("https://api.openai.com")).toBe(true);
-    expect(isDefaultProviderUrl("https://generativelanguage.googleapis.com")).toBe(true);
+    expect(
+      isDefaultProviderUrl("https://generativelanguage.googleapis.com"),
+    ).toBe(true);
     expect(isDefaultProviderUrl("https://api.anthropic.com")).toBe(true);
-    expect(isDefaultProviderUrl("https://my-custom-proxy.example.com")).toBe(false);
+    expect(isDefaultProviderUrl("https://my-custom-proxy.example.com")).toBe(
+      false,
+    );
+  });
+
+  it.each([
+    "https://api.openai.com.proxy.example/v1",
+    "https://api.openai.com@proxy.example/v1",
+    "https://api.openai.com/custom/v1",
+    "https://api.openai.com/v2",
+    "https://api.openai.com/v1?region=custom",
+    "https://api.openai.com/v1#custom",
+    "https://user:password@api.openai.com/v1",
+    "https://api.openai.com:8443/v1",
+    "https://generativelanguage.googleapis.com/v1",
+  ])("preserves explicitly configured provider URL %s", (url) => {
+    expect(isDefaultProviderUrl(url)).toBe(false);
+  });
+
+  it.each([
+    undefined,
+    " default ",
+    " https://api.openai.com/v1/ ",
+    "https://API.OPENAI.COM:443/v1",
+    "https://api.anthropic.com/v1",
+    "https://generativelanguage.googleapis.com/v1beta",
+  ])("recognizes default provider URL %s", (url) => {
+    expect(isDefaultProviderUrl(url)).toBe(true);
   });
 });

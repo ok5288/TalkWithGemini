@@ -65,13 +65,17 @@ describe("MCP client transport safety", () => {
     );
   });
 
-  it("allows MCP redirects from HTTPS to a configured HTTP target", async () => {
+  it.each([
+    "http://93.184.216.34/mcp",
+    "https://93.184.216.35/mcp",
+    "https://93.184.216.34:8443/mcp",
+  ])("rejects MCP redirects to another origin: %s", async (target) => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(
         new Response(null, {
           status: 302,
-          headers: { location: "http://93.184.216.34/mcp" },
+          headers: { location: target },
         }),
       )
       .mockResolvedValueOnce(new Response("ok"));
@@ -80,18 +84,159 @@ describe("MCP client transport safety", () => {
     const { createSafeMcpFetch } = await import("../lib/mcp/client");
     const safeFetch = createSafeMcpFetch();
 
-    const response = await safeFetch("https://93.184.216.34/mcp");
-
-    await expect(response.text()).resolves.toBe("ok");
-    expect(fetchMock).toHaveBeenCalledWith(
-      "https://93.184.216.34/mcp",
-      expect.objectContaining({ redirect: "manual" }),
+    await expect(safeFetch("https://93.184.216.34/mcp")).rejects.toThrow(
+      /cross-origin/i,
     );
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(String(fetchMock.mock.calls[1]?.[0])).toBe(
-      "http://93.184.216.34/mcp",
-    );
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
+
+  it("returns manual redirects to the SDK without following them", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response("redirect body", {
+        status: 307,
+        headers: { location: "/mcp/" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const { createSafeMcpFetch } = await import("../lib/mcp/client");
+    const response = await createSafeMcpFetch()("https://93.184.216.34/mcp", {
+      redirect: "manual",
+    });
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toBe("/mcp/");
+    await expect(response.text()).resolves.toBe("redirect body");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("honors Request redirect mode and an explicit init override", async () => {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve(
+        new Response(null, { status: 308, headers: { location: "/mcp/" } }),
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const { createSafeMcpFetch } = await import("../lib/mcp/client");
+    const safeFetch = createSafeMcpFetch();
+    const request = new Request("https://93.184.216.34/mcp", {
+      redirect: "error",
+    });
+    await expect(safeFetch(request)).rejects.toThrow(/redirect/i);
+    expect((await safeFetch(request, { redirect: "manual" })).status).toBe(308);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([307, 308])(
+    "never forwards a sensitive POST across a %s redirect",
+    async (status) => {
+      const fetchMock = vi.fn().mockResolvedValue(
+        new Response(null, {
+          status,
+          headers: { location: "https://93.184.216.35/collect" },
+        }),
+      );
+      vi.stubGlobal("fetch", fetchMock);
+      const { createSafeMcpFetch } = await import("../lib/mcp/client");
+      await expect(
+        createSafeMcpFetch()("https://93.184.216.34/mcp", {
+          method: "POST",
+          headers: {
+            "X-Custom-Secret": "fixture-key",
+            "mcp-session-id": "fixture-session",
+          },
+          body: "private tool arguments",
+        }),
+      ).rejects.toThrow(/cross-origin/i);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it("lets the real SDK discover tools through same-origin redirects", async () => {
+    const fetchMock = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = new URL(
+          typeof input === "string" || input instanceof URL ? input : input.url,
+        );
+        if (url.pathname === "/mcp") {
+          return new Response(null, {
+            status: 307,
+            headers: { location: "/canonical" },
+          });
+        }
+        if (init?.method !== "POST") return new Response(null, { status: 405 });
+        const request = JSON.parse(String(init.body));
+        if (request.id === undefined)
+          return new Response(null, { status: 202 });
+        return Response.json({
+          jsonrpc: "2.0",
+          id: request.id,
+          result:
+            request.method === "initialize"
+              ? {
+                  protocolVersion: request.params.protocolVersion,
+                  capabilities: { tools: {} },
+                  serverInfo: { name: "redirect-fixture", version: "1.0.0" },
+                }
+              : { tools: [{ name: "echo", inputSchema: { type: "object" } }] },
+        });
+      },
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const { discoverMcpTools } = await import("../lib/mcp/client");
+    await expect(
+      discoverMcpTools({
+        serverUrl: "https://93.184.216.34/mcp",
+        timeoutMs: 1_000,
+      }),
+    ).resolves.toMatchObject({
+      tools: [{ name: "echo" }],
+      transport: "streamable-http",
+    });
+    expect(
+      fetchMock.mock.calls.some(([input]) =>
+        String(input).endsWith("/canonical"),
+      ),
+    ).toBe(true);
+  });
+
+  it("honors redirect:error without dispatching the redirect", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(null, { status: 307, headers: { location: "/mcp/" } }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    const { createSafeMcpFetch } = await import("../lib/mcp/client");
+    await expect(
+      createSafeMcpFetch()("https://93.184.216.34/mcp", { redirect: "error" }),
+    ).rejects.toThrow(/redirect/i);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["streamable-http", "sse"] as const)(
+    "keeps %s credentials and request bodies away from redirected origins",
+    async (transport) => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce(
+          new Response(null, {
+            status: 307,
+            headers: { location: "https://93.184.216.35/collect" },
+          }),
+        )
+        .mockResolvedValue(new Response("Unexpected request", { status: 401 }));
+      vi.stubGlobal("fetch", fetchMock);
+      const { discoverMcpTools } = await import("../lib/mcp/client");
+      await expect(
+        discoverMcpTools({
+          serverUrl: "https://93.184.216.34/mcp",
+          transport,
+          staticHeaders: { "X-Custom-Secret": "fixture-secret" },
+          timeoutMs: 1_000,
+        }),
+      ).rejects.toThrow();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    },
+  );
 
   it("limits MCP response bodies before the SDK parses them", async () => {
     const encoder = new TextEncoder();

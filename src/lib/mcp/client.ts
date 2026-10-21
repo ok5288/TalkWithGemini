@@ -54,13 +54,6 @@ const MCP_REQUEST_TIMEOUT_MS = 30_000;
 const MCP_MAX_RESPONSE_BYTES = PLUGIN_EXECUTION_LIMITS.maxRequestBodyChars;
 const MCP_MAX_REDIRECTS = 5;
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
-const CROSS_ORIGIN_REDIRECT_SENSITIVE_HEADERS = [
-  "authorization",
-  "cookie",
-  "proxy-authorization",
-  "x-api-key",
-  "x-goog-api-key",
-];
 
 function resolveMcpServerUrl(
   serverUrl: string,
@@ -163,24 +156,6 @@ function limitMcpResponseBody(
   });
 }
 
-function stripCrossOriginRedirectHeaders(
-  init: RequestInit,
-  fromUrl: URL,
-  toUrl: URL,
-): RequestInit {
-  if (fromUrl.origin === toUrl.origin) return init;
-
-  const headers = new Headers(init.headers);
-  for (const header of CROSS_ORIGIN_REDIRECT_SENSITIVE_HEADERS) {
-    headers.delete(header);
-  }
-
-  return {
-    ...init,
-    headers,
-  };
-}
-
 function normalizeRedirectRequestInit(
   init: RequestInit,
   status: number,
@@ -222,6 +197,8 @@ export function createSafeMcpFetch(
     let requestInit: RequestInit = { ...init };
     const callerSignal =
       init?.signal ?? (input instanceof Request ? input.signal : undefined);
+    const redirectMode =
+      init?.redirect ?? (input instanceof Request ? input.redirect : "follow");
 
     for (
       let redirectCount = 0;
@@ -239,8 +216,17 @@ export function createSafeMcpFetch(
         redirect: "manual",
       });
 
-      if (!REDIRECT_STATUSES.has(response.status)) {
+      // The SDK supplies manual mode so it can enforce its own redirect policy.
+      if (
+        !REDIRECT_STATUSES.has(response.status) ||
+        redirectMode === "manual"
+      ) {
         return limitMcpResponseBody(response, maxResponseBytes);
+      }
+
+      if (redirectMode === "error") {
+        await response.body?.cancel().catch(() => undefined);
+        throw new Error("MCP redirect is not allowed");
       }
 
       const location = response.headers.get("location");
@@ -258,19 +244,17 @@ export function createSafeMcpFetch(
       await response.body?.cancel().catch(() => undefined);
       const redirectUrl = new URL(location, url);
       const validatedRedirect = validateOutboundUrl(redirectUrl, policy);
+      if (validatedRedirect.url.origin !== url.origin) {
+        throw new Error(
+          "Cross-origin MCP redirect is not allowed; configure the final server URL",
+        );
+      }
       await assertOutboundUrlAllowed(validatedRedirect.url, {
         policy,
         timeoutMs,
         signal: callerSignal || undefined,
       });
-      requestInit = normalizeRedirectRequestInit(
-        stripCrossOriginRedirectHeaders(
-          requestInit,
-          url,
-          validatedRedirect.url,
-        ),
-        response.status,
-      );
+      requestInit = normalizeRedirectRequestInit(requestInit, response.status);
       url = validatedRedirect.url;
       requestInput = url;
     }

@@ -180,11 +180,18 @@ export function getProviderApiKey(provider: ProviderRuntimeConfig): string {
 }
 
 export function isDefaultProviderUrl(baseUrl: string | undefined): boolean {
-  if (!baseUrl || !baseUrl.trim() || baseUrl === "default") return true;
-  const clean = trimBaseUrl(baseUrl);
-  return Object.values(DEFAULT_PROVIDER_API).some(
-    (entry) => clean === entry.baseUrl || clean.startsWith(entry.baseUrl),
-  );
+  const value = baseUrl?.trim();
+  if (!value || value === "default") return true;
+  try {
+    const clean = trimBaseUrl(new URL(value).href);
+    return Object.values(DEFAULT_PROVIDER_API).some(
+      (entry) =>
+        clean === entry.baseUrl ||
+        clean === `${entry.baseUrl}/${entry.version}`,
+    );
+  } catch {
+    return false;
+  }
 }
 
 export function getDefaultProviderBaseUrl(type: ProviderType): string {
@@ -192,7 +199,6 @@ export function getDefaultProviderBaseUrl(type: ProviderType): string {
   const rootUrl = DEFAULT_PROVIDER_API[normalized].baseUrl;
   return normalizeProviderBaseUrl(rootUrl, normalized);
 }
-
 
 export function redactUrl(url: string): string {
   try {
